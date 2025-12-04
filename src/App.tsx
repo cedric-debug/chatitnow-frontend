@@ -6,11 +6,9 @@ import AdUnit from './AdUnit';
 // --- CONFIGURATION ---
 const PROD_URL = "https://chatitnow-server.onrender.com"; 
 const ADSENSE_CLIENT_ID = "ca-pub-1806664183023369"; 
-
-// AD SLOTS
-const AD_SLOT_SQUARE = "4725306503";  // Searching Screen
-const AD_SLOT_VERTICAL = "1701533824"; // Inactivity Popup
-const AD_SLOT_TOP_BANNER = "9658354392"; // Chat Area Top Banner
+const AD_SLOT_SQUARE = "4725306503"; 
+const AD_SLOT_VERTICAL = "1701533824"; 
+const AD_SLOT_TOP_BANNER = "YOUR_NEW_AD_ID_HERE"; // Paste your new Banner ID here
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 const socket: Socket = io(SERVER_URL, { autoConnect: false });
@@ -55,7 +53,9 @@ export default function ChatItNow() {
       setPartnerStatus('connected');
       setIsConnected(true);
       setShowNextConfirm(false);
+      
       partnerNameRef.current = data.name; 
+
       setMessages([{ type: 'system', data: { name: data.name, field: data.field, action: 'connected' } }]);
       resetActivity();
     });
@@ -83,12 +83,11 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- DARK MODE & BROWSER PAINTING LOGIC ---
+  // --- DARK MODE LOGIC ---
   useEffect(() => {
     const root = window.document.documentElement;
-    const body = document.body;
     
-    // Manage meta tag for browser UI color
+    // Update meta tag for mobile browser bars
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
@@ -96,26 +95,17 @@ export default function ChatItNow() {
       document.head.appendChild(metaThemeColor);
     }
 
-    // Prevent scrolling/bouncing on the body itself
-    body.style.overscrollBehavior = 'none';
-
     if (darkMode) { 
       root.classList.add('dark'); 
-      // Force paint root elements dark
-      root.style.backgroundColor = '#111827'; 
-      body.style.backgroundColor = '#111827'; 
       metaThemeColor.setAttribute('content', '#111827');
     } else { 
       root.classList.remove('dark'); 
-      // Force paint root elements white
-      root.style.backgroundColor = '#ffffff'; 
-      body.style.backgroundColor = '#ffffff'; 
       metaThemeColor.setAttribute('content', '#ffffff');
     }
   }, [darkMode]);
 
-  // Clean up on mount
   useEffect(() => {
+    // Ensure we start fresh
     window.document.documentElement.classList.remove('dark');
   }, []);
 
@@ -184,7 +174,6 @@ export default function ChatItNow() {
 
   const renderSystemMessage = (msg: Message) => {
     if (!msg.data) return null;
-    // Force explicit colors via inline style to prevent CSS conflicts
     const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
     
     if (msg.data.action === 'connected') {
@@ -203,10 +192,9 @@ export default function ChatItNow() {
 
   if (showWelcome) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
+      <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6">
-             {/* Use custom logo if available in public folder */}
              <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
              <h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1>
              <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
@@ -220,7 +208,7 @@ export default function ChatItNow() {
 
   if (!isLoggedIn) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
+      <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1><p className="text-sm text-gray-600">Chat with Fellow Filipinos</p></div>
           <div className="space-y-4">
@@ -256,9 +244,10 @@ export default function ChatItNow() {
     );
   }
 
-  // --- MAIN CHAT INTERFACE (ABSOLUTE POSITIONING) ---
+  // --- MAIN CHAT INTERFACE ---
   return (
-    <div className={`fixed inset-0 flex flex-col items-center justify-center`}>
+    // FIXED: Removed bg color here, handled by index.css & body injection
+    <div className="fixed inset-0 flex flex-col items-center justify-center">
       
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
@@ -294,7 +283,7 @@ export default function ChatItNow() {
           </div>
         )}
 
-        {/* HEADER (Fixed Top) */}
+        {/* HEADER */}
         <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
@@ -308,14 +297,14 @@ export default function ChatItNow() {
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* CHAT AREA (Pinned Middle) */}
+        {/* CHAT AREA */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD - SCROLLABLE */}
+          {/* TOP BANNER AD */}
           <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
-                slotId={AD_SLOT_TOP_BANNER} // Uses the specific Banner Slot ID you requested
+                slotId={AD_SLOT_TOP_BANNER} // Uses new variable
                 format="horizontal" 
                 responsive="false"
                 style={{ display: 'block', maxHeight: '50px', width: '100%' }}
@@ -367,7 +356,7 @@ export default function ChatItNow() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* INPUT BAR (Fixed Bottom) */}
+        {/* INPUT BAR */}
         <div className={`absolute bottom-0 left-0 right-0 h-[60px] p-2 border-t z-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
           <div className="flex gap-2 items-center h-full">
             {partnerStatus === 'disconnected' ? (
