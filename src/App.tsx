@@ -83,44 +83,54 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME PAINTER (FIXED FOR IOS) ---
+  // --- THEME PAINTER: AGGRESSIVE MODE ---
   useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    
-    // 1. Find or Create the Theme Color Meta Tag (Controls Address Bar)
+    // Get DOM elements
+    const root = window.document.documentElement;
+    const body = window.document.body;
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
+    let metaApple = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
+
+    // Ensure meta tags exist
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
       metaThemeColor.setAttribute('name', 'theme-color');
       document.head.appendChild(metaThemeColor);
     }
+    if (!metaApple) {
+      metaApple = document.createElement('meta');
+      metaApple.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
+      document.head.appendChild(metaApple);
+    }
 
-    if (darkMode) { 
-      // === DARK MODE ===
-      html.classList.add('dark'); 
+    // --- APPLY COLORS ---
+    if (darkMode) {
+      // 1. CSS Class
+      root.classList.add('dark');
       
-      // Hard paint the background to Dark Blue (#111827 is Tailwind gray-900)
-      html.style.backgroundColor = '#111827'; 
-      body.style.backgroundColor = '#111827'; 
+      // 2. Direct DOM Painting (Fixes White Spots)
+      root.style.backgroundColor = '#111827';
+      body.style.backgroundColor = '#111827';
       
-      // Force the Browser Bars to match
-      metaThemeColor.setAttribute('content', '#111827'); 
+      // 3. Browser UI Painting
+      metaThemeColor.setAttribute('content', '#111827');
+      metaApple.setAttribute('content', 'black-translucent'); // For iOS
       
-    } else { 
-      // === LIGHT MODE ===
-      html.classList.remove('dark'); 
+    } else {
+      // 1. CSS Class
+      root.classList.remove('dark');
       
-      // Hard paint the background to White
-      html.style.backgroundColor = '#ffffff'; 
-      body.style.backgroundColor = '#ffffff'; 
+      // 2. Direct DOM Painting
+      root.style.backgroundColor = '#ffffff';
+      body.style.backgroundColor = '#ffffff';
       
-      // Force the Browser Bars to match
+      // 3. Browser UI Painting
       metaThemeColor.setAttribute('content', '#ffffff');
+      metaApple.setAttribute('content', 'default'); // For iOS
     }
   }, [darkMode]);
 
-  // Ensure clean start
+  // Clean Start
   useEffect(() => {
     window.document.documentElement.classList.remove('dark');
     document.body.style.backgroundColor = '#ffffff';
@@ -209,7 +219,7 @@ export default function ChatItNow() {
 
   if (showWelcome) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6">
              <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
@@ -225,7 +235,7 @@ export default function ChatItNow() {
 
   if (!isLoggedIn) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1><p className="text-sm text-gray-600">Chat with Fellow Filipinos</p></div>
           <div className="space-y-4">
@@ -263,9 +273,9 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
+    // Layout: Absolute Pinning to prevent stretching
     <div className={`fixed inset-0 flex flex-col items-center justify-center`}>
       
-      {/* APP SHELL */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl sm:border-x
