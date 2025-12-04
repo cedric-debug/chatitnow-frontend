@@ -83,19 +83,21 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME PAINTER: AGGRESSIVE MODE ---
+  // --- MASTER COLOR CONTROLLER ---
+  // This useEffect controls HTML class, Body Background, and Meta Tags all at once.
   useEffect(() => {
-    // Get DOM elements
-    const root = window.document.documentElement;
-    const body = window.document.body;
-    let metaThemeColor = document.querySelector("meta[name='theme-color']");
+    const html = document.documentElement;
+    const body = document.body;
+    
+    // 1. Get Meta Tags
+    let metaTheme = document.querySelector("meta[name='theme-color']");
     let metaApple = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
 
-    // Ensure meta tags exist
-    if (!metaThemeColor) {
-      metaThemeColor = document.createElement('meta');
-      metaThemeColor.setAttribute('name', 'theme-color');
-      document.head.appendChild(metaThemeColor);
+    // 2. Create if missing
+    if (!metaTheme) {
+      metaTheme = document.createElement('meta');
+      metaTheme.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaTheme);
     }
     if (!metaApple) {
       metaApple = document.createElement('meta');
@@ -103,34 +105,23 @@ export default function ChatItNow() {
       document.head.appendChild(metaApple);
     }
 
-    // --- APPLY COLORS ---
+    // 3. Apply Colors
     if (darkMode) {
-      // 1. CSS Class
-      root.classList.add('dark');
-      
-      // 2. Direct DOM Painting (Fixes White Spots)
-      root.style.backgroundColor = '#111827';
-      body.style.backgroundColor = '#111827';
-      
-      // 3. Browser UI Painting
-      metaThemeColor.setAttribute('content', '#111827');
-      metaApple.setAttribute('content', 'black-translucent'); // For iOS
-      
+      // Dark Mode Settings
+      html.classList.add('dark');
+      body.style.backgroundColor = '#111827'; // Tailwind gray-900
+      metaTheme.setAttribute('content', '#111827'); // Matches body
+      metaApple.setAttribute('content', 'black-translucent'); // iOS specific
     } else {
-      // 1. CSS Class
-      root.classList.remove('dark');
-      
-      // 2. Direct DOM Painting
-      root.style.backgroundColor = '#ffffff';
-      body.style.backgroundColor = '#ffffff';
-      
-      // 3. Browser UI Painting
-      metaThemeColor.setAttribute('content', '#ffffff');
-      metaApple.setAttribute('content', 'default'); // For iOS
+      // Light Mode Settings
+      html.classList.remove('dark');
+      body.style.backgroundColor = '#ffffff'; // White
+      metaTheme.setAttribute('content', '#ffffff'); // Matches body
+      metaApple.setAttribute('content', 'default'); // iOS specific
     }
   }, [darkMode]);
 
-  // Clean Start
+  // Initial Clean State
   useEffect(() => {
     window.document.documentElement.classList.remove('dark');
     document.body.style.backgroundColor = '#ffffff';
@@ -273,9 +264,9 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-    // Layout: Absolute Pinning to prevent stretching
     <div className={`fixed inset-0 flex flex-col items-center justify-center`}>
       
+      {/* APP SHELL */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl sm:border-x
