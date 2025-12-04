@@ -1,11 +1,15 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark"> <!-- Default to class="dark" initially -->
   <head>
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1806664183023369" crossorigin="anonymous"></script>
     <meta charset="UTF-8" />
     
-    <!-- FIXED VIEWPORT: This prevents zooming and white bars on iOS/Android -->
+    <!-- PREVENT ZOOMING & HANDLE VIEWPORT -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    
+    <!-- STATUS BAR COLORS (iOS/Android) -->
+    <meta name="theme-color" content="#111827" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
     <link rel="icon" type="image/svg+xml" href="/logofinal.png" />
     <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
@@ -15,10 +19,20 @@
     <meta name="apple-mobile-web-app-title" content="ChatItNow" />
     <link rel="manifest" href="/site.webmanifest" />
     
-    <!-- Default theme color (will be updated by React) -->
-    <meta name="theme-color" content="#ffffff" />
-    
     <title>ChatItNow</title>
+
+    <!-- INSTANT CSS FIX: Forces background color before React loads -->
+    <style>
+      html, body {
+        background-color: #111827; /* Dark Gray */
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+        overflow: hidden; /* Lock scroll on body, let React handle it */
+        -webkit-tap-highlight-color: transparent;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

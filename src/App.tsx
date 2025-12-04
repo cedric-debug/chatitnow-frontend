@@ -31,7 +31,8 @@ export default function ChatItNow() {
   const [isConnected, setIsConnected] = useState(false);
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  // Default to TRUE for Dark Mode so it matches index.html
+  const [darkMode, setDarkMode] = useState(true);
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showSearching, setShowSearching] = useState(false);
   const [isTyping, setIsTyping] = useState(false); 
@@ -88,8 +89,9 @@ export default function ChatItNow() {
     const root = window.document.documentElement;
     const body = document.body;
     
-    // Ensure the meta tag exists
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
+    
+    // Create meta tag if missing (fallback)
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
       metaThemeColor.setAttribute('name', 'theme-color');
@@ -97,30 +99,19 @@ export default function ChatItNow() {
     }
 
     if (darkMode) { 
-      // DARK MODE ACTIVE
       root.classList.add('dark'); 
-      // 1. Paint the HTML tag
+      // Hard paint the browser background
       root.style.backgroundColor = '#111827'; 
-      // 2. Paint the Body tag
       body.style.backgroundColor = '#111827'; 
-      // 3. Tell the Browser (Safari/Chrome) to change its bar color
       metaThemeColor.setAttribute('content', '#111827');
     } else { 
-      // LIGHT MODE ACTIVE
       root.classList.remove('dark'); 
-      // 1. Paint the HTML tag
+      // Hard paint the browser background
       root.style.backgroundColor = '#ffffff'; 
-      // 2. Paint the Body tag
       body.style.backgroundColor = '#ffffff'; 
-      // 3. Tell the Browser (Safari/Chrome) to change its bar color
       metaThemeColor.setAttribute('content', '#ffffff');
     }
   }, [darkMode]);
-
-  // Force cleanup on mount
-  useEffect(() => {
-    window.document.documentElement.classList.remove('dark');
-  }, []);
 
   useEffect(() => {
     if (isConnected) {
@@ -205,14 +196,14 @@ export default function ChatItNow() {
 
   if (showWelcome) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto relative z-10">
           <div className="text-center mb-6">
              <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
              <h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1>
              <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
           </div>
-          <div className="space-y-4 text-gray-700 text-sm sm:text-base"><p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p><p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p><p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p><p className="text-gray-600">ChatItNow is completely free and anonymous. Connect with fellow Filipinos, one conversation at a time.</p></div>
+          <div className="space-y-4 text-gray-700 text-sm sm:text-base"><p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p><p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p><p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p><p className="text-gray-600">ChatItNow is completely free, anonymous, and designed with your safety in mind. Connect with fellow Filipinos, one conversation at a time.</p></div>
           <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
         </div>
       </div>
@@ -221,8 +212,8 @@ export default function ChatItNow() {
 
   if (!isLoggedIn) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto relative z-10">
           <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1><p className="text-sm text-gray-600">Chat with Fellow Filipinos</p></div>
           <div className="space-y-4">
             <div><label className="block text-sm font-semibold text-gray-700 mb-1.5">Choose a Username</label><input type="text" value={username} onChange={(e) => setUsername(e.target.value)} onKeyPress={handleKeyPress} placeholder="Enter username..." className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm" maxLength={20} /></div>
@@ -236,7 +227,7 @@ export default function ChatItNow() {
         </div>
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto relative z-50">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
               <div className="space-y-4 text-sm text-gray-700">
                 <p>Last updated: December 5, 2025</p>
@@ -261,7 +252,6 @@ export default function ChatItNow() {
   return (
     <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
       
-      {/* APP SHELL */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl sm:border-x
