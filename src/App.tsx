@@ -31,8 +31,7 @@ export default function ChatItNow() {
   const [isConnected, setIsConnected] = useState(false);
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
-  // Default to TRUE (Dark Mode) to match the HTML background
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showSearching, setShowSearching] = useState(false);
   const [isTyping, setIsTyping] = useState(false); 
@@ -84,33 +83,41 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- DARK MODE & BROWSER PAINTING LOGIC ---
+  // --- THEME PAINTER: Fixes Mobile Browser Bars ---
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
-    
-    let metaThemeColor = document.querySelector("meta[name='theme-color']");
-    
-    if (!metaThemeColor) {
-      metaThemeColor = document.createElement('meta');
-      metaThemeColor.setAttribute('name', 'theme-color');
-      document.head.appendChild(metaThemeColor);
-    }
+    // Grab the meta tag defined in index.html
+    const metaThemeColor = document.querySelector("meta[name='theme-color']");
 
     if (darkMode) { 
       // DARK MODE
       html.classList.add('dark'); 
-      // Force paint the body (fixes white spots)
+      
+      // 1. Force HTML/Body Background (Overscroll area)
+      html.style.backgroundColor = '#111827'; 
       body.style.backgroundColor = '#111827'; 
-      metaThemeColor.setAttribute('content', '#111827');
+      
+      // 2. Force Browser Interface (Notch/Address Bar)
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#111827');
     } else { 
       // LIGHT MODE
       html.classList.remove('dark'); 
-      // Force paint the body
+      
+      // 1. Force HTML/Body Background
+      html.style.backgroundColor = '#ffffff'; 
       body.style.backgroundColor = '#ffffff'; 
-      metaThemeColor.setAttribute('content', '#ffffff');
+      
+      // 2. Force Browser Interface
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#ffffff');
     }
   }, [darkMode]);
+
+  // Ensure clean start
+  useEffect(() => {
+    window.document.documentElement.classList.remove('dark');
+    document.body.style.backgroundColor = '#ffffff';
+  }, []);
 
   useEffect(() => {
     if (isConnected) {
@@ -177,6 +184,7 @@ export default function ChatItNow() {
 
   const renderSystemMessage = (msg: Message) => {
     if (!msg.data) return null;
+    // Inline styles override Tailwind to guarantee color switch
     const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
     
     if (msg.data.action === 'connected') {
@@ -226,7 +234,7 @@ export default function ChatItNow() {
         </div>
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto relative z-50">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
               <div className="space-y-4 text-sm text-gray-700">
                 <p>Last updated: December 5, 2025</p>
@@ -348,9 +356,9 @@ export default function ChatItNow() {
             <div className="flex justify-start w-full">
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border border-gray-100`}>
                 <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></div>
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-150"></div>
+                  <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce delay-75"></div>
+                  <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce delay-150"></div>
                 </div>
               </div>
             </div>
