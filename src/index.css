@@ -2,32 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 1. Define the colors in one place */
+/* 1. Define Variables & Color Scheme */
 :root {
-  --app-bg: #ffffff; /* Pure White for Light Mode */
-  --app-text: #000000;
+  --bg-color: #ffffff;
+  color-scheme: light; /* CRITICAL: Tells browser UI to be light */
 }
 
 :root.dark {
-  --app-bg: #111827; /* Gray-900 for Dark Mode */
-  --app-text: #ffffff;
+  --bg-color: #111827; /* gray-900 */
+  color-scheme: dark; /* CRITICAL: Tells browser UI to be dark */
 }
 
-/* 2. Force the browser canvas to match */
-html, body {
-  background-color: var(--app-bg);
-  color: var(--app-text);
+/* 2. Apply to Canvas */
+html {
+  background-color: var(--bg-color);
   height: 100%;
   width: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 3. Apply to Body */
+body {
+  background-color: var(--bg-color);
   margin: 0;
   padding: 0;
-  overscroll-behavior: none; /* Stop the bounce */
-  -webkit-tap-highlight-color: transparent;
-  transition: background-color 0.2s ease; /* Smooth transition */
+  min-height: 100dvh;
+  width: 100%;
+  overscroll-behavior: none; /* Stops white bounce */
+  transition: background-color 0.2s ease;
 }
 
 #root {
   height: 100%;
   width: 100%;
-  background-color: var(--app-bg);
 }
