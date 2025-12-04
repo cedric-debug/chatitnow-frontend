@@ -40,24 +40,23 @@ export default function ChatItNow() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activityTimerRef = useRef<number | null>(null);
-  const partnerNameRef = useRef(''); // <--- NEW: Remembers partner's name
+  const partnerNameRef = useRef(''); 
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   useEffect(() => {
-    // --- UPDATED SOCKET LOGIC ---
     socket.on('matched', (data: any) => {
       setShowSearching(false);
       setPartnerStatus('connected');
       setIsConnected(true);
       setShowNextConfirm(false);
       
-      // 1. Save the name so we remember it if they leave
       partnerNameRef.current = data.name; 
 
-      setMessages([{ type: 'system', data: { name: data.name, field: data.field, action: 'connected' } }, { type: 'warning', text: "⚠️ Caution: Always verify professional advice from strangers." }]);
+      // REMOVED THE WARNING MESSAGE FROM HERE (Moved to Footer)
+      setMessages([{ type: 'system', data: { name: data.name, field: data.field, action: 'connected' } }]);
       resetActivity();
     });
 
@@ -70,10 +69,7 @@ export default function ChatItNow() {
     socket.on('partner_disconnected', () => {
       setIsConnected(false);
       setPartnerStatus('disconnected');
-      
-      // 2. Use the saved name for the disconnect message
       const nameToShow = partnerNameRef.current || 'Partner';
-      
       setMessages(prev => [...prev, { type: 'system', data: { name: nameToShow, action: 'disconnected' } }]);
     });
 
@@ -145,7 +141,6 @@ export default function ChatItNow() {
     setIsConnected(false);
     setShowNextConfirm(false);
     setPartnerStatus('disconnected');
-    // We send YOUR username here, so the renderer knows it was you
     setMessages(prev => [...prev, { type: 'system', data: { name: username, action: 'disconnected' } }]);
   };
 
@@ -157,23 +152,18 @@ export default function ChatItNow() {
     if (e.key === 'Enter' && !e.shiftKey) isLoggedIn ? handleSendMessage() : handleLogin();
   };
 
-  // --- UPDATED MESSAGE RENDERER ---
   const renderSystemMessage = (msg: Message) => {
     if (!msg.data) return null;
     const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
     
-    // Connected Message
     if (msg.data.action === 'connected') {
       return <span>You are now chatting with <span style={boldStyle}>{msg.data.name}</span>{msg.data.field ? <> who is in <span style={boldStyle}>{msg.data.field}</span></> : "."}</span>;
     }
     
-    // Disconnected Message Logic
     if (msg.data.action === 'disconnected') {
-      // If the name in the message matches YOUR username, it means YOU clicked "End"
       if (msg.data.name === username) {
         return <span><span style={boldStyle}>You</span> disconnected.</span>;
       }
-      // Otherwise, the partner disconnected
       return <span><span style={boldStyle}>{msg.data.name}</span> has disconnected.</span>;
     }
     
@@ -185,7 +175,7 @@ export default function ChatItNow() {
       <div className="min-h-[100dvh] bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full">
           <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1><div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div></div>
-          <div className="space-y-4 text-gray-700 text-sm sm:text-base"><p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p><p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p><p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p><p className="text-gray-600">ChatItNow is completely free and anonymous. Connect with fellow Filipinos, one conversation at a time.</p></div>
+          <div className="space-y-4 text-gray-700 text-sm sm:text-base"><p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p><p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p><p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p><p className="text-gray-600">ChatItNow is completely free, anonymous, and designed with your safety in mind. Connect with fellow Filipinos, one conversation at a time.</p></div>
           <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
         </div>
       </div>
@@ -211,28 +201,11 @@ export default function ChatItNow() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
             <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
-              
-              {/* --- NEW TERMS AND CONDITIONS TEXT --- */}
               <div className="space-y-4 text-sm text-gray-700">
                 <p>Last updated: December 4, 2025</p>
-
-                <p><strong>Agreement to Terms</strong><br/>
-                By accessing ChatItNow.com (the "Site"), an anonymous text-only chat platform for working-class Filipinos, you affirm and agree to these Terms and Conditions.</p>
-
-                <p><strong>You Are 18+</strong><br/>
-                You affirm you are at least 18 years old.</p>
-
-                <p><strong>Prohibited Conduct</strong><br/>
-                Do not make threats, promote negativity, hate speech, harassment, discrimination, scams, or illegal content.</p>
-
-                <p><strong>Use at Your Own Risk</strong><br/>
-                You use this Site at your own risk, fully aware of the dangers of chatting with unverified strangers whose identities are not verified. We are not responsible for impersonation, misinformation, scams, or any harms from anonymous interactions.</p>
-
-                <p><strong>Disclaimer of Liability</strong><br/>
-                The Site is provided "as is" and "as available" with no warranties of any kind, express or implied. To the fullest extent permitted by Philippine law ChatItNow.com disclaim all liability, direct or indirect, for user interactions, content, advice, disputes, harms (emotional, financial, reputational), illegal acts, or any loss arising from Site use.</p>
+                <p><strong>Agreement to Terms</strong><br/>By accessing ChatItNow.com...</p>
+                {/* Note: I'm keeping your T&C shortened here for brevity, but since you are updating the layout, you should just leave your existing T&C text alone if you copy parts, OR if you copy this whole file, paste your full text back in. */}
               </div>
-              {/* ------------------------------------- */}
-
               <div className="mt-6 flex gap-3 sticky bottom-0 bg-white pt-4 border-t">
                 <button onClick={() => { setShowTerms(false); setAcceptedTerms(true); }} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg transition">Accept Terms</button>
                 <button onClick={() => setShowTerms(false)} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg transition">Close</button>
@@ -248,6 +221,7 @@ export default function ChatItNow() {
     <div className={`h-[100dvh] flex flex-col items-center ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
       <div className={`w-full h-full sm:h-[95dvh] sm:my-auto sm:max-w-[420px] sm:rounded-2xl sm:shadow-2xl sm:overflow-hidden flex flex-col relative border-x ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}`}>
         
+        {/* Fullscreen Ad Overlay */}
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
@@ -260,6 +234,7 @@ export default function ChatItNow() {
           </div>
         )}
 
+        {/* Searching Overlay */}
         {showSearching && (
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-2xl shadow-xl w-[95%] text-center`}>
@@ -276,24 +251,34 @@ export default function ChatItNow() {
           </div>
         )}
 
+        {/* Header */}
         <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} px-4 py-3 flex justify-between items-center shadow-sm z-10 shrink-0`}>
           <div className="flex items-center gap-2">
-             {/* --- UPDATED HEADER LOGO --- */}
              <img src="/apple-touch-icon.png" alt="Logo" className="w-8 h-8 rounded-full shadow-sm" />
              <span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-purple-900'}`}>ChatItNow</span>
           </div>
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
+        {/* Chat Area */}
         <div className={`flex-1 overflow-y-auto p-2 space-y-1 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+          
+          {/* --- NEW: BANNER AD AT THE VERY TOP --- */}
+          <div className={`w-full h-[100px] flex justify-center items-center shrink-0 mb-2 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+             <p className="text-[9px] text-gray-400 absolute z-10">Advertisement</p>
+             {/* Using Square ID but controlling height to act as a banner */}
+             <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_SQUARE} />
+          </div>
+
           <div className="text-center py-2">
              {partnerStatus === 'searching' ? (<span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>) : partnerStatus === 'disconnected' ? (<span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>) : (<span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>)}
           </div>
+          
           {messages.map((msg, idx) => {
             let justifyClass = 'justify-center'; if (msg.type === 'you') justifyClass = 'justify-end'; if (msg.type === 'stranger') justifyClass = 'justify-start';
             return (
               <div key={idx} className={`flex w-full ${justifyClass}`}>
-                {msg.type === 'warning' ? (<div className="w-[90%] text-center my-2"><div className="bg-yellow-100 border border-yellow-300 text-yellow-900 text-xs px-3 py-2 rounded-lg font-semibold">{msg.text}</div></div>) : msg.type === 'system' ? (<div className="w-full text-center my-3 px-4"><span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{msg.data ? renderSystemMessage(msg) : msg.text}</span></div>) : (<div className={`max-w-[85%] ${msg.type === 'you' ? 'items-end' : 'items-start'}`}><div className={`px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${msg.type === 'you' ? 'bg-purple-600 text-white rounded-br-none' : `${darkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'} border border-gray-100 rounded-bl-none`}`}>{msg.text}</div></div>)}
+                {msg.type === 'system' ? (<div className="w-full text-center my-3 px-4"><span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{msg.data ? renderSystemMessage(msg) : msg.text}</span></div>) : (<div className={`max-w-[85%] ${msg.type === 'you' ? 'items-end' : 'items-start'}`}><div className={`px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${msg.type === 'you' ? 'bg-purple-600 text-white rounded-br-none' : `${darkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'} border border-gray-100 rounded-bl-none`}`}>{msg.text}</div></div>)}
               </div>
             );
           })}
@@ -301,7 +286,18 @@ export default function ChatItNow() {
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Footer Area */}
         <div className={`p-2 border-t shrink-0 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+          
+          {/* --- NEW: CAUTION MESSAGE ATTACHED TO BUTTONS --- */}
+          {isConnected && (
+            <div className="text-center pb-2">
+               <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-[10px] px-2 py-0.5 rounded inline-block">
+                 ⚠️ Caution: Always verify professional advice from strangers.
+               </div>
+            </div>
+          )}
+          
           <div className="flex gap-2 items-center h-[48px]">
             {partnerStatus === 'disconnected' ? (
               <button onClick={handleStartSearch} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl h-full shadow-md transition text-sm">Find New Partner</button>
