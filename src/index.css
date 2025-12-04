@@ -2,28 +2,27 @@
 @tailwind components;
 @tailwind utilities;
 
-/* --- MOBILE BROWSER BACKGROUND FIX --- */
+/* --- FIX MOBILE WHITE BACKGROUND --- */
 :root {
   background-color: #ffffff;
 }
+
 :root.dark {
   background-color: #111827;
 }
-html {
+
+/* Force the actual HTML page to change color */
+html, body {
   height: 100%;
-  height: -webkit-fill-available;
-  background-color: inherit;
-}
-body {
+  width: 100%;
   margin: 0;
   padding: 0;
-  background-color: inherit;
-  min-height: 100vh;
-  min-height: -webkit-fill-available;
-  width: 100%;
-  overscroll-behavior-y: none;
+  background-color: inherit; /* Follows the root class */
+  overscroll-behavior: none; /* Stops the white "bounce" area */
+  -webkit-tap-highlight-color: transparent;
 }
+
 #root {
-  width: 100%;
   height: 100%;
+  width: 100%;
 }

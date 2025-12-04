@@ -31,10 +31,7 @@ export default function ChatItNow() {
   const [isConnected, setIsConnected] = useState(false);
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
-  
-  // CHANGED: Default to FALSE (Light Mode)
   const [darkMode, setDarkMode] = useState(false);
-  
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showSearching, setShowSearching] = useState(false);
   const [isTyping, setIsTyping] = useState(false); 
@@ -86,11 +83,12 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- DARK MODE & BROWSER PAINTING LOGIC ---
+  // --- THEME PAINTER: Fixes White Bars on Mobile ---
   useEffect(() => {
     const root = window.document.documentElement;
     const body = document.body;
     
+    // Find or create the meta tag that controls the browser UI color
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
@@ -99,19 +97,25 @@ export default function ChatItNow() {
     }
 
     if (darkMode) { 
-      // Switch to Dark
       root.classList.add('dark'); 
+      // Force Paint Dark
       root.style.backgroundColor = '#111827'; 
       body.style.backgroundColor = '#111827'; 
-      metaThemeColor.setAttribute('content', '#111827');
+      metaThemeColor.setAttribute('content', '#111827'); // Browser Bar Dark
     } else { 
-      // Switch to Light
       root.classList.remove('dark'); 
+      // Force Paint White
       root.style.backgroundColor = '#ffffff'; 
       body.style.backgroundColor = '#ffffff'; 
-      metaThemeColor.setAttribute('content', '#ffffff');
+      metaThemeColor.setAttribute('content', '#ffffff'); // Browser Bar White
     }
   }, [darkMode]);
+
+  useEffect(() => {
+    // Start fresh on load
+    window.document.documentElement.classList.remove('dark');
+    document.body.style.backgroundColor = '#ffffff';
+  }, []);
 
   useEffect(() => {
     if (isConnected) {
@@ -196,7 +200,7 @@ export default function ChatItNow() {
 
   if (showWelcome) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
+      <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6">
              <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
@@ -212,7 +216,7 @@ export default function ChatItNow() {
 
   if (!isLoggedIn) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
+      <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1><p className="text-sm text-gray-600">Chat with Fellow Filipinos</p></div>
           <div className="space-y-4">
@@ -227,7 +231,7 @@ export default function ChatItNow() {
         </div>
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto relative z-50">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
               <div className="space-y-4 text-sm text-gray-700">
                 <p>Last updated: December 5, 2025</p>
@@ -250,7 +254,7 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-    <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
+    <div className={`fixed inset-0 flex flex-col items-center justify-center`}>
       
       {/* APP SHELL */}
       <div className={`
@@ -348,7 +352,7 @@ export default function ChatItNow() {
           
           {isTyping && (
             <div className="flex justify-start w-full">
-              <div className={`${darkMode ? 'bg-gray-800' : 'bg-gray-100'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border border-gray-100`}>
+              <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border border-gray-100`}>
                 <div className="flex gap-1">
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></div>
