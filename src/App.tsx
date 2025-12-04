@@ -83,11 +83,14 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME CONTROLLER ---
+  // --- THEME CONTROLLER (CSS Variable Method) ---
   useEffect(() => {
     const html = document.documentElement;
     
-    // Meta tag for address bar color
+    // We only update the class 'dark' on HTML.
+    // The CSS file handles the actual background color change via variables.
+    
+    // We still manually update the Meta Tag for the browser UI (Address bar)
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
@@ -97,12 +100,17 @@ export default function ChatItNow() {
 
     if (darkMode) { 
       html.classList.add('dark'); 
-      metaThemeColor.setAttribute('content', '#111827'); 
+      metaThemeColor.setAttribute('content', '#111827'); // Dark Blue
     } else { 
       html.classList.remove('dark'); 
-      metaThemeColor.setAttribute('content', '#ffffff'); 
+      metaThemeColor.setAttribute('content', '#ffffff'); // White
     }
   }, [darkMode]);
+
+  useEffect(() => {
+    // Start fresh in Light mode
+    document.documentElement.classList.remove('dark');
+  }, []);
 
   useEffect(() => {
     if (isConnected) {
@@ -187,8 +195,7 @@ export default function ChatItNow() {
 
   if (showWelcome) {
     return (
-      // Double Protection: Uses CSS var AND Tailwind classes
-      <div className={`fixed inset-0 flex items-center justify-center p-4 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+      <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6">
              <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
@@ -204,7 +211,7 @@ export default function ChatItNow() {
 
   if (!isLoggedIn) {
     return (
-      <div className={`fixed inset-0 flex items-center justify-center p-4 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+      <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1><p className="text-sm text-gray-600">Chat with Fellow Filipinos</p></div>
           <div className="space-y-4">
@@ -242,9 +249,10 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-    // Outer Wrapper: Explicitly toggles bg-gray-900 / bg-white
-    <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+    // Background color is handled by index.css variables, but we add flex center here
+    <div className={`fixed inset-0 flex flex-col items-center justify-center`}>
       
+      {/* APP SHELL */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl sm:border-x

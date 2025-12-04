@@ -2,37 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 1. Define Variables & Color Scheme */
+/* 1. Define the background color variable */
 :root {
-  --bg-color: #ffffff;
-  color-scheme: light; /* CRITICAL: Tells browser UI to be light */
+  --bg-color: #ffffff; /* Default White */
 }
 
+/* When "dark" class is present on HTML tag */
 :root.dark {
-  --bg-color: #111827; /* gray-900 */
-  color-scheme: dark; /* CRITICAL: Tells browser UI to be dark */
+  --bg-color: #111827; /* Tailwind gray-900 */
 }
 
-/* 2. Apply to Canvas */
+/* 2. Force the browser canvas to use this variable */
 html {
-  background-color: var(--bg-color);
+  background-color: var(--bg-color) !important;
   height: 100%;
   width: 100%;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 3. Apply to Body */
+/* 3. Force the body to fill the screen and use the variable */
 body {
-  background-color: var(--bg-color);
+  background-color: var(--bg-color) !important;
   margin: 0;
   padding: 0;
-  min-height: 100dvh;
+  min-height: 100dvh; /* Uses dynamic viewport height */
   width: 100%;
-  overscroll-behavior: none; /* Stops white bounce */
-  transition: background-color 0.2s ease;
+  overscroll-behavior: none; /* Prevents white bounce effect */
+  transition: background-color 0.1s ease;
 }
 
 #root {
   height: 100%;
   width: 100%;
+  background-color: var(--bg-color) !important;
 }
