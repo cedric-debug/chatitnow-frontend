@@ -181,8 +181,8 @@ export default function ChatItNow() {
 
   if (showWelcome) {
     return (
-      <div className="min-h-[100dvh] bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full">
+      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1><div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div></div>
           <div className="space-y-4 text-gray-700 text-sm sm:text-base"><p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p><p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p><p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p><p className="text-gray-600">ChatItNow is completely free, anonymous, and designed with your safety in mind. Connect with fellow Filipinos, one conversation at a time.</p></div>
           <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
@@ -193,8 +193,8 @@ export default function ChatItNow() {
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-[100dvh] bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full">
+      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1><p className="text-sm text-gray-600">Chat with Fellow Filipinos</p></div>
           <div className="space-y-4">
             <div><label className="block text-sm font-semibold text-gray-700 mb-1.5">Choose a Username</label><input type="text" value={username} onChange={(e) => setUsername(e.target.value)} onKeyPress={handleKeyPress} placeholder="Enter username..." className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm" maxLength={20} /></div>
@@ -226,10 +226,21 @@ export default function ChatItNow() {
     );
   }
 
+  // --- MAIN CHAT INTERFACE ---
   return (
-    <div className={`h-[100dvh] flex flex-col items-center ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
-      <div className={`w-full h-full sm:h-[95dvh] sm:my-auto sm:max-w-[420px] sm:rounded-2xl sm:shadow-2xl sm:overflow-hidden flex flex-col relative border-x ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}`}>
+    // FIXED: Use h-[100dvh] and w-full for the outer wrapper to catch all screen size
+    <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
+      
+      {/* 
+         LAYOUT FIX: 
+         - h-full (fills the viewport) 
+         - max-h-[100dvh] (prevents growing beyond screen)
+         - flex-col (organizes header, chat, input vertically)
+         - This effectively creates the "App Window"
+      */}
+      <div className={`w-full h-full sm:h-[95dvh] sm:max-h-[800px] sm:max-w-[420px] sm:rounded-2xl sm:shadow-2xl flex flex-col relative border-x overflow-hidden ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}`}>
         
+        {/* Ads Overlay */}
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
@@ -242,6 +253,7 @@ export default function ChatItNow() {
           </div>
         )}
 
+        {/* Searching Overlay */}
         {showSearching && (
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-2xl shadow-xl w-[95%] text-center`}>
@@ -258,42 +270,78 @@ export default function ChatItNow() {
           </div>
         )}
 
+        {/* HEADER (Fixed Height, Shrink 0) */}
         <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} px-4 py-3 flex justify-between items-center shadow-sm z-10 shrink-0`}>
-          <div className="flex items-center gap-2"><div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">C</div><span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-purple-900'}`}>ChatItNow</span></div>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">C</div>
+            <span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-purple-900'}`}>ChatItNow</span>
+          </div>
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* CHAT AREA - Ad is moved INSIDE here so it scrolls */}
-        <div className={`flex-1 overflow-y-auto p-2 space-y-1 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        {/* 
+           CHAT AREA (Flex-1, Scrollable) 
+           min-h-0 is CRITICAL for nested flex scrolling 
+        */}
+        <div className={`flex-1 overflow-y-auto min-h-0 p-2 space-y-1 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* --- TOP BANNER AD (Now scrollable) --- */}
-          <div className="w-full flex justify-center pb-2">
-             <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
-                <AdUnit 
-                   client={ADSENSE_CLIENT_ID} 
-                   slotId={AD_SLOT_SQUARE} 
-                   format="horizontal" 
-                   responsive="false"
-                   style={{ display: 'block', maxHeight: '50px', width: '100%' }}
-                />
-             </div>
+          {/* BANNER AD (Scrolls with messages) */}
+          <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+             <AdUnit 
+                client={ADSENSE_CLIENT_ID} 
+                slotId={AD_SLOT_SQUARE} 
+                format="horizontal" 
+                responsive="false"
+                style={{ display: 'block', maxHeight: '50px', width: '100%' }}
+             />
           </div>
 
           <div className="text-center py-2">
              {partnerStatus === 'searching' ? (<span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>) : partnerStatus === 'disconnected' ? (<span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>) : (<span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>)}
           </div>
+
           {messages.map((msg, idx) => {
             let justifyClass = 'justify-center'; if (msg.type === 'you') justifyClass = 'justify-end'; if (msg.type === 'stranger') justifyClass = 'justify-start';
             return (
               <div key={idx} className={`flex w-full ${justifyClass}`}>
-                {msg.type === 'warning' ? (<div className="w-[90%] text-center my-2"><div className="bg-yellow-100 border border-yellow-300 text-yellow-900 text-xs px-3 py-2 rounded-lg font-semibold">{msg.text}</div></div>) : msg.type === 'system' ? (<div className="w-full text-center my-3 px-4"><span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{msg.data ? renderSystemMessage(msg) : msg.text}</span></div>) : (<div className={`max-w-[85%] ${msg.type === 'you' ? 'items-end' : 'items-start'}`}><div className={`px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${msg.type === 'you' ? 'bg-purple-600 text-white rounded-br-none' : `${darkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'} border border-gray-100 rounded-bl-none`}`}>{msg.text}</div></div>)}
+                {msg.type === 'warning' ? (
+                  <div className="w-[90%] text-center my-2">
+                    <div className="bg-yellow-100 border border-yellow-300 text-yellow-900 text-xs px-3 py-2 rounded-lg font-semibold">{msg.text}</div>
+                  </div>
+                ) : msg.type === 'system' ? (
+                  <div className="w-full text-center my-3 px-4">
+                    <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{msg.data ? renderSystemMessage(msg) : msg.text}</span>
+                  </div>
+                ) : (
+                  <div className={`max-w-[85%] ${msg.type === 'you' ? 'items-end' : 'items-start'}`}>
+                    <div className={`px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
+                      msg.type === 'you'
+                        ? 'bg-purple-600 text-white rounded-br-none' 
+                        : `${darkMode ? 'bg-gray-800 text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
+                    }`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
-          {isTyping && (<div className="flex justify-start w-full"><div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border border-gray-100`}><div className="flex gap-1"><div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></div><div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce delay-75"></div><div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce delay-150"></div></div></div></div>)}
+          
+          {isTyping && (
+            <div className="flex justify-start w-full">
+              <div className={`${darkMode ? 'bg-gray-800' : 'bg-gray-100'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm`}>
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-150"></div>
+                </div>
+              </div>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
+        {/* INPUT BAR (Fixed Height, Shrink 0) */}
         <div className={`p-2 border-t shrink-0 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
           <div className="flex gap-2 items-center h-[48px]">
             {partnerStatus === 'disconnected' ? (
@@ -313,6 +361,7 @@ export default function ChatItNow() {
             )}
           </div>
         </div>
+
       </div>
     </div>
   );
