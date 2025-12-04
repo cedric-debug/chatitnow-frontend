@@ -3,35 +3,26 @@
 @tailwind utilities;
 
 /* --- MOBILE BROWSER BACKGROUND FIX --- */
-
-/* 1. Define the base colors for Light/Dark modes on the Root */
 :root {
-  background-color: #ffffff; /* Light Mode Background */
+  background-color: #ffffff;
 }
-
 :root.dark {
-  background-color: #111827; /* Dark Mode Background (Gray-900) */
+  background-color: #111827;
 }
-
-/* 2. Force HTML tag to fill screen and inherit color */
 html {
   height: 100%;
-  height: -webkit-fill-available; /* Fix for iOS Safari height */
-  background-color: inherit; /* Takes color from :root */
+  height: -webkit-fill-available;
+  background-color: inherit;
 }
-
-/* 3. Force Body to fill screen, inherit color, and stop "bouncing" */
 body {
   margin: 0;
   padding: 0;
-  background-color: inherit; /* Takes color from :root */
+  background-color: inherit;
   min-height: 100vh;
   min-height: -webkit-fill-available;
   width: 100%;
-  overscroll-behavior-y: none; /* PREVENTS WHITE RUBBER-BANDING ON SCROLL */
+  overscroll-behavior-y: none;
 }
-
-/* 4. Ensure the App root fills the space */
 #root {
   width: 100%;
   height: 100%;
