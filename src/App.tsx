@@ -40,22 +40,23 @@ export default function ChatItNow() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activityTimerRef = useRef<number | null>(null);
-  const partnerNameRef = useRef(''); 
+  const partnerNameRef = useRef(''); // <--- NEW: Remembers partner's name
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   useEffect(() => {
+    // --- UPDATED SOCKET LOGIC ---
     socket.on('matched', (data: any) => {
       setShowSearching(false);
       setPartnerStatus('connected');
       setIsConnected(true);
       setShowNextConfirm(false);
       
+      // 1. Save the name so we remember it if they leave
       partnerNameRef.current = data.name; 
 
-      // REMOVED THE WARNING MESSAGE FROM HERE (Moved to Footer)
       setMessages([{ type: 'system', data: { name: data.name, field: data.field, action: 'connected' } }]);
       resetActivity();
     });
@@ -69,7 +70,10 @@ export default function ChatItNow() {
     socket.on('partner_disconnected', () => {
       setIsConnected(false);
       setPartnerStatus('disconnected');
+      
+      // 2. Use the saved name for the disconnect message
       const nameToShow = partnerNameRef.current || 'Partner';
+      
       setMessages(prev => [...prev, { type: 'system', data: { name: nameToShow, action: 'disconnected' } }]);
     });
 
@@ -141,6 +145,7 @@ export default function ChatItNow() {
     setIsConnected(false);
     setShowNextConfirm(false);
     setPartnerStatus('disconnected');
+    // We send YOUR username here, so the renderer knows it was you
     setMessages(prev => [...prev, { type: 'system', data: { name: username, action: 'disconnected' } }]);
   };
 
@@ -152,18 +157,23 @@ export default function ChatItNow() {
     if (e.key === 'Enter' && !e.shiftKey) isLoggedIn ? handleSendMessage() : handleLogin();
   };
 
+  // --- UPDATED MESSAGE RENDERER ---
   const renderSystemMessage = (msg: Message) => {
     if (!msg.data) return null;
     const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
     
+    // Connected Message
     if (msg.data.action === 'connected') {
       return <span>You are now chatting with <span style={boldStyle}>{msg.data.name}</span>{msg.data.field ? <> who is in <span style={boldStyle}>{msg.data.field}</span></> : "."}</span>;
     }
     
+    // Disconnected Message Logic
     if (msg.data.action === 'disconnected') {
+      // If the name in the message matches YOUR username, it means YOU clicked "End"
       if (msg.data.name === username) {
         return <span><span style={boldStyle}>You</span> disconnected.</span>;
       }
+      // Otherwise, the partner disconnected
       return <span><span style={boldStyle}>{msg.data.name}</span> has disconnected.</span>;
     }
     
@@ -201,11 +211,28 @@ export default function ChatItNow() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
             <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
+              
+              {/* --- NEW TERMS AND CONDITIONS TEXT --- */}
               <div className="space-y-4 text-sm text-gray-700">
                 <p>Last updated: December 4, 2025</p>
-                <p><strong>Agreement to Terms</strong><br/>By accessing ChatItNow.com...</p>
-                {/* Note: I'm keeping your T&C shortened here for brevity, but since you are updating the layout, you should just leave your existing T&C text alone if you copy parts, OR if you copy this whole file, paste your full text back in. */}
+
+                <p><strong>Agreement to Terms</strong><br/>
+                By accessing ChatItNow.com (the "Site"), an anonymous text-only chat platform for working-class Filipinos, you affirm and agree to these Terms and Conditions.</p>
+
+                <p><strong>You Are 18+</strong><br/>
+                You affirm you are at least 18 years old.</p>
+
+                <p><strong>Prohibited Conduct</strong><br/>
+                Do not make threats, promote negativity, hate speech, harassment, discrimination, scams, or illegal content.</p>
+
+                <p><strong>Use at Your Own Risk</strong><br/>
+                You use this Site at your own risk, fully aware of the dangers of chatting with unverified strangers whose identities are not verified. We are not responsible for impersonation, misinformation, scams, or any harms from anonymous interactions.</p>
+
+                <p><strong>Disclaimer of Liability</strong><br/>
+                The Site is provided "as is" and "as available" with no warranties of any kind, express or implied. To the fullest extent permitted by Philippine law ChatItNow.com disclaim all liability, direct or indirect, for user interactions, content, advice, disputes, harms (emotional, financial, reputational), illegal acts, or any loss arising from Site use.</p>
               </div>
+              {/* ------------------------------------- */}
+
               <div className="mt-6 flex gap-3 sticky bottom-0 bg-white pt-4 border-t">
                 <button onClick={() => { setShowTerms(false); setAcceptedTerms(true); }} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg transition">Accept Terms</button>
                 <button onClick={() => setShowTerms(false)} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg transition">Close</button>
@@ -263,10 +290,8 @@ export default function ChatItNow() {
         {/* Chat Area */}
         <div className={`flex-1 overflow-y-auto p-2 space-y-1 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* --- NEW: BANNER AD AT THE VERY TOP --- */}
+          {/* --- NEW: BANNER AD AT THE VERY TOP (TEXT REMOVED) --- */}
           <div className={`w-full h-[100px] flex justify-center items-center shrink-0 mb-2 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
-             <p className="text-[9px] text-gray-400 absolute z-10">Advertisement</p>
-             {/* Using Square ID but controlling height to act as a banner */}
              <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_SQUARE} />
           </div>
 
@@ -289,7 +314,7 @@ export default function ChatItNow() {
         {/* Footer Area */}
         <div className={`p-2 border-t shrink-0 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
           
-          {/* --- NEW: CAUTION MESSAGE ATTACHED TO BUTTONS --- */}
+          {/* --- CAUTION MESSAGE ATTACHED TO BUTTONS --- */}
           {isConnected && (
             <div className="text-center pb-2">
                <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-[10px] px-2 py-0.5 rounded inline-block">
