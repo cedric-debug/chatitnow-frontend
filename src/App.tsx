@@ -82,29 +82,33 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- DARK MODE LOGIC & BROWSER THEME COLOR FIX ---
+  // --- DARK MODE & MOBILE BROWSER COLOR FIX ---
   useEffect(() => {
     const root = window.document.documentElement;
-    
-    // Helper to update or create the meta theme-color tag
-    const updateThemeColor = (color: string) => {
-      let metaThemeColor = document.querySelector("meta[name='theme-color']");
-      if (!metaThemeColor) {
-        metaThemeColor = document.createElement('meta');
-        metaThemeColor.setAttribute('name', 'theme-color');
-        document.head.appendChild(metaThemeColor);
-      }
-      metaThemeColor.setAttribute('content', color);
-    };
+    // We select the meta tag to change the actual browser UI color (URL bar etc.)
+    let metaThemeColor = document.querySelector("meta[name='theme-color']");
+
+    // Create it if it doesn't exist
+    if (!metaThemeColor) {
+      metaThemeColor = document.createElement('meta');
+      metaThemeColor.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaThemeColor);
+    }
 
     if (darkMode) { 
       root.classList.add('dark'); 
+      // Force HTML and BODY to be dark (fixes overscroll white background)
+      root.style.backgroundColor = '#111827'; 
       document.body.style.backgroundColor = '#111827'; 
-      updateThemeColor('#111827'); // Sets browser bar to Dark Grey
+      // Change browser UI color
+      metaThemeColor.setAttribute('content', '#111827');
     } else { 
       root.classList.remove('dark'); 
+      // Force HTML and BODY to be white
+      root.style.backgroundColor = '#ffffff'; 
       document.body.style.backgroundColor = '#ffffff'; 
-      updateThemeColor('#ffffff'); // Sets browser bar to White
+      // Change browser UI color
+      metaThemeColor.setAttribute('content', '#ffffff');
     }
   }, [darkMode]);
 
@@ -177,6 +181,7 @@ export default function ChatItNow() {
 
   const renderSystemMessage = (msg: Message) => {
     if (!msg.data) return null;
+    // Strict inline style to force color change
     const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
     
     if (msg.data.action === 'connected') {
@@ -195,7 +200,8 @@ export default function ChatItNow() {
 
   if (showWelcome) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        {/* Added 'bg-white' here to ensure card has background in light/dark modes */}
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1><div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div></div>
           <div className="space-y-4 text-gray-700 text-sm sm:text-base"><p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p><p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p><p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p><p className="text-gray-600">ChatItNow is completely free, anonymous, and designed with your safety in mind. Connect with fellow Filipinos, one conversation at a time.</p></div>
@@ -207,7 +213,7 @@ export default function ChatItNow() {
 
   if (!isLoggedIn) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
+      <div className="fixed inset-0 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1><p className="text-sm text-gray-600">Chat with Fellow Filipinos</p></div>
           <div className="space-y-4">
@@ -245,8 +251,14 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-    <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
+    // NOTE: The outer div has 'fixed inset-0', but we manage bg color in useEffect now
+    <div className={`fixed inset-0 flex flex-col items-center justify-center`}>
       
+      {/* 
+         LAYOUT: ABSOLUTE PINNING (v60)
+         - Strict pinning prevents mobile stretching issues
+         - bg colors managed via darkMode toggle
+      */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl sm:border-x
@@ -281,7 +293,7 @@ export default function ChatItNow() {
           </div>
         )}
 
-        {/* HEADER */}
+        {/* --- HEADER (Absolute Top) --- */}
         <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
@@ -295,7 +307,7 @@ export default function ChatItNow() {
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* CHAT AREA */}
+        {/* --- CHAT AREA (Pinned strictly between Header and Footer) --- */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
           {/* Banner Ad */}
@@ -342,7 +354,7 @@ export default function ChatItNow() {
           
           {isTyping && (
             <div className="flex justify-start w-full">
-              <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border border-gray-100`}>
+              <div className={`${darkMode ? 'bg-gray-800' : 'bg-gray-100'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border border-gray-100`}>
                 <div className="flex gap-1">
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></div>
@@ -354,7 +366,7 @@ export default function ChatItNow() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* INPUT BAR */}
+        {/* --- INPUT BAR (Absolute Bottom) --- */}
         <div className={`absolute bottom-0 left-0 right-0 h-[60px] p-2 border-t z-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
           <div className="flex gap-2 items-center h-full">
             {partnerStatus === 'disconnected' ? (
