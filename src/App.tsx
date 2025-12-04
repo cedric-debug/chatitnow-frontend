@@ -207,7 +207,39 @@ export default function ChatItNow() {
             <button onClick={handleLogin} disabled={!username.trim() || !acceptedTerms || !confirmedAdult} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-base shadow-lg mt-2">Start Chatting</button>
           </div>
         </div>
-        {showTerms && (<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto"><div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto"><h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2><div className="space-y-4 text-sm text-gray-700"><p>Last updated: December 3, 2025</p><p>By accessing ChatItNow.com...</p></div><div className="mt-6 flex gap-3 sticky bottom-0 bg-white pt-4 border-t"><button onClick={() => { setShowTerms(false); setAcceptedTerms(true); }} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg transition">Accept Terms</button><button onClick={() => setShowTerms(false)} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg transition">Close</button></div></div></div>)}
+        {showTerms && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
+              
+              {/* --- NEW TERMS AND CONDITIONS TEXT --- */}
+              <div className="space-y-4 text-sm text-gray-700">
+                <p>Last updated: December 4, 2025</p>
+
+                <p><strong>Agreement to Terms</strong><br/>
+                By accessing ChatItNow.com (the "Site"), an anonymous text-only chat platform for working-class Filipinos, you affirm and agree to these Terms and Conditions.</p>
+
+                <p><strong>You Are 18+</strong><br/>
+                You affirm you are at least 18 years old.</p>
+
+                <p><strong>Prohibited Conduct</strong><br/>
+                Do not make threats, promote negativity, hate speech, harassment, discrimination, scams, or illegal content.</p>
+
+                <p><strong>Use at Your Own Risk</strong><br/>
+                You use this Site at your own risk, fully aware of the dangers of chatting with unverified strangers whose identities are not verified. We are not responsible for impersonation, misinformation, scams, or any harms from anonymous interactions.</p>
+
+                <p><strong>Disclaimer of Liability</strong><br/>
+                The Site is provided "as is" and "as available" with no warranties of any kind, express or implied. To the fullest extent permitted by Philippine law ChatItNow.com disclaim all liability, direct or indirect, for user interactions, content, advice, disputes, harms (emotional, financial, reputational), illegal acts, or any loss arising from Site use.</p>
+              </div>
+              {/* ------------------------------------- */}
+
+              <div className="mt-6 flex gap-3 sticky bottom-0 bg-white pt-4 border-t">
+                <button onClick={() => { setShowTerms(false); setAcceptedTerms(true); }} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg transition">Accept Terms</button>
+                <button onClick={() => setShowTerms(false)} className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-lg transition">Close</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
