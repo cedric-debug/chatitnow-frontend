@@ -83,14 +83,11 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME CONTROLLER (CSS Variable Method) ---
+  // --- THEME CONTROLLER ---
   useEffect(() => {
     const html = document.documentElement;
     
-    // We only update the class 'dark' on HTML.
-    // The CSS file handles the actual background color change via variables.
-    
-    // We still manually update the Meta Tag for the browser UI (Address bar)
+    // This controls the Browser UI color (Status Bar / Address Bar)
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
@@ -99,17 +96,21 @@ export default function ChatItNow() {
     }
 
     if (darkMode) { 
+      // Add class for CSS to pick up
       html.classList.add('dark'); 
-      metaThemeColor.setAttribute('content', '#111827'); // Dark Blue
+      // Update Browser UI to Dark Blue
+      metaThemeColor.setAttribute('content', '#111827'); 
     } else { 
+      // Remove class for CSS
       html.classList.remove('dark'); 
-      metaThemeColor.setAttribute('content', '#ffffff'); // White
+      // Update Browser UI to White
+      metaThemeColor.setAttribute('content', '#ffffff'); 
     }
   }, [darkMode]);
 
+  // Ensure clean start
   useEffect(() => {
-    // Start fresh in Light mode
-    document.documentElement.classList.remove('dark');
+    window.document.documentElement.classList.remove('dark');
   }, []);
 
   useEffect(() => {
@@ -249,10 +250,8 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-    // Background color is handled by index.css variables, but we add flex center here
     <div className={`fixed inset-0 flex flex-col items-center justify-center`}>
       
-      {/* APP SHELL */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl sm:border-x
