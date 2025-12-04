@@ -6,8 +6,8 @@ import AdUnit from './AdUnit';
 // --- CONFIGURATION ---
 const PROD_URL = "https://chatitnow-server.onrender.com"; // Paste Render URL here
 const ADSENSE_CLIENT_ID = "ca-pub-1806664183023369"; 
-const AD_SLOT_SQUARE = "1234567890"; 
-const AD_SLOT_VERTICAL = "0987654321"; 
+const AD_SLOT_SQUARE = "4725306503"; 
+const AD_SLOT_VERTICAL = "1701533824"; 
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 const socket: Socket = io(SERVER_URL, { autoConnect: false });
