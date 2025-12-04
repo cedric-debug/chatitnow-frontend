@@ -82,15 +82,29 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- DARK MODE LOGIC ---
+  // --- DARK MODE LOGIC & BROWSER THEME COLOR FIX ---
   useEffect(() => {
     const root = window.document.documentElement;
+    
+    // Helper to update or create the meta theme-color tag
+    const updateThemeColor = (color: string) => {
+      let metaThemeColor = document.querySelector("meta[name='theme-color']");
+      if (!metaThemeColor) {
+        metaThemeColor = document.createElement('meta');
+        metaThemeColor.setAttribute('name', 'theme-color');
+        document.head.appendChild(metaThemeColor);
+      }
+      metaThemeColor.setAttribute('content', color);
+    };
+
     if (darkMode) { 
       root.classList.add('dark'); 
       document.body.style.backgroundColor = '#111827'; 
+      updateThemeColor('#111827'); // Sets browser bar to Dark Grey
     } else { 
       root.classList.remove('dark'); 
       document.body.style.backgroundColor = '#ffffff'; 
+      updateThemeColor('#ffffff'); // Sets browser bar to White
     }
   }, [darkMode]);
 
@@ -163,7 +177,6 @@ export default function ChatItNow() {
 
   const renderSystemMessage = (msg: Message) => {
     if (!msg.data) return null;
-    // FIXED: Hard style override for color
     const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
     
     if (msg.data.action === 'connected') {
@@ -208,9 +221,8 @@ export default function ChatItNow() {
           </div>
         </div>
         {showTerms && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-            {/* FIXED T&C: Correct text and opaque background */}
-            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-8 max-h-[90vh] overflow-y-auto relative z-50">
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
               <div className="space-y-4 text-sm text-gray-700">
                 <p>Last updated: December 5, 2025</p>
@@ -235,14 +247,6 @@ export default function ChatItNow() {
   return (
     <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
       
-      {/* 
-         LAYOUT: ABSOLUTE PINNING (v59)
-         This structure prevents stretching by anchoring the chat area strictly between header and footer.
-         - Container: Relative, Fixed Height.
-         - Header: Absolute Top.
-         - Footer: Absolute Bottom.
-         - Chat: Absolute Top/Bottom pinned with overflow.
-      */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl sm:border-x
@@ -277,7 +281,7 @@ export default function ChatItNow() {
           </div>
         )}
 
-        {/* --- HEADER (Absolute Top) --- */}
+        {/* HEADER */}
         <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
@@ -291,7 +295,7 @@ export default function ChatItNow() {
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* --- CHAT AREA (Pinned strictly between Header and Footer) --- */}
+        {/* CHAT AREA */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
           {/* Banner Ad */}
@@ -350,7 +354,7 @@ export default function ChatItNow() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* --- INPUT BAR (Absolute Bottom) --- */}
+        {/* INPUT BAR */}
         <div className={`absolute bottom-0 left-0 right-0 h-[60px] p-2 border-t z-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
           <div className="flex gap-2 items-center h-full">
             {partnerStatus === 'disconnected' ? (
