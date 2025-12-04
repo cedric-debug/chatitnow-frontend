@@ -2,17 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
-/* STRUCTURE ONLY - NO COLORS HERE */
+/* 1. Define the colors in one place */
+:root {
+  --app-bg: #ffffff; /* Pure White for Light Mode */
+  --app-text: #000000;
+}
+
+:root.dark {
+  --app-bg: #111827; /* Gray-900 for Dark Mode */
+  --app-text: #ffffff;
+}
+
+/* 2. Force the browser canvas to match */
 html, body {
+  background-color: var(--app-bg);
+  color: var(--app-text);
   height: 100%;
   width: 100%;
   margin: 0;
   padding: 0;
-  overscroll-behavior: none; /* Prevents bouncing */
+  overscroll-behavior: none; /* Stop the bounce */
   -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.2s ease; /* Smooth transition */
 }
 
 #root {
   height: 100%;
   width: 100%;
+  background-color: var(--app-bg);
 }
