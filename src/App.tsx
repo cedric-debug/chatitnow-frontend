@@ -37,33 +37,46 @@ export default function ChatItNow() {
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [showInactivityAd, setShowInactivityAd] = useState(false);
   const [showTabReturnAd, setShowTabReturnAd] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activityTimerRef = useRef<number | null>(null);
+  const partnerNameRef = useRef(''); // <--- NEW: Remembers partner's name
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   useEffect(() => {
-    // Added ': any' to fix TypeScript errors
+    // --- UPDATED SOCKET LOGIC ---
     socket.on('matched', (data: any) => {
       setShowSearching(false);
       setPartnerStatus('connected');
       setIsConnected(true);
       setShowNextConfirm(false);
+      
+      // 1. Save the name so we remember it if they leave
+      partnerNameRef.current = data.name; 
+
       setMessages([{ type: 'system', data: { name: data.name, field: data.field, action: 'connected' } }, { type: 'warning', text: "⚠️ Caution: Always verify professional advice from strangers." }]);
       resetActivity();
     });
+
     socket.on('receive_message', (data: any) => {
       setMessages(prev => [...prev, { type: 'stranger', text: data.text }]);
       setIsTyping(false);
       resetActivity();
     });
+
     socket.on('partner_disconnected', () => {
       setIsConnected(false);
       setPartnerStatus('disconnected');
-      setMessages(prev => [...prev, { type: 'system', data: { name: 'Partner', action: 'disconnected' } }]);
+      
+      // 2. Use the saved name for the disconnect message
+      const nameToShow = partnerNameRef.current || 'Partner';
+      
+      setMessages(prev => [...prev, { type: 'system', data: { name: nameToShow, action: 'disconnected' } }]);
     });
+
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
     
     return () => { 
@@ -132,6 +145,7 @@ export default function ChatItNow() {
     setIsConnected(false);
     setShowNextConfirm(false);
     setPartnerStatus('disconnected');
+    // We send YOUR username here, so the renderer knows it was you
     setMessages(prev => [...prev, { type: 'system', data: { name: username, action: 'disconnected' } }]);
   };
 
@@ -143,11 +157,27 @@ export default function ChatItNow() {
     if (e.key === 'Enter' && !e.shiftKey) isLoggedIn ? handleSendMessage() : handleLogin();
   };
 
+  // --- UPDATED MESSAGE RENDERER ---
   const renderSystemMessage = (msg: Message) => {
     if (!msg.data) return null;
     const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
-    if (msg.data.action === 'connected') return <span>You are now chatting with <span style={boldStyle}>{msg.data.name}</span>{msg.data.field ? <> who is in <span style={boldStyle}>{msg.data.field}</span></> : "."}</span>;
-    return <span><span style={boldStyle}>{msg.data.name}</span> has disconnected.</span>;
+    
+    // Connected Message
+    if (msg.data.action === 'connected') {
+      return <span>You are now chatting with <span style={boldStyle}>{msg.data.name}</span>{msg.data.field ? <> who is in <span style={boldStyle}>{msg.data.field}</span></> : "."}</span>;
+    }
+    
+    // Disconnected Message Logic
+    if (msg.data.action === 'disconnected') {
+      // If the name in the message matches YOUR username, it means YOU clicked "End"
+      if (msg.data.name === username) {
+        return <span className="italic opacity-75">You disconnected.</span>;
+      }
+      // Otherwise, the partner disconnected
+      return <span><span style={boldStyle}>{msg.data.name}</span> has disconnected.</span>;
+    }
+    
+    return null;
   };
 
   if (showWelcome) {
