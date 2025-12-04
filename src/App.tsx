@@ -208,35 +208,15 @@ export default function ChatItNow() {
         </div>
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto z-50">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
               <div className="space-y-4 text-sm text-gray-700">
-                <p className="font-semibold">Last updated: December 5, 2025</p>
-                
-                <div>
-                  <h3 className="font-bold text-base mb-2">Agreement to Terms</h3>
-                  <p>By accessing ChatItNow.com (the "Site"), an anonymous text-only chat platform made for Filipinos, you affirm and agree to these Terms and Conditions.</p>
-                </div>
-
-                <div>
-                  <h3 className="font-bold text-base mb-2">You Are 18+</h3>
-                  <p>You affirm you are at least 18 years old.</p>
-                </div>
-
-                <div>
-                  <h3 className="font-bold text-base mb-2">Prohibited Conduct</h3>
-                  <p>Do not make threats, promote negativity, hate speech, harassment, discrimination, scams, or illegal content.</p>
-                </div>
-
-                <div>
-                  <h3 className="font-bold text-base mb-2">Use at Your Own Risk</h3>
-                  <p>You use this Site at your own risk, fully aware of the dangers of chatting with strangers whose identities are not verified. We are not responsible for impersonation, misinformation, scams, or any harms from anonymous interactions.</p>
-                </div>
-
-                <div>
-                  <h3 className="font-bold text-base mb-2">Disclaimer of Liability</h3>
-                  <p>The Site is provided "as is" and "as available" with no warranties of any kind, express or implied. To the fullest extent permitted by Philippine law ChatItNow.com disclaim all liability, direct or indirect, for user interactions, content, advice, disputes, harms (emotional, financial, reputational), illegal acts, or any loss arising from Site use.</p>
-                </div>
+                <p>Last updated: December 5, 2025</p>
+                <p><strong>Agreement to Terms</strong><br/>By accessing ChatItNow.com (the "Site"), an anonymous text-only chat platform made for Filipinos, you affirm and agree to these Terms and Conditions.</p>
+                <p><strong>You Are 18+</strong><br/>You affirm you are at least 18 years old.</p>
+                <p><strong>Prohibited Conduct</strong><br/>Do not make threats, promote negativity, hate speech, harassment, discrimination, scams, or illegal content.</p>
+                <p><strong>Use at Your Own Risk</strong><br/>You use this Site at your own risk, fully aware of the dangers of chatting with strangers whose identities are not verified. We are not responsible for impersonation, misinformation, scams, or any harms from anonymous interactions.</p>
+                <p><strong>Disclaimer of Liability</strong><br/>The Site is provided "as is" and "as available" with no warranties of any kind, express or implied. To the fullest extent permitted by Philippine law ChatItNow.com disclaim all liability, direct or indirect, for user interactions, content, advice, disputes, harms (emotional, financial, reputational), illegal acts, or any loss arising from Site use.</p>
               </div>
               <div className="mt-6 flex gap-3 sticky bottom-0 bg-white pt-4 border-t">
                 <button onClick={() => { setShowTerms(false); setAcceptedTerms(true); }} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg transition">Accept Terms</button>
@@ -253,7 +233,21 @@ export default function ChatItNow() {
   return (
     <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
       
-      <div className={`w-full h-full sm:h-[90vh] sm:max-h-[900px] sm:max-w-[420px] sm:rounded-2xl sm:shadow-2xl sm:overflow-hidden flex flex-col relative border-x ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}`}>
+      {/* 
+         LAYOUT FIX (Reverted to GRID sandwich to guarantee height stability)
+         - Grid Rows: Auto (Header) - 1fr (Chat) - Auto (Input)
+         - Forces chat to take up exactly available space
+         - h-[100dvh]: Full height mobile
+         - sm:h-[90vh]: Fixed tall height desktop
+      */}
+      <div className={`
+        grid grid-rows-[auto_1fr_auto]
+        w-full h-[100dvh]
+        sm:w-[420px] sm:h-[90vh] 
+        sm:rounded-2xl sm:shadow-2xl sm:border-x
+        overflow-hidden relative
+        ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}
+      `}>
         
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
@@ -283,27 +277,24 @@ export default function ChatItNow() {
           </div>
         )}
 
-        {/* HEADER */}
-        <div className={`h-[60px] shrink-0 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} px-4 flex justify-between items-center shadow-sm z-10`}>
+        {/* ROW 1: HEADER */}
+        <div className={`h-[60px] ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} px-4 flex justify-between items-center shadow-sm z-20`}>
           <div className="flex items-center gap-2">
-            {/* Custom Logo Logic */}
             <img 
-              src="/apple-touch-icon.png" 
+              src="/logo.png" 
               alt="ChatItNow Logo" 
               className="w-8 h-8 rounded-full object-cover shadow-sm"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none'; // Hides if broken
-                // Optional: You could render a fallback text here
-              }}
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
             <span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-purple-900'}`}>ChatItNow</span>
           </div>
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* CHAT AREA */}
-        <div className={`flex-1 overflow-y-auto p-2 space-y-1 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        {/* ROW 2: CHAT AREA (Scrollable, fills remaining space) */}
+        <div className={`overflow-y-auto p-2 space-y-1 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
+          {/* BANNER AD (Scrollable) */}
           <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
@@ -359,8 +350,8 @@ export default function ChatItNow() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* INPUT BAR */}
-        <div className={`p-2 border-t shrink-0 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+        {/* ROW 3: INPUT BAR */}
+        <div className={`p-2 border-t ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
           <div className="flex gap-2 items-center h-[48px]">
             {partnerStatus === 'disconnected' ? (
               <button onClick={handleStartSearch} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl h-full shadow-md transition text-sm">Find New Partner</button>
