@@ -6,8 +6,11 @@ import AdUnit from './AdUnit';
 // --- CONFIGURATION ---
 const PROD_URL = "https://chatitnow-server.onrender.com"; 
 const ADSENSE_CLIENT_ID = "ca-pub-1806664183023369"; 
-const AD_SLOT_SQUARE = "4725306503"; 
-const AD_SLOT_VERTICAL = "1701533824"; 
+
+// AD SLOTS
+const AD_SLOT_SQUARE = "4725306503";  // Searching Screen
+const AD_SLOT_VERTICAL = "1701533824"; // Inactivity Popup
+const AD_SLOT_TOP_BANNER = "9658354392"; // Chat Area Top Banner
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 const socket: Socket = io(SERVER_URL, { autoConnect: false });
@@ -85,6 +88,7 @@ export default function ChatItNow() {
     const root = window.document.documentElement;
     const body = document.body;
     
+    // Manage meta tag for browser UI color
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
@@ -92,30 +96,25 @@ export default function ChatItNow() {
       document.head.appendChild(metaThemeColor);
     }
 
-    // Prevent white rubber-banding on mobile
+    // Prevent scrolling/bouncing on the body itself
     body.style.overscrollBehavior = 'none';
 
     if (darkMode) { 
       root.classList.add('dark'); 
-      
-      // Force paint the ROOT and BODY dark
+      // Force paint root elements dark
       root.style.backgroundColor = '#111827'; 
       body.style.backgroundColor = '#111827'; 
-      
-      // Paint Browser UI (Address Bar/Notch)
       metaThemeColor.setAttribute('content', '#111827');
     } else { 
       root.classList.remove('dark'); 
-      
-      // Force paint the ROOT and BODY white
+      // Force paint root elements white
       root.style.backgroundColor = '#ffffff'; 
       body.style.backgroundColor = '#ffffff'; 
-      
-      // Paint Browser UI White
       metaThemeColor.setAttribute('content', '#ffffff');
     }
   }, [darkMode]);
 
+  // Clean up on mount
   useEffect(() => {
     window.document.documentElement.classList.remove('dark');
   }, []);
@@ -185,6 +184,7 @@ export default function ChatItNow() {
 
   const renderSystemMessage = (msg: Message) => {
     if (!msg.data) return null;
+    // Force explicit colors via inline style to prevent CSS conflicts
     const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
     
     if (msg.data.action === 'connected') {
@@ -205,7 +205,12 @@ export default function ChatItNow() {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
-          <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1><div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div></div>
+          <div className="text-center mb-6">
+             {/* Use custom logo if available in public folder */}
+             <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
+             <h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1>
+             <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
+          </div>
           <div className="space-y-4 text-gray-700 text-sm sm:text-base"><p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p><p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p><p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p><p className="text-gray-600">ChatItNow is completely free, anonymous, and designed with your safety in mind. Connect with fellow Filipinos, one conversation at a time.</p></div>
           <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
         </div>
@@ -251,10 +256,9 @@ export default function ChatItNow() {
     );
   }
 
-  // --- MAIN CHAT INTERFACE ---
+  // --- MAIN CHAT INTERFACE (ABSOLUTE POSITIONING) ---
   return (
-    // NOTE: Background color is now handled by useEffect via DOM manipulation
-    <div className="fixed inset-0 flex flex-col items-center justify-center">
+    <div className={`fixed inset-0 flex flex-col items-center justify-center`}>
       
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
@@ -290,7 +294,7 @@ export default function ChatItNow() {
           </div>
         )}
 
-        {/* HEADER */}
+        {/* HEADER (Fixed Top) */}
         <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
@@ -304,14 +308,14 @@ export default function ChatItNow() {
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* CHAT AREA */}
+        {/* CHAT AREA (Pinned Middle) */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* Banner Ad */}
+          {/* TOP BANNER AD - SCROLLABLE */}
           <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
-                slotId={AD_SLOT_SQUARE} 
+                slotId={AD_SLOT_TOP_BANNER} // Uses the specific Banner Slot ID you requested
                 format="horizontal" 
                 responsive="false"
                 style={{ display: 'block', maxHeight: '50px', width: '100%' }}
@@ -363,7 +367,7 @@ export default function ChatItNow() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* INPUT BAR */}
+        {/* INPUT BAR (Fixed Bottom) */}
         <div className={`absolute bottom-0 left-0 right-0 h-[60px] p-2 border-t z-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
           <div className="flex gap-2 items-center h-full">
             {partnerStatus === 'disconnected' ? (
