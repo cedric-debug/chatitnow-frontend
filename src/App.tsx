@@ -277,7 +277,11 @@ export default function ChatItNow() {
         )}
 
         <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} px-4 py-3 flex justify-between items-center shadow-sm z-10 shrink-0`}>
-          <div className="flex items-center gap-2"><div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">C</div><span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-purple-900'}`}>ChatItNow</span></div>
+          <div className="flex items-center gap-2">
+             {/* --- UPDATED HEADER LOGO --- */}
+             <img src="/apple-touch-icon.png" alt="Logo" className="w-8 h-8 rounded-full shadow-sm" />
+             <span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-purple-900'}`}>ChatItNow</span>
+          </div>
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
