@@ -171,7 +171,7 @@ export default function ChatItNow() {
     if (msg.data.action === 'disconnected') {
       // If the name in the message matches YOUR username, it means YOU clicked "End"
       if (msg.data.name === username) {
-        return <span className="italic opacity-75">You disconnected.</span>;
+        return <span><span style={boldStyle}>You</span> disconnected.</span>;
       }
       // Otherwise, the partner disconnected
       return <span><span style={boldStyle}>{msg.data.name}</span> has disconnected.</span>;
