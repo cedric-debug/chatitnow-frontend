@@ -31,7 +31,8 @@ export default function ChatItNow() {
   const [isConnected, setIsConnected] = useState(false);
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  // Default to TRUE (Dark Mode) to match the HTML background
+  const [darkMode, setDarkMode] = useState(true);
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showSearching, setShowSearching] = useState(false);
   const [isTyping, setIsTyping] = useState(false); 
@@ -83,13 +84,13 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME PAINTER: Fixes White Bars on Mobile ---
+  // --- DARK MODE & BROWSER PAINTING LOGIC ---
   useEffect(() => {
-    const root = window.document.documentElement;
+    const html = document.documentElement;
     const body = document.body;
     
-    // Find or create the meta tag that controls the browser UI color
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
+    
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
       metaThemeColor.setAttribute('name', 'theme-color');
@@ -97,25 +98,19 @@ export default function ChatItNow() {
     }
 
     if (darkMode) { 
-      root.classList.add('dark'); 
-      // Force Paint Dark
-      root.style.backgroundColor = '#111827'; 
+      // DARK MODE
+      html.classList.add('dark'); 
+      // Force paint the body (fixes white spots)
       body.style.backgroundColor = '#111827'; 
-      metaThemeColor.setAttribute('content', '#111827'); // Browser Bar Dark
+      metaThemeColor.setAttribute('content', '#111827');
     } else { 
-      root.classList.remove('dark'); 
-      // Force Paint White
-      root.style.backgroundColor = '#ffffff'; 
+      // LIGHT MODE
+      html.classList.remove('dark'); 
+      // Force paint the body
       body.style.backgroundColor = '#ffffff'; 
-      metaThemeColor.setAttribute('content', '#ffffff'); // Browser Bar White
+      metaThemeColor.setAttribute('content', '#ffffff');
     }
   }, [darkMode]);
-
-  useEffect(() => {
-    // Start fresh on load
-    window.document.documentElement.classList.remove('dark');
-    document.body.style.backgroundColor = '#ffffff';
-  }, []);
 
   useEffect(() => {
     if (isConnected) {
@@ -200,7 +195,7 @@ export default function ChatItNow() {
 
   if (showWelcome) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
+      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6">
              <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
@@ -216,7 +211,7 @@ export default function ChatItNow() {
 
   if (!isLoggedIn) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
+      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1><p className="text-sm text-gray-600">Chat with Fellow Filipinos</p></div>
           <div className="space-y-4">
@@ -231,7 +226,7 @@ export default function ChatItNow() {
         </div>
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto relative z-50">
+            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
               <div className="space-y-4 text-sm text-gray-700">
                 <p>Last updated: December 5, 2025</p>
@@ -256,7 +251,6 @@ export default function ChatItNow() {
   return (
     <div className={`fixed inset-0 flex flex-col items-center justify-center`}>
       
-      {/* APP SHELL */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl sm:border-x

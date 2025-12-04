@@ -2,24 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
-/* --- FIX MOBILE WHITE BACKGROUND --- */
-:root {
-  background-color: #ffffff;
-}
-
-:root.dark {
-  background-color: #111827;
-}
-
-/* Force the actual HTML page to change color */
-html, body {
+/* 1. DEFAULT (Light Mode) */
+html {
+  background-color: #ffffff; /* White background */
   height: 100%;
   width: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: #ffffff; /* White background */
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
   margin: 0;
   padding: 0;
-  background-color: inherit; /* Follows the root class */
-  overscroll-behavior: none; /* Stops the white "bounce" area */
-  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none; /* Stop the rubber-band bounce */
+}
+
+/* 2. DARK MODE OVERRIDES (When html tag has class="dark") */
+html.dark {
+  background-color: #111827; /* Force Tailwind gray-900 Dark Blue */
+}
+
+html.dark body {
+  background-color: #111827; /* Force Tailwind gray-900 Dark Blue */
 }
 
 #root {
