@@ -83,33 +83,40 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME PAINTER: Fixes Mobile Browser Bars ---
+  // --- THEME PAINTER (Fixed for Mobile) ---
   useEffect(() => {
-    const html = document.documentElement;
+    const root = window.document.documentElement;
     const body = document.body;
-    // Grab the meta tag defined in index.html
+
+    // Select the specific meta tags
     const metaThemeColor = document.querySelector("meta[name='theme-color']");
+    const metaAppleStatus = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
 
     if (darkMode) { 
-      // DARK MODE
-      html.classList.add('dark'); 
+      // === DARK MODE ===
+      root.classList.add('dark'); 
       
-      // 1. Force HTML/Body Background (Overscroll area)
-      html.style.backgroundColor = '#111827'; 
+      // Paint the actual background behind the app
+      root.style.backgroundColor = '#111827'; 
       body.style.backgroundColor = '#111827'; 
       
-      // 2. Force Browser Interface (Notch/Address Bar)
+      // Paint the Browser UI (Address Bar / Notch)
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#111827');
-    } else { 
-      // LIGHT MODE
-      html.classList.remove('dark'); 
+      // iOS Status Bar style
+      if (metaAppleStatus) metaAppleStatus.setAttribute('content', 'black-translucent');
       
-      // 1. Force HTML/Body Background
-      html.style.backgroundColor = '#ffffff'; 
+    } else { 
+      // === LIGHT MODE ===
+      root.classList.remove('dark'); 
+      
+      // Paint the actual background behind the app
+      root.style.backgroundColor = '#ffffff'; 
       body.style.backgroundColor = '#ffffff'; 
       
-      // 2. Force Browser Interface
+      // Paint the Browser UI
       if (metaThemeColor) metaThemeColor.setAttribute('content', '#ffffff');
+      // iOS Status Bar style
+      if (metaAppleStatus) metaAppleStatus.setAttribute('content', 'default');
     }
   }, [darkMode]);
 
@@ -184,7 +191,6 @@ export default function ChatItNow() {
 
   const renderSystemMessage = (msg: Message) => {
     if (!msg.data) return null;
-    // Inline styles override Tailwind to guarantee color switch
     const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
     
     if (msg.data.action === 'connected') {
@@ -210,7 +216,7 @@ export default function ChatItNow() {
              <h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1>
              <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
           </div>
-          <div className="space-y-4 text-gray-700 text-sm sm:text-base"><p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p><p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p><p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p><p className="text-gray-600">ChatItNow is completely free and anonymous. Connect with fellow Filipinos, one conversation at a time.</p></div>
+          <div className="space-y-4 text-gray-700 text-sm sm:text-base"><p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p><p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p><p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p><p className="text-gray-600">ChatItNow is completely free, anonymous, and designed with your safety in mind. Connect with fellow Filipinos, one conversation at a time.</p></div>
           <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
         </div>
       </div>
@@ -234,7 +240,7 @@ export default function ChatItNow() {
         </div>
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto relative z-50">
+            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
               <div className="space-y-4 text-sm text-gray-700">
                 <p>Last updated: December 5, 2025</p>
@@ -356,9 +362,9 @@ export default function ChatItNow() {
             <div className="flex justify-start w-full">
               <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border border-gray-100`}>
                 <div className="flex gap-1">
-                  <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce delay-75"></div>
-                  <div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce delay-150"></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-150"></div>
                 </div>
               </div>
             </div>
