@@ -226,14 +226,10 @@ export default function ChatItNow() {
     );
   }
 
-  // --- MAIN CHAT INTERFACE ---
   return (
     <div className={`h-[100dvh] flex flex-col items-center ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
-      
-      {/* Container - Fixed Structure */}
       <div className={`w-full h-full sm:h-[95dvh] sm:my-auto sm:max-w-[420px] sm:rounded-2xl sm:shadow-2xl sm:overflow-hidden flex flex-col relative border-x ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}`}>
-
-        {/* Ads Overlay */}
+        
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
@@ -246,7 +242,6 @@ export default function ChatItNow() {
           </div>
         )}
 
-        {/* Searching Overlay */}
         {showSearching && (
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-2xl shadow-xl w-[95%] text-center`}>
@@ -263,83 +258,43 @@ export default function ChatItNow() {
           </div>
         )}
 
-        {/* HEADER */}
         <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} px-4 py-3 flex justify-between items-center shadow-sm z-10 shrink-0`}>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">C</div>
-            <span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-purple-900'}`}>ChatItNow</span>
-          </div>
+          <div className="flex items-center gap-2"><div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">C</div><span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-purple-900'}`}>ChatItNow</span></div>
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* TOP AD BANNER - Placed OUTSIDE the scroll area to prevent layout breaks */}
-        <div className={`w-full h-[60px] flex justify-center items-center shrink-0 border-b ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-100'}`}>
-           <div className="w-full h-full max-w-[320px] overflow-hidden">
-             <AdUnit 
-                client={ADSENSE_CLIENT_ID} 
-                slotId={AD_SLOT_SQUARE} 
-                format="horizontal" 
-                responsive="false"
-                style={{ display: 'block', maxHeight: '60px', width: '100%' }}
-             />
-           </div>
-        </div>
+        {/* CHAT AREA - Ad is moved INSIDE here so it scrolls */}
+        <div className={`flex-1 overflow-y-auto p-2 space-y-1 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+          
+          {/* --- TOP BANNER AD (Now scrollable) --- */}
+          <div className="w-full flex justify-center pb-2">
+             <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                <AdUnit 
+                   client={ADSENSE_CLIENT_ID} 
+                   slotId={AD_SLOT_SQUARE} 
+                   format="horizontal" 
+                   responsive="false"
+                   style={{ display: 'block', maxHeight: '50px', width: '100%' }}
+                />
+             </div>
+          </div>
 
-        {/* CHAT SCROLL AREA */}
-        <div className={`flex-1 overflow-y-auto p-4 space-y-2 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           <div className="text-center py-2">
              {partnerStatus === 'searching' ? (<span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>) : partnerStatus === 'disconnected' ? (<span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>) : (<span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>)}
           </div>
-
           {messages.map((msg, idx) => {
             let justifyClass = 'justify-center'; if (msg.type === 'you') justifyClass = 'justify-end'; if (msg.type === 'stranger') justifyClass = 'justify-start';
             return (
               <div key={idx} className={`flex w-full ${justifyClass}`}>
-                {msg.type === 'warning' ? (
-                  <div className="w-full text-center my-2">
-                    <div className="bg-yellow-100 border border-yellow-300 text-yellow-900 text-xs px-3 py-2 rounded-lg font-semibold inline-block">
-                      {msg.text}
-                    </div>
-                  </div>
-                ) : msg.type === 'system' ? (
-                  <div className="w-full text-center my-3 px-4">
-                    <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      {msg.data ? renderSystemMessage(msg) : msg.text}
-                    </span>
-                  </div>
-                ) : (
-                  <div className={`max-w-[85%] ${msg.type === 'you' ? 'items-end' : 'items-start'}`}>
-                    <div className={`px-4 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
-                      msg.type === 'you'
-                        ? 'bg-purple-600 text-white rounded-br-none' 
-                        : `${darkMode ? 'bg-gray-800 text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
-                    }`}>
-                      {msg.text}
-                    </div>
-                  </div>
-                )}
+                {msg.type === 'warning' ? (<div className="w-[90%] text-center my-2"><div className="bg-yellow-100 border border-yellow-300 text-yellow-900 text-xs px-3 py-2 rounded-lg font-semibold">{msg.text}</div></div>) : msg.type === 'system' ? (<div className="w-full text-center my-3 px-4"><span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{msg.data ? renderSystemMessage(msg) : msg.text}</span></div>) : (<div className={`max-w-[85%] ${msg.type === 'you' ? 'items-end' : 'items-start'}`}><div className={`px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${msg.type === 'you' ? 'bg-purple-600 text-white rounded-br-none' : `${darkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'} border border-gray-100 rounded-bl-none`}`}>{msg.text}</div></div>)}
               </div>
             );
           })}
-          
-          {isTyping && (
-            <div className="flex justify-start w-full">
-              <div className={`${darkMode ? 'bg-gray-800' : 'bg-gray-100'} px-4 py-2 rounded-2xl rounded-bl-none shadow-sm`}>
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></div>
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-150"></div>
-                </div>
-              </div>
-            </div>
-          )}
+          {isTyping && (<div className="flex justify-start w-full"><div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border border-gray-100`}><div className="flex gap-1"><div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce"></div><div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce delay-75"></div><div className="w-1 h-1 bg-gray-400 rounded-full animate-bounce delay-150"></div></div></div></div>)}
           <div ref={messagesEndRef} />
         </div>
 
-        {/* INPUT BAR */}
         <div className={`p-2 border-t shrink-0 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-          {/* Caution is now inside chat stream or system message, removed from sticky bottom to save space */}
-          
           <div className="flex gap-2 items-center h-[48px]">
             {partnerStatus === 'disconnected' ? (
               <button onClick={handleStartSearch} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl h-full shadow-md transition text-sm">Find New Partner</button>
@@ -358,7 +313,6 @@ export default function ChatItNow() {
             )}
           </div>
         </div>
-
       </div>
     </div>
   );
