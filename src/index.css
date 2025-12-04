@@ -2,33 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 1. DEFAULT (Light Mode) */
+/* 1. Define Strict Colors */
+:root {
+  --bg-color: #ffffff;
+}
+
+:root.dark {
+  --bg-color: #111827; /* gray-900 */
+}
+
+/* 2. Apply to HTML (The Canvas) */
 html {
-  background-color: #ffffff; /* White background */
+  background-color: var(--bg-color) !important;
   height: 100%;
   width: 100%;
   -webkit-tap-highlight-color: transparent;
 }
 
+/* 3. Apply to Body (The Page) */
 body {
-  background-color: #ffffff; /* White background */
-  min-height: 100vh;
-  min-height: -webkit-fill-available;
+  background-color: var(--bg-color) !important;
+  min-height: 100dvh; /* Dynamic Viewport Height */
+  width: 100%;
   margin: 0;
   padding: 0;
-  overscroll-behavior-y: none; /* Stop the rubber-band bounce */
+  overscroll-behavior: none; /* Stops the "bounce" that reveals white background */
 }
 
-/* 2. DARK MODE OVERRIDES (When html tag has class="dark") */
-html.dark {
-  background-color: #111827; /* Force Tailwind gray-900 Dark Blue */
-}
-
-html.dark body {
-  background-color: #111827; /* Force Tailwind gray-900 Dark Blue */
-}
-
+/* 4. Ensure App Root fills the body */
 #root {
-  height: 100%;
   width: 100%;
+  height: 100%;
+  background-color: var(--bg-color) !important;
 }

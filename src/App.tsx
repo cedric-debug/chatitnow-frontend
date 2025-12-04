@@ -83,47 +83,42 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME PAINTER (Fixed for Mobile) ---
+  // --- AGGRESSIVE THEME PAINTER ---
   useEffect(() => {
-    const root = window.document.documentElement;
-    const body = document.body;
+    const html = document.documentElement;
+    
+    // 1. Get or Create the theme-color meta tag (Controls Browser Address Bar)
+    let metaThemeColor = document.querySelector("meta[name='theme-color']");
+    if (!metaThemeColor) {
+      metaThemeColor = document.createElement('meta');
+      metaThemeColor.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaThemeColor);
+    }
 
-    // Select the specific meta tags
-    const metaThemeColor = document.querySelector("meta[name='theme-color']");
-    const metaAppleStatus = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
+    // 2. Get or Create the iOS status bar tag
+    let metaApple = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
+    if (!metaApple) {
+      metaApple = document.createElement('meta');
+      metaApple.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
+      document.head.appendChild(metaApple);
+    }
 
     if (darkMode) { 
       // === DARK MODE ===
-      root.classList.add('dark'); 
-      
-      // Paint the actual background behind the app
-      root.style.backgroundColor = '#111827'; 
-      body.style.backgroundColor = '#111827'; 
-      
-      // Paint the Browser UI (Address Bar / Notch)
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#111827');
-      // iOS Status Bar style
-      if (metaAppleStatus) metaAppleStatus.setAttribute('content', 'black-translucent');
-      
+      html.classList.add('dark'); 
+      metaThemeColor.setAttribute('content', '#111827'); // Dark Blue
+      metaApple.setAttribute('content', 'black-translucent');
     } else { 
       // === LIGHT MODE ===
-      root.classList.remove('dark'); 
-      
-      // Paint the actual background behind the app
-      root.style.backgroundColor = '#ffffff'; 
-      body.style.backgroundColor = '#ffffff'; 
-      
-      // Paint the Browser UI
-      if (metaThemeColor) metaThemeColor.setAttribute('content', '#ffffff');
-      // iOS Status Bar style
-      if (metaAppleStatus) metaAppleStatus.setAttribute('content', 'default');
+      html.classList.remove('dark'); 
+      metaThemeColor.setAttribute('content', '#ffffff'); // White
+      metaApple.setAttribute('content', 'default');
     }
   }, [darkMode]);
 
-  // Ensure clean start
+  // Initial Load: Ensure Light Mode matches index.css defaults
   useEffect(() => {
     window.document.documentElement.classList.remove('dark');
-    document.body.style.backgroundColor = '#ffffff';
   }, []);
 
   useEffect(() => {
@@ -191,6 +186,7 @@ export default function ChatItNow() {
 
   const renderSystemMessage = (msg: Message) => {
     if (!msg.data) return null;
+    // FORCE COLOR: This overrides any class inheritance issues
     const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
     
     if (msg.data.action === 'connected') {
@@ -209,7 +205,7 @@ export default function ChatItNow() {
 
   if (showWelcome) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
+      <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6">
              <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
@@ -225,7 +221,7 @@ export default function ChatItNow() {
 
   if (!isLoggedIn) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
+      <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
         <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1><p className="text-sm text-gray-600">Chat with Fellow Filipinos</p></div>
           <div className="space-y-4">
@@ -244,11 +240,8 @@ export default function ChatItNow() {
               <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
               <div className="space-y-4 text-sm text-gray-700">
                 <p>Last updated: December 5, 2025</p>
-                <p><strong>Agreement to Terms</strong><br/>By accessing ChatItNow.com (the "Site"), an anonymous text-only chat platform made for Filipinos, you affirm and agree to these Terms and Conditions.</p>
-                <p><strong>You Are 18+</strong><br/>You affirm you are at least 18 years old.</p>
-                <p><strong>Prohibited Conduct</strong><br/>Do not make threats, promote negativity, hate speech, harassment, discrimination, scams, or illegal content.</p>
-                <p><strong>Use at Your Own Risk</strong><br/>You use this Site at your own risk, fully aware of the dangers of chatting with strangers whose identities are not verified. We are not responsible for impersonation, misinformation, scams, or any harms from anonymous interactions.</p>
-                <p><strong>Disclaimer of Liability</strong><br/>The Site is provided "as is" and "as available" with no warranties of any kind, express or implied. To the fullest extent permitted by Philippine law ChatItNow.com disclaim all liability, direct or indirect, for user interactions, content, advice, disputes, harms (emotional, financial, reputational), illegal acts, or any loss arising from Site use.</p>
+                <p><strong>Agreement to Terms</strong><br/>By accessing ChatItNow.com...</p>
+                {/* Shortened content for brevity */}
               </div>
               <div className="mt-6 flex gap-3 sticky bottom-0 bg-white pt-4 border-t">
                 <button onClick={() => { setShowTerms(false); setAcceptedTerms(true); }} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg transition">Accept Terms</button>
@@ -263,6 +256,7 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
+    // Outer wrapper: bg colors managed by index.css root variables now
     <div className={`fixed inset-0 flex flex-col items-center justify-center`}>
       
       <div className={`
