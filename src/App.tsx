@@ -82,11 +82,21 @@ export default function ChatItNow() {
     };
   }, []);
 
+  // --- DARK MODE LOGIC ---
   useEffect(() => {
     const root = window.document.documentElement;
-    if (darkMode) { root.classList.add('dark'); document.body.style.backgroundColor = '#111827'; } 
-    else { root.classList.remove('dark'); document.body.style.backgroundColor = '#ffffff'; }
+    if (darkMode) { 
+      root.classList.add('dark'); 
+      document.body.style.backgroundColor = '#111827'; 
+    } else { 
+      root.classList.remove('dark'); 
+      document.body.style.backgroundColor = '#ffffff'; 
+    }
   }, [darkMode]);
+
+  useEffect(() => {
+    window.document.documentElement.classList.remove('dark');
+  }, []);
 
   useEffect(() => {
     if (isConnected) {
@@ -203,7 +213,6 @@ export default function ChatItNow() {
               <div className="space-y-4 text-sm text-gray-700">
                 <p>Last updated: December 4, 2025</p>
                 <p><strong>Agreement to Terms</strong><br/>By accessing ChatItNow.com...</p>
-                {/* Content shortened for brevity, keeping existing structure */}
                 <p><strong>Disclaimer of Liability</strong><br/>The Site is provided "as is"...</p>
               </div>
               <div className="mt-6 flex gap-3 sticky bottom-0 bg-white pt-4 border-t">
@@ -249,32 +258,33 @@ export default function ChatItNow() {
           </div>
         )}
 
-        {/* Header */}
         <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} px-4 py-3 flex justify-between items-center shadow-sm z-10 shrink-0`}>
-          <div className="flex items-center gap-2">
-             <img src="/apple-touch-icon.png" alt="Logo" className="w-8 h-8 rounded-full shadow-sm" />
-             <span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-purple-900'}`}>ChatItNow</span>
-          </div>
+          <div className="flex items-center gap-2"><div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">C</div><span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-purple-900'}`}>ChatItNow</span></div>
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* Chat Area */}
         <div className={`flex-1 overflow-y-auto p-2 space-y-1 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* --- RESIZED BANNER AD: 50px Mobile (h-[50px]) / 90px Desktop (sm:h-[90px]) --- */}
+          {/* --- MOBILE AD BANNER (Forced Horizontal) --- */}
+          {/* Using format='horizontal' and style overrides to force AdSense to stay small */}
           <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-2 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
-             <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_SQUARE} />
+             <AdUnit 
+                client={ADSENSE_CLIENT_ID} 
+                slotId={AD_SLOT_SQUARE} 
+                format="horizontal" 
+                responsive="false"
+                style={{ display: 'block', maxHeight: '50px', width: '100%' }} // Strict style for mobile
+             />
           </div>
 
           <div className="text-center py-2">
              {partnerStatus === 'searching' ? (<span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>) : partnerStatus === 'disconnected' ? (<span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>) : (<span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>)}
           </div>
-          
           {messages.map((msg, idx) => {
             let justifyClass = 'justify-center'; if (msg.type === 'you') justifyClass = 'justify-end'; if (msg.type === 'stranger') justifyClass = 'justify-start';
             return (
               <div key={idx} className={`flex w-full ${justifyClass}`}>
-                {msg.type === 'system' ? (<div className="w-full text-center my-3 px-4"><span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{msg.data ? renderSystemMessage(msg) : msg.text}</span></div>) : (<div className={`max-w-[85%] ${msg.type === 'you' ? 'items-end' : 'items-start'}`}><div className={`px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${msg.type === 'you' ? 'bg-purple-600 text-white rounded-br-none' : `${darkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'} border border-gray-100 rounded-bl-none`}`}>{msg.text}</div></div>)}
+                {msg.type === 'warning' ? (<div className="w-[90%] text-center my-2"><div className="bg-yellow-100 border border-yellow-300 text-yellow-900 text-xs px-3 py-2 rounded-lg font-semibold">{msg.text}</div></div>) : msg.type === 'system' ? (<div className="w-full text-center my-3 px-4"><span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{msg.data ? renderSystemMessage(msg) : msg.text}</span></div>) : (<div className={`max-w-[85%] ${msg.type === 'you' ? 'items-end' : 'items-start'}`}><div className={`px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${msg.type === 'you' ? 'bg-purple-600 text-white rounded-br-none' : `${darkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'} border border-gray-100 rounded-bl-none`}`}>{msg.text}</div></div>)}
               </div>
             );
           })}
@@ -282,18 +292,8 @@ export default function ChatItNow() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Footer Area */}
         <div className={`p-2 border-t shrink-0 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-          
-          {/* --- CAUTION MESSAGE (Now correctly placed ABOVE input bar) --- */}
-          {isConnected && (
-            <div className="text-center pb-2">
-               <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-[10px] px-2 py-0.5 rounded inline-block">
-                 ⚠️ Caution: Always verify professional advice from strangers.
-               </div>
-            </div>
-          )}
-          
+          {isConnected && (<div className="text-center pb-2"><div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-[10px] px-2 py-0.5 rounded inline-block">⚠️ Caution: Always verify professional advice from strangers.</div></div>)}
           <div className="flex gap-2 items-center h-[48px]">
             {partnerStatus === 'disconnected' ? (
               <button onClick={handleStartSearch} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl h-full shadow-md transition text-sm">Find New Partner</button>
