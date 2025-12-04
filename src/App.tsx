@@ -213,15 +213,13 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-    <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
+    // LAYOUT FIX: FIXED INSET 0 prevents the whole page from scrolling.
+    <div className={`fixed inset-0 flex flex-col items-center justify-center overflow-hidden ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
       
-      {/* 
-         LAYOUT FIX (v51): 
-         - h-[100dvh]: Force full height on mobile
-         - sm:h-[90vh]: Force 90% height on desktop (Tall box)
-         - Removed max-h limit so it doesn't squash
-      */}
-      <div className={`w-full h-[100dvh] sm:h-[90vh] sm:max-w-[420px] sm:rounded-2xl sm:shadow-2xl sm:overflow-hidden flex flex-col relative border-x ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}`}>
+      {/* APP SHELL: Strict Height Enforcement */}
+      {/* w-full h-full (Mobile) | sm:h-[90vh] (Desktop) */}
+      {/* overflow-hidden is CRITICAL here to force internal scrolling */}
+      <div className={`flex flex-col w-full h-full sm:h-[90vh] sm:max-h-[900px] sm:max-w-[420px] sm:rounded-2xl sm:shadow-2xl overflow-hidden relative border-x ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}`}>
         
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
@@ -251,15 +249,16 @@ export default function ChatItNow() {
           </div>
         )}
 
-        <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} px-4 py-3 flex justify-between items-center shadow-sm z-10 shrink-0`}>
+        {/* HEADER (Fixed, does not shrink) */}
+        <div className={`h-[60px] shrink-0 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} px-4 flex justify-between items-center shadow-sm z-10`}>
           <div className="flex items-center gap-2"><div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">C</div><span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-purple-900'}`}>ChatItNow</span></div>
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* CHAT AREA - Added flex-grow to fill the forced height */}
-        <div className={`flex-grow overflow-y-auto p-2 space-y-1 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        {/* CHAT AREA (Flex-1 to fill space, min-h-0 to allow scrolling) */}
+        <div className={`flex-1 overflow-y-auto min-h-0 p-2 space-y-1 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* BANNER AD (Scrollable) */}
+          {/* BANNER AD (Inside scrollable area) */}
           <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
@@ -303,7 +302,7 @@ export default function ChatItNow() {
           
           {isTyping && (
             <div className="flex justify-start w-full">
-              <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border border-gray-100`}>
+              <div className={`${darkMode ? 'bg-gray-800' : 'bg-gray-100'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm`}>
                 <div className="flex gap-1">
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></div>
@@ -315,9 +314,9 @@ export default function ChatItNow() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* INPUT BAR */}
-        <div className={`p-2 border-t shrink-0 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-          <div className="flex gap-2 items-center h-[48px]">
+        {/* INPUT BAR (Fixed Height, Shrink 0) */}
+        <div className={`h-[60px] shrink-0 p-2 border-t ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+          <div className="flex gap-2 items-center h-full">
             {partnerStatus === 'disconnected' ? (
               <button onClick={handleStartSearch} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl h-full shadow-md transition text-sm">Find New Partner</button>
             ) : !showNextConfirm ? (
