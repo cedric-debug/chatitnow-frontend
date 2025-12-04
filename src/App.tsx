@@ -182,8 +182,7 @@ export default function ChatItNow() {
   if (showWelcome) {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
-        {/* WELCOME CARD - Matches Login Size */}
-        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
+        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-[90vh] overflow-y-auto">
           <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1><div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div></div>
           <div className="space-y-4 text-gray-700 text-sm sm:text-base"><p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p><p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p><p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p><p className="text-gray-600">ChatItNow is completely free, anonymous, and designed with your safety in mind. Connect with fellow Filipinos, one conversation at a time.</p></div>
           <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
@@ -195,7 +194,7 @@ export default function ChatItNow() {
   if (!isLoggedIn) {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-purple-900 via-indigo-800 to-blue-900 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
+        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-[90vh] overflow-y-auto">
           <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1><p className="text-sm text-gray-600">Chat with Fellow Filipinos</p></div>
           <div className="space-y-4">
             <div><label className="block text-sm font-semibold text-gray-700 mb-1.5">Choose a Username</label><input type="text" value={username} onChange={(e) => setUsername(e.target.value)} onKeyPress={handleKeyPress} placeholder="Enter username..." className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm" maxLength={20} /></div>
@@ -212,16 +211,23 @@ export default function ChatItNow() {
     );
   }
 
+  // --- MAIN CHAT INTERFACE ---
   return (
-    <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
+    <div className={`fixed inset-0 w-full h-full flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
       
       {/* 
          LAYOUT FIX: 
-         - h-[100dvh] (Full height on mobile)
-         - sm:h-[90vh] (90% of screen on Desktop, no max-h limit)
-         - This effectively creates a "tall phone" on desktop
+         - Mobile: h-full w-full (Takes entire screen)
+         - Desktop: h-[90vh] (Forced tall) w-[420px] (Phone width)
+         - This prevents the "squashed" look
       */}
-      <div className={`w-full h-[100dvh] sm:h-[90vh] sm:max-w-[420px] sm:rounded-2xl sm:shadow-2xl sm:overflow-hidden flex flex-col relative border-x ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}`}>
+      <div className={`
+        flex flex-col relative overflow-hidden
+        w-full h-full 
+        sm:w-[420px] sm:h-[90vh] sm:max-h-[900px] 
+        sm:rounded-2xl sm:shadow-2xl sm:border-x
+        ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}
+      `}>
         
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
@@ -251,24 +257,23 @@ export default function ChatItNow() {
           </div>
         )}
 
-        <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} px-4 py-3 flex justify-between items-center shadow-sm z-10 shrink-0`}>
+        {/* HEADER (Fixed Height) */}
+        <div className={`h-[60px] shrink-0 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'} px-4 flex justify-between items-center shadow-sm z-10`}>
           <div className="flex items-center gap-2"><div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">C</div><span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-purple-900'}`}>ChatItNow</span></div>
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
+        {/* CHAT AREA (Fills all remaining space) */}
         <div className={`flex-1 overflow-y-auto p-2 space-y-1 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* --- TOP BANNER AD (Scrolls with messages) --- */}
-          <div className="w-full flex justify-center pb-2">
-             <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
-                <AdUnit 
-                   client={ADSENSE_CLIENT_ID} 
-                   slotId={AD_SLOT_SQUARE} 
-                   format="horizontal" 
-                   responsive="false"
-                   style={{ display: 'block', maxHeight: '50px', width: '100%' }}
-                />
-             </div>
+          <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+             <AdUnit 
+                client={ADSENSE_CLIENT_ID} 
+                slotId={AD_SLOT_SQUARE} 
+                format="horizontal" 
+                responsive="false"
+                style={{ display: 'block', maxHeight: '50px', width: '100%' }}
+             />
           </div>
 
           <div className="text-center py-2">
@@ -286,8 +291,9 @@ export default function ChatItNow() {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className={`p-2 border-t shrink-0 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-          <div className="flex gap-2 items-center h-[48px]">
+        {/* INPUT BAR (Fixed Height) */}
+        <div className={`h-[60px] shrink-0 p-2 border-t ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+          <div className="flex gap-2 items-center h-full">
             {partnerStatus === 'disconnected' ? (
               <button onClick={handleStartSearch} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl h-full shadow-md transition text-sm">Find New Partner</button>
             ) : !showNextConfirm ? (
