@@ -86,12 +86,12 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME CONTROLLER (FIXED) ---
+  // --- THEME CONTROLLER (CRITICAL FIX) ---
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
     
-    // Find or create the meta tag that controls the browser address bar color
+    // 1. Manage Theme Color Meta (Address Bar)
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
@@ -99,28 +99,50 @@ export default function ChatItNow() {
       document.head.appendChild(metaThemeColor);
     }
 
+    // 2. Manage iOS Status Bar Meta
+    let metaStatusBar = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
+    if (!metaStatusBar) {
+        metaStatusBar = document.createElement('meta');
+        metaStatusBar.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
+        document.head.appendChild(metaStatusBar);
+    }
+
+    // THEME COLORS (Must match index.css)
+    const COLOR_DARK = '#111827'; // Gray 900 (Matches your index.css)
+    const COLOR_LIGHT = '#ffffff';
+
     if (darkMode) { 
+      // Add Dark Class for Tailwind
       html.classList.add('dark');
-      // FIXED: Force Body Background to #111827 (Gray-900) to match the dark app theme
-      body.style.backgroundColor = '#111827'; 
-      // FIXED: Tell browser (Safari/Chrome) to make the address bar dark
-      metaThemeColor.setAttribute('content', '#111827');
+      
+      // FORCE INLINE STYLES (Overrides System Preferences for Overscroll Area)
+      html.style.backgroundColor = COLOR_DARK; 
+      body.style.backgroundColor = COLOR_DARK; 
+      
+      // Update Browser UI
+      metaThemeColor.setAttribute('content', COLOR_DARK);
+      metaStatusBar.setAttribute('content', 'black-translucent'); 
+      
     } else { 
+      // Remove Dark Class
       html.classList.remove('dark'); 
-      // FIXED: Force Body Background to White to kill the black bar at the bottom
-      body.style.backgroundColor = '#ffffff';
-      // FIXED: Tell browser (Safari/Chrome) to make the address bar White
-      metaThemeColor.setAttribute('content', '#ffffff'); 
+      
+      // FORCE INLINE STYLES (Overrides System Preferences for Overscroll Area)
+      html.style.backgroundColor = COLOR_LIGHT; 
+      body.style.backgroundColor = COLOR_LIGHT;
+      
+      // Update Browser UI
+      metaThemeColor.setAttribute('content', COLOR_LIGHT); 
+      metaStatusBar.setAttribute('content', 'default');
     }
   }, [darkMode]);
 
-  // Ensure clean start on mount (Forces white initially)
+  // Initial Cleanup on Mount
   useEffect(() => {
+    // Start pure white
+    document.documentElement.style.backgroundColor = '#ffffff';
     document.body.style.backgroundColor = '#ffffff';
     document.documentElement.classList.remove('dark');
-    // Ensure meta tag starts white
-    const meta = document.querySelector("meta[name='theme-color']");
-    if (meta) meta.setAttribute('content', '#ffffff');
   }, []);
 
   useEffect(() => {
@@ -260,7 +282,7 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // Outer Wrapper: bg-gray-900 in Dark Mode (matches chat area), bg-white in Light Mode
+  // Outer Wrapper: bg-gray-900 (#111827) in Dark Mode to match index.css EXACTLY
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
       <div className={`
@@ -272,7 +294,7 @@ export default function ChatItNow() {
         {/* Fullscreen Ad Overlay */}
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
+            <div className={`${darkMode ? 'bg-gray-900' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
               <p className="text-xs text-gray-500 mb-2">Advertisement</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_VERTICAL} />
@@ -285,13 +307,13 @@ export default function ChatItNow() {
         {/* Searching Overlay */}
         {showSearching && (
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-2xl shadow-xl w-[95%] text-center`}>
+            <div className={`${darkMode ? 'bg-gray-900' : 'bg-white'} p-6 rounded-2xl shadow-xl w-[95%] text-center`}>
               <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
               <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Finding Partner...</h3>
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-4`}>Looking in {field || 'All Fields'}</p>
-              <div className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-200'} border rounded-lg p-2`}>
+              <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-200'} border rounded-lg p-2`}>
                 <p className={`text-[10px] mb-1 opacity-50 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Advertisement</p>
-                <div className={`${darkMode ? 'bg-gray-600' : 'bg-gray-200'} h-64 rounded flex items-center justify-center overflow-hidden`}>
+                <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-200'} h-64 rounded flex items-center justify-center overflow-hidden`}>
                   <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_SQUARE} />
                 </div>
               </div>
@@ -300,7 +322,7 @@ export default function ChatItNow() {
         )}
 
         {/* HEADER */}
-        <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
+        <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-900 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
               src="/logo.png" 
@@ -310,14 +332,14 @@ export default function ChatItNow() {
             />
             <span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-purple-900'}`}>ChatItNow</span>
           </div>
-          <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
+          <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-800 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
         {/* CHAT AREA */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD - LOCKED SIZE */}
-          <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+          {/* TOP BANNER AD */}
+          <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
                 slotId={AD_SLOT_TOP_BANNER} 
@@ -373,14 +395,14 @@ export default function ChatItNow() {
         </div>
 
         {/* INPUT BAR */}
-        <div className={`absolute bottom-0 left-0 right-0 h-[60px] p-2 border-t z-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+        <div className={`absolute bottom-0 left-0 right-0 h-[60px] p-2 border-t z-20 ${darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-100'}`}>
           <div className="flex gap-2 items-center h-full">
             {partnerStatus === 'disconnected' ? (
               <button onClick={handleStartSearch} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl h-full shadow-md transition text-sm">Find New Partner</button>
             ) : !showNextConfirm ? (
               <>
                 <button onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full aspect-square rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'} disabled:opacity-50`}><SkipForward size={18} /></button>
-                <input type="text" value={currentMessage} onChange={handleTyping} onKeyPress={handleKeyPress} placeholder={isConnected ? "Say something..." : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
+                <input type="text" value={currentMessage} onChange={handleTyping} onKeyPress={handleKeyPress} placeholder={isConnected ? "Say something..." : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
                 <button onClick={handleSendMessage} disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
               </>
             ) : (
