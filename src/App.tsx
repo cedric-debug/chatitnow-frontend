@@ -53,6 +53,7 @@ export default function ChatItNow() {
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
+  // Scroll to bottom when messages change OR when typing starts
   useEffect(() => { 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); 
   }, [messages, isTyping]);
@@ -308,7 +309,7 @@ export default function ChatItNow() {
   return (
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
-      {/* --- ADDED: Custom CSS for wave animation --- */}
+      {/* Wave Keyframes */}
       <style>{`
         @keyframes wave {
           0%, 60%, 100% { transform: translateY(0); }
@@ -323,7 +324,6 @@ export default function ChatItNow() {
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[650px] sm:shadow-2xl 
         transition-colors duration-200
-        /* FIXED: Squared corners (removed rounded-2xl), full height, side borders only */
         border-0 sm:border-x
         ${darkMode ? 'bg-gray-900 sm:border-gray-700' : 'bg-white sm:border-gray-200'}
       `}>
@@ -426,16 +426,14 @@ export default function ChatItNow() {
             );
           })}
           
-          {/* --- UPDATED TYPING INDICATOR: WAVE ANIMATION & LARGER BUBBLE --- */}
+          {/* UPDATED: Matches exact padding (px-3 py-2) and height of text message bubbles */}
           {isTyping && (
             <div className="flex justify-start w-full">
-              {/* Changed bg-white to bg-gray-100 to match stranger messages */}
-              {/* Increased padding to px-4 py-3 to match text bubble height */}
-              <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} px-4 py-3 rounded-2xl rounded-bl-none shadow-sm border-0 flex items-center`}>
-                <div className="flex gap-1.5 h-4 items-center">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-wave" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-wave" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-wave" style={{ animationDelay: '300ms' }}></div>
+              <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border-0 flex items-center`}>
+                <div className="flex gap-1 h-[21px] items-center">
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-wave" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-wave" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-wave" style={{ animationDelay: '300ms' }}></div>
                 </div>
               </div>
             </div>
