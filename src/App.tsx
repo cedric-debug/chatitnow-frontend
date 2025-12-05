@@ -95,22 +95,15 @@ export default function ChatItNow() {
     const activeColor = darkMode ? DARK_THEME_COLOR : LIGHT_THEME_COLOR;
     const activeStatusText = darkMode ? 'black-translucent' : 'default';
 
-    // 1. DESKTOP BACKGROUND
-    const BG_DESKTOP = '#111827'; // Gray 900 (Dark) or Pitch Black depending on taste
-    const BG_LIGHT = '#ffffff';
-    const desktopBg = darkMode ? BG_DESKTOP : BG_LIGHT;
-
     if (darkMode) {
       html.classList.add('dark');
     } else {
       html.classList.remove('dark');
     }
 
-    // Force Body/HTML Background (Handles mobile/desktop voids)
-    body.style.backgroundColor = desktopBg;
-    html.style.backgroundColor = desktopBg;
+    body.style.backgroundColor = activeColor;
+    html.style.backgroundColor = activeColor;
 
-    // Mobile Notch Sync (Only updates mobile address bar)
     const updateMeta = (name: string, content: string) => {
       let meta = document.querySelector(`meta[name='${name}']`);
       if (!meta) {
@@ -126,7 +119,6 @@ export default function ChatItNow() {
 
   }, [darkMode]);
 
-  // Clean Start
   useLayoutEffect(() => {
     document.documentElement.classList.remove('dark');
     document.body.style.backgroundColor = '#ffffff';
@@ -280,17 +272,13 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-zinc-950' : 'bg-white'}`}>
       
-      {/* 
-         - Updated: Removes "border" from the main list. 
-         - Logic: Uses "border-4" for dark mode (intense border) and "border-2" for light mode.
-      */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[650px] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl 
-        transition-colors duration-200
-        ${darkMode ? 'bg-gray-900 border-4 border-gray-600' : 'bg-white border-2 border-gray-200'}
+        border transition-colors duration-200
+        ${darkMode ? 'bg-gray-900 border-4 border-gray-700' : 'bg-white border-2 border-gray-200'}
       `}>
         
         {/* Fullscreen Ad Overlay */}
@@ -333,13 +321,14 @@ export default function ChatItNow() {
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
             {/* PURPLE LOGO COLOR */}
-            <span className={`font-bold text-lg ${darkMode ? 'text-purple-500' : 'text-purple-600'}`}>ChatItNow</span>
+            <span className="font-bold text-lg text-purple-600">ChatItNow</span>
           </div>
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
         {/* CHAT AREA */}
-        <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        {/* Added space-y-3 for better bubble separation */}
+        <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-3 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
           {/* TOP BANNER AD (FIXED) */}
           <div className="w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg bg-gray-100">
@@ -370,10 +359,11 @@ export default function ChatItNow() {
                   </div>
                 ) : (
                   <div className={`max-w-[85%] ${msg.type === 'you' ? 'items-end' : 'items-start'}`}>
+                    {/* BUBBLE STYLING: Improved Dark Mode Colors (Gray-700) */}
                     <div className={`px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
                       msg.type === 'you'
                         ? 'bg-purple-600 text-white rounded-br-none' 
-                        : `${darkMode ? 'bg-gray-800 text-gray-100' : 'bg-white text-gray-900'} border border-gray-100 rounded-bl-none`
+                        : `${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
                     }`}>
                       {msg.text}
                     </div>
@@ -405,6 +395,7 @@ export default function ChatItNow() {
             ) : !showNextConfirm ? (
               <>
                 <button onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full aspect-square rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'} disabled:opacity-50`}><SkipForward size={18} /></button>
+                {/* Lighter Input Background in Dark Mode for contrast */}
                 <input type="text" value={currentMessage} onChange={handleTyping} onKeyPress={handleKeyPress} placeholder={isConnected ? "Say something..." : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
                 <button onClick={handleSendMessage} disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
               </>
