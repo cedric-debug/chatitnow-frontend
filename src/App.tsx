@@ -501,7 +501,7 @@ export default function ChatItNow() {
               
               <div className="text-center pt-2">
                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking advice from strangers. Do you due diligence.
+                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking advice from strangers. Do your due diligence.
                  </p>
               </div>
 
