@@ -94,10 +94,11 @@ export default function ChatItNow() {
     const html = document.documentElement;
     const body = document.body;
 
-    const APP_NOTCH_DARK = '#1f2937'; 
+    const APP_NOTCH_DARK = '#1f2937'; // Header Color (Gray 800)
     const APP_NOTCH_LIGHT = '#ffffff';
     
-    const DESKTOP_BG_DARK = '#09090b'; 
+    // UPDATED: Desktop Background now matches UI Dark Mode Color (Gray 900)
+    const DESKTOP_BG_DARK = '#111827'; 
     const DESKTOP_BG_LIGHT = '#ffffff';
 
     const currentMetaColor = darkMode ? APP_NOTCH_DARK : APP_NOTCH_LIGHT;
@@ -110,6 +111,7 @@ export default function ChatItNow() {
       html.classList.remove('dark');
     }
 
+    // Apply Background
     body.style.backgroundColor = currentBgColor;
     html.style.backgroundColor = currentBgColor;
 
@@ -281,7 +283,7 @@ export default function ChatItNow() {
         
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-2xl max-w-[700px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
               <div className="space-y-4 text-sm text-gray-700">
                 <p>Last updated: December 5, 2025</p>
@@ -304,21 +306,21 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-zinc-950' : 'bg-white'}`}>
+  // FIXED: Outer background now matches the App UI (Gray-900) instead of being Black
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
-        sm:w-[650px] sm:rounded-2xl sm:shadow-2xl 
-        transition-colors duration-200
-        border-0 sm:border
-        ${darkMode ? 'bg-gray-900 sm:border-gray-700' : 'bg-white sm:border-gray-200'}
+        sm:w-[650px] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl 
+        border transition-colors duration-200
+        ${darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}
       `}>
         
         {/* Fullscreen Ad Overlay */}
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Advertisement"}</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
