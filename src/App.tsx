@@ -32,7 +32,7 @@ export default function ChatItNow() {
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
   
-  // FIXED: Default is strictly FALSE (White/Light mode)
+  // 1. DEFAULT IS WHITE (No static darkness)
   const [darkMode, setDarkMode] = useState(false);
 
   const [showNextConfirm, setShowNextConfirm] = useState(false);
@@ -86,12 +86,12 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME CONTROLLER (CRITICAL FIX) ---
+  // --- 2. THEME CONTROLLER (CONFLICT FREE) ---
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
-    
-    // 1. Manage Theme Color Meta (Address Bar)
+
+    // Grab or create meta tags for address bar control
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
@@ -99,50 +99,38 @@ export default function ChatItNow() {
       document.head.appendChild(metaThemeColor);
     }
 
-    // 2. Manage iOS Status Bar Meta
-    let metaStatusBar = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
-    if (!metaStatusBar) {
-        metaStatusBar = document.createElement('meta');
-        metaStatusBar.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
-        document.head.appendChild(metaStatusBar);
-    }
-
-    // THEME COLORS (Must match index.css)
-    const COLOR_DARK = '#111827'; // Gray 900 (Matches your index.css)
-    const COLOR_LIGHT = '#ffffff';
+    // MATCHING YOUR INDEX.CSS EXACTLY
+    const DARK_BG = '#111827'; // Tailwind gray-900 (Matches your index.css)
+    const LIGHT_BG = '#ffffff';
 
     if (darkMode) { 
-      // Add Dark Class for Tailwind
+      // Add class for Tailwind
       html.classList.add('dark');
       
-      // FORCE INLINE STYLES (Overrides System Preferences for Overscroll Area)
-      html.style.backgroundColor = COLOR_DARK; 
-      body.style.backgroundColor = COLOR_DARK; 
+      // Force Inline Styles (Fixes the "static bar" issue)
+      html.style.backgroundColor = DARK_BG;
+      body.style.backgroundColor = DARK_BG;
       
-      // Update Browser UI
-      metaThemeColor.setAttribute('content', COLOR_DARK);
-      metaStatusBar.setAttribute('content', 'black-translucent'); 
-      
+      // Update Browser Address Bar
+      metaThemeColor.setAttribute('content', DARK_BG); 
     } else { 
-      // Remove Dark Class
+      // Remove class
       html.classList.remove('dark'); 
       
-      // FORCE INLINE STYLES (Overrides System Preferences for Overscroll Area)
-      html.style.backgroundColor = COLOR_LIGHT; 
-      body.style.backgroundColor = COLOR_LIGHT;
+      // Force Inline Styles
+      html.style.backgroundColor = LIGHT_BG;
+      body.style.backgroundColor = LIGHT_BG;
       
-      // Update Browser UI
-      metaThemeColor.setAttribute('content', COLOR_LIGHT); 
-      metaStatusBar.setAttribute('content', 'default');
+      // Update Browser Address Bar
+      metaThemeColor.setAttribute('content', LIGHT_BG); 
     }
   }, [darkMode]);
 
-  // Initial Cleanup on Mount
+  // 3. CLEANUP (Ensures app starts White/Clean)
   useEffect(() => {
-    // Start pure white
+    document.documentElement.classList.remove('dark');
     document.documentElement.style.backgroundColor = '#ffffff';
     document.body.style.backgroundColor = '#ffffff';
-    document.documentElement.classList.remove('dark');
   }, []);
 
   useEffect(() => {
@@ -282,7 +270,7 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // Outer Wrapper: bg-gray-900 (#111827) in Dark Mode to match index.css EXACTLY
+  // FIXED: Using bg-gray-900 (same as index.css)
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
       <div className={`
@@ -338,7 +326,7 @@ export default function ChatItNow() {
         {/* CHAT AREA */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD */}
+          {/* TOP BANNER AD (FIXED SIZE) */}
           <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
