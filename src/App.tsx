@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { SkipForward, Moon, Sun, Volume2, VolumeX, X, Reply } from 'lucide-react';
-import io from 'socket.io-client'; // FIX: Removed { Socket } to solve the error
+import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 
 // --- CONFIGURATION ---
@@ -15,7 +15,6 @@ const AD_SLOT_INACTIVITY = "2655630641";
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
-// --- SESSION ID HELPER (Placed Here) ---
 const getSessionID = () => {
   if (typeof window === 'undefined') return '';
   let sessionID = localStorage.getItem("chat_session_id");
@@ -26,7 +25,6 @@ const getSessionID = () => {
   return sessionID;
 };
 
-// --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
   autoConnect: false,
   reconnection: true,             
@@ -261,9 +259,12 @@ export default function ChatItNow() {
       resetActivity();
     });
 
+    // --- UPDATED: HANDLE PARTNER DISCONNECT ---
     socket.on('partner_disconnected', () => {
       setIsConnected(false);
       setPartnerStatus('disconnected');
+      setIsTyping(false); // Stop typing bubble immediately
+      setReplyingTo(null); // Clear reply context
       const nameToShow = partnerNameRef.current || 'Partner';
       setMessages(prev => [...prev, { type: 'system', data: { name: nameToShow, action: 'disconnected' } }]);
     });
@@ -409,6 +410,7 @@ export default function ChatItNow() {
     setShowNextConfirm(false);
     setPartnerStatus('disconnected');
     setMessages(prev => [...prev, { type: 'system', data: { name: username, action: 'disconnected' } }]);
+    setIsTyping(false); // Stop typing on manual disconnect
     setReplyingTo(null);
   };
 
@@ -540,7 +542,6 @@ export default function ChatItNow() {
   return (
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
-      {/* Wave Keyframes */}
       <style>{`
         @keyframes typing-bounce {
           0%, 100% {
@@ -693,6 +694,7 @@ export default function ChatItNow() {
             );
           })}
           
+          {/* Typing Indicator */}
           {isTyping && (
             <div className="flex justify-start w-full">
               <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border-0 flex items-center`}>
@@ -744,4 +746,4 @@ export default function ChatItNow() {
       </div>
     </div>
   );
-}//
+}
