@@ -84,53 +84,49 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME LOGIC (FIXED FOR TOP STATUS BAR) ---
+  // --- THEME LOGIC (FIXED) ---
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
-    
-    // 1. Get Address Bar Meta Tag (Chrome/Safari)
+
+    // 1. COLORS MATCHING TAILWIND & INDEX.CSS
+    const HEADER_DARK = '#1f2937'; // Gray 800 (Header Color)
+    const BODY_DARK = '#111827';   // Gray 900 (Chat Body)
+    const LIGHT_BG = '#ffffff';
+
+    // 2. META TAG MANAGEMENT (Prevents Duplicates)
+    // We try to find the tag that ALREADY exists in index.html
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
-    if (!metaThemeColor) {
-      metaThemeColor = document.createElement('meta');
-      metaThemeColor.setAttribute('name', 'theme-color');
-      document.head.appendChild(metaThemeColor);
-    }
-
-    // 2. Get iOS Status Bar Style Meta Tag
-    let metaStatusStyle = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
-    if (!metaStatusStyle) {
-      metaStatusStyle = document.createElement('meta');
-      metaStatusStyle.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
-      document.head.appendChild(metaStatusStyle);
-    }
-
-    // COLORS
-    const HEADER_DARK = '#1f2937'; // Gray 800 (Matches Header)
-    const BODY_DARK = '#111827';   // Gray 900 (Matches Chat)
-    const WHITE = '#ffffff';
+    let metaStatusBar = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
 
     if (darkMode) { 
+      // --- DARK MODE ON ---
       html.classList.add('dark');
-      
-      // CRITICAL FIX: Make the HTML bg match the HEADER (for top bounce/status bar)
-      html.style.backgroundColor = HEADER_DARK; 
-      // Make the BODY bg match the CHAT (for the rest of the app)
+
+      // Force HTML bg to match HEADER (Fixes top status bar bounce color)
+      html.style.backgroundColor = HEADER_DARK;
+      // Force Body bg to match CHAT (Fixes bottom bounce color)
       body.style.backgroundColor = BODY_DARK;
 
-      // Update Browser Address Bar to match HEADER
-      metaThemeColor.setAttribute('content', HEADER_DARK); 
-      // Update iOS Status Bar to allow white text
-      metaStatusStyle.setAttribute('content', 'black-translucent'); 
+      // Update Browser Address Bar to match HEADER (Gray 800)
+      if (metaThemeColor) metaThemeColor.setAttribute('content', HEADER_DARK);
       
-    } else { 
-      html.classList.remove('dark'); 
-      
-      html.style.backgroundColor = WHITE;
-      body.style.backgroundColor = WHITE;
+      // Update iOS Status Bar Text to White
+      if (metaStatusBar) metaStatusBar.setAttribute('content', 'black-translucent');
 
-      metaThemeColor.setAttribute('content', WHITE); 
-      metaStatusStyle.setAttribute('content', 'default'); 
+    } else { 
+      // --- DARK MODE OFF ---
+      html.classList.remove('dark');
+      
+      // Reset backgrounds to White
+      html.style.backgroundColor = LIGHT_BG;
+      body.style.backgroundColor = LIGHT_BG;
+
+      // Update Browser Address Bar to White
+      if (metaThemeColor) metaThemeColor.setAttribute('content', LIGHT_BG);
+      
+      // Update iOS Status Bar Text to Dark
+      if (metaStatusBar) metaStatusBar.setAttribute('content', 'default');
     }
   }, [darkMode]);
 
