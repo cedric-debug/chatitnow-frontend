@@ -482,11 +482,11 @@ export default function ChatItNow() {
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
-            <div className={`space-y-4 text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                <p><strong>ChatItNow</strong> was created to give Filipinos a simple and safe place to connect with others from anywhere in the country. Whether you're a student, a professional, or just someone looking to talk, this platform is for anyone who wants to meet new people or share their experiences with others.</p>
-                <p>Sometimes, it's hard to find someone to talk to—whether its about life, school, work, or anything you're going through. That's why ChatItNow exists. Here, you can have real conversations, make new friends, or just chill and chat with someone who might understand what you're feeling. Everything is anonymous, so you can open up without worrying about being judged.</p>
-                <p>This platform was built by a university student who knows how important it is to have a space where people can feel heard. In a world that's becoming more digital and less personal, ChatItNow aims to give Filipinos a chance to express themselves freely, find support, and connect with others who get what they're going through.</p>
-                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is free and completely anonymous. Enjoy meeting new people and starting meaningful conversations—one chat at a time.</p>
+            <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+    <p><strong>ChatItNow</strong> was created to give Filipinos a simple and safe place to connect with others from anywhere in the country. Whether you're a student, a professional, or just someone looking to talk, this platform is for anyone who wants to meet new people or share their experiences with others.</p>
+    <p>Sometimes, it's hard to find someone to talk to—whether its about life, school, work, or anything you're going through. That's why ChatItNow exists. Here, you can have real conversations, make new friends, or just chill and chat with someone who might understand what you're feeling. Everything is anonymous, so you can open up without worrying about being judged.</p>
+    <p>This platform was built by a university student who knows how important it is to have a space where people can feel heard. In a world that's becoming more digital and less personal, ChatItNow aims to give Filipinos a chance to express themselves freely, find support, and connect with others who get what they're going through.</p>
+    <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is free and completely anonymous. Enjoy meeting new people and starting meaningful conversations—one chat at a time.</p>
             </div>
             <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
           </div>
