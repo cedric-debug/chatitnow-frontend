@@ -32,14 +32,8 @@ export default function ChatItNow() {
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
   
-  // 1. Initialize State from LocalStorage or System Preference
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') === 'dark' || 
-             (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    }
-    return false;
-  });
+  // 1. DEFAULT IS LIGHT MODE (Native)
+  const [darkMode, setDarkMode] = useState(false);
 
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showSearching, setShowSearching] = useState(false);
@@ -90,47 +84,50 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME SYNC ENGINE ---
+  // --- 2. THEME SYNC ENGINE ---
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
 
-    // ChatKOOL / Native App Style Colors
-    const DARK_BG = '#111827'; // Tailwind gray-900
-    const LIGHT_BG = '#ffffff';
-
+    // COLORS: Gray-900 for Dark, White for Light
+    const THEME_COLOR = darkMode ? '#111827' : '#ffffff';
+    
     if (darkMode) {
-      // Apply Class for Tailwind (Requires darkMode: 'class' in config)
+      // Add Tailwind Class
       html.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-
-      // Apply Body Background (Fixes Overscroll/Bounce)
-      html.style.backgroundColor = DARK_BG;
-      body.style.backgroundColor = DARK_BG;
-
-      // Update Browser Address Bar (Chrome/Safari)
+      
+      // Update Meta Tag (Browser Address Bar)
       let metaTheme = document.querySelector("meta[name='theme-color']");
-      if (metaTheme) metaTheme.setAttribute('content', DARK_BG);
+      if (!metaTheme) {
+        metaTheme = document.createElement('meta');
+        metaTheme.setAttribute('name', 'theme-color');
+        document.head.appendChild(metaTheme);
+      }
+      metaTheme.setAttribute('content', THEME_COLOR);
 
-      // Update iOS Status Bar Text (White Text)
-      let metaStatus = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
-      if (metaStatus) metaStatus.setAttribute('content', 'black-translucent');
+      // Force Background Color (Fixes Footer/Overscroll)
+      html.style.backgroundColor = THEME_COLOR;
+      body.style.backgroundColor = THEME_COLOR;
 
     } else {
-      // Light Mode Revert
+      // Remove Tailwind Class
       html.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-
-      html.style.backgroundColor = LIGHT_BG;
-      body.style.backgroundColor = LIGHT_BG;
-
+      
+      // Update Meta Tag
       let metaTheme = document.querySelector("meta[name='theme-color']");
-      if (metaTheme) metaTheme.setAttribute('content', LIGHT_BG);
+      if (metaTheme) metaTheme.setAttribute('content', THEME_COLOR);
 
-      let metaStatus = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
-      if (metaStatus) metaStatus.setAttribute('content', 'default');
+      // Force Background Color
+      html.style.backgroundColor = THEME_COLOR;
+      body.style.backgroundColor = THEME_COLOR;
     }
   }, [darkMode]);
+
+  // Clean Start
+  useEffect(() => {
+    document.documentElement.classList.remove('dark');
+    document.body.style.backgroundColor = '#ffffff';
+  }, []);
 
   useEffect(() => {
     if (isConnected) {
@@ -269,7 +266,8 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // Unified Background: Matches the Global Theme (Gray-900)
+  // 3. UNIFIED BACKGROUND
+  // This uses the SAME class as the body (Gray-900 for Dark, White for Light)
   <div className={`fixed inset-0 flex flex-col items-center justify-center transition-colors duration-300 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
       <div className={`
@@ -281,7 +279,7 @@ export default function ChatItNow() {
         {/* Fullscreen Ad Overlay */}
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
+            <div className={`${darkMode ? 'bg-gray-900' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
               <p className="text-xs text-gray-500 mb-2">Advertisement</p>
               {/* Ad Container ALWAYS Light so ad is visible */}
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
@@ -310,7 +308,7 @@ export default function ChatItNow() {
           </div>
         )}
 
-        {/* HEADER - Gray-900 in Dark Mode (Matches Background) */}
+        {/* HEADER - Gray-900 in Dark Mode (Matches Global Background) */}
         <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-900 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
