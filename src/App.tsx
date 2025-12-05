@@ -571,7 +571,8 @@ export default function ChatItNow() {
                 ) : (
                   // --- SWIPEABLE MESSAGE WRAPPER ---
                   <SwipeableMessage onReply={() => initiateReply(msg.text, msg.type)} isSystem={false}>
-                     <div className={`flex flex-col ${msg.type === 'you' ? 'items-end' : 'items-start'} max-w-[85%]`}>
+                     {/* UPDATED: Added ml-auto to sender messages to hug the right side */}
+                     <div className={`flex flex-col ${msg.type === 'you' ? 'items-end ml-auto' : 'items-start'} max-w-[85%]`}>
                         {/* Render Reply Quote if exists */}
                         {msg.replyTo && (
                           <div className={`mb-1 text-xs opacity-75 px-3 py-1.5 rounded-lg border-l-4 ${msg.type === 'you' ? 'bg-purple-700 text-purple-100 border-purple-300' : (darkMode ? 'bg-gray-800 text-gray-400 border-gray-500' : 'bg-gray-200 text-gray-600 border-gray-400')}`}>
