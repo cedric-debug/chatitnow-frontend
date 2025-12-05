@@ -39,7 +39,7 @@ export default function ChatItNow() {
   const [showSearching, setShowSearching] = useState(false);
   const [isTyping, setIsTyping] = useState(false); 
   
-  // --- INACTIVITY TRACKING STATE ---
+  // --- INACTIVITY TRACKING ---
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [showInactivityAd, setShowInactivityAd] = useState(false);
   const [showTabReturnAd, setShowTabReturnAd] = useState(false);
@@ -91,15 +91,17 @@ export default function ChatItNow() {
     const html = document.documentElement;
     const body = document.body;
 
-    const APP_NOTCH_DARK = '#1f2937'; 
-    const APP_NOTCH_LIGHT = '#ffffff';
+    // BACKGROUND COLOR LOGIC
+    // Reverted desktop background to match Dark Mode UI (#111827 / gray-900)
+    const BG_DARK = '#111827'; 
+    const BG_LIGHT = '#ffffff';
     
-    // Background color for Desktop (Pitch Black vs White)
-    const DESKTOP_BG_DARK = '#09090b'; // Zinc-950 (Reverted to this per request)
-    const DESKTOP_BG_LIGHT = '#ffffff';
+    // Header/Notch Color
+    const NOTCH_DARK = '#1f2937'; // Gray 800
+    const NOTCH_LIGHT = '#ffffff';
 
-    const currentMetaColor = darkMode ? APP_NOTCH_DARK : APP_NOTCH_LIGHT;
-    const currentBgColor = darkMode ? DESKTOP_BG_DARK : DESKTOP_BG_LIGHT;
+    const activeBg = darkMode ? BG_DARK : BG_LIGHT;
+    const activeMeta = darkMode ? NOTCH_DARK : NOTCH_LIGHT;
     const activeStatusText = darkMode ? 'black-translucent' : 'default';
 
     if (darkMode) {
@@ -109,8 +111,8 @@ export default function ChatItNow() {
     }
 
     // Force Body/HTML Background
-    body.style.backgroundColor = currentBgColor;
-    html.style.backgroundColor = currentBgColor;
+    body.style.backgroundColor = activeBg;
+    html.style.backgroundColor = activeBg;
 
     const updateMeta = (name: string, content: string) => {
       let meta = document.querySelector(`meta[name='${name}']`);
@@ -122,43 +124,53 @@ export default function ChatItNow() {
       meta.setAttribute('content', content);
     };
 
-    updateMeta('theme-color', currentMetaColor);
+    updateMeta('theme-color', activeMeta);
     updateMeta('apple-mobile-web-app-status-bar-style', activeStatusText);
 
   }, [darkMode]);
 
+  // Clean Start
   useLayoutEffect(() => {
     document.documentElement.classList.remove('dark');
     document.body.style.backgroundColor = '#ffffff';
   }, []);
 
-  // --- INACTIVITY MONITOR (7 Minutes) ---
+  // --- 7-MINUTE INACTIVITY LOGIC ---
   const resetActivity = () => {
     if (!showInactivityAd) {
       setLastActivity(Date.now());
     }
   };
 
-  // 1. Listen for user actions to reset timer
+  // 1. Listen for ALL user interactions
   useEffect(() => {
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    const handleUserActivity = () => resetActivity();
+    const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
+    
+    const handleUserInteraction = () => resetActivity();
 
-    events.forEach(event => window.addEventListener(event, handleUserActivity));
-    return () => events.forEach(event => window.removeEventListener(event, handleUserActivity));
+    activityEvents.forEach(event => {
+      window.addEventListener(event, handleUserInteraction);
+    });
+
+    return () => {
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, handleUserInteraction);
+      });
+    };
   }, [showInactivityAd]);
 
-  // 2. Check time every 10 seconds
+  // 2. Timer Check (7 Minutes)
   useEffect(() => {
     if (isConnected) {
       activityTimerRef.current = window.setInterval(() => {
-        const timeSinceLastActive = Date.now() - lastActivity;
+        const now = Date.now();
+        const timeDiff = now - lastActivity;
         const SEVEN_MINUTES = 7 * 60 * 1000; 
 
-        if (timeSinceLastActive > SEVEN_MINUTES && !showInactivityAd) {
+        if (timeDiff > SEVEN_MINUTES && !showInactivityAd) {
           setShowInactivityAd(true);
         }
-      }, 10000); // Check every 10s
+      }, 5000); // Check every 5 seconds
       return () => { if (activityTimerRef.current) clearInterval(activityTimerRef.current); };
     }
   }, [isConnected, lastActivity, showInactivityAd]);
@@ -172,6 +184,8 @@ export default function ChatItNow() {
   
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCurrentMessage(e.target.value);
+    // Typing counts as activity
+    resetActivity();
     if (isConnected) socket.emit('typing', e.target.value.length > 0);
   };
 
@@ -301,35 +315,29 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-zinc-950' : 'bg-white'}`}>
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
-      {/* APP CONTAINER */}
+      {/* 
+         - Reverted Background: Outer 'bg-gray-900' now matches Inner 'bg-gray-900'
+         - Vertical Height: h-[100dvh] (100% Dynamic Height) to fill gaps 
+         - Width: 650px on desktop
+      */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
-        sm:w-[650px] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl 
+        sm:w-[650px] sm:rounded-2xl sm:shadow-2xl 
         border transition-colors duration-200
-        ${darkMode ? 'bg-gray-900 border-4 border-gray-700' : 'bg-white border-2 border-gray-200'}
+        ${darkMode ? 'bg-gray-900 border-4 border-gray-600' : 'bg-white border-2 border-gray-200'}
       `}>
         
-        {/* Fullscreen Ad Overlay (Inactivity / Tab Return) */}
+        {/* Fullscreen Ad Overlay */}
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              {/* Show different title based on which ad triggered */}
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
+              <p className="text-xs text-gray-500 mb-2">Advertisement</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_VERTICAL} />
               </div>
-              <button 
-                onClick={() => { 
-                  setShowInactivityAd(false); 
-                  setShowTabReturnAd(false); 
-                  setLastActivity(Date.now()); // Reset timer on close
-                }} 
-                className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold"
-              >
-                Close Ad
-              </button>
+              <button onClick={() => { setShowInactivityAd(false); setShowTabReturnAd(false); resetActivity(); }} className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold">Close Ad</button>
             </div>
           </div>
         )}
@@ -360,8 +368,7 @@ export default function ChatItNow() {
               className="w-8 h-8 rounded-full object-cover shadow-sm"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
-            {/* Logo color is fixed to Purple in both modes now */}
-            <span className="font-bold text-lg text-purple-600">ChatItNow</span>
+            <span className={`font-bold text-lg ${darkMode ? 'text-purple-500' : 'text-purple-600'}`}>ChatItNow</span>
           </div>
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
