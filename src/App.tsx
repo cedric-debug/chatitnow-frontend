@@ -32,7 +32,7 @@ export default function ChatItNow() {
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
   
-  // DEFAULT: Light Mode (False)
+  // DEFAULT: Light Mode
   const [darkMode, setDarkMode] = useState(false);
 
   const [showNextConfirm, setShowNextConfirm] = useState(false);
@@ -84,12 +84,12 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME LOGIC (FIXED) ---
+  // --- THEME LOGIC (FIXED FOR TOP STATUS BAR) ---
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
     
-    // Manage Address Bar Color
+    // 1. Get Address Bar Meta Tag (Chrome/Safari)
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
@@ -97,28 +97,40 @@ export default function ChatItNow() {
       document.head.appendChild(metaThemeColor);
     }
 
-    // MATCHING INDEX.CSS COLORS
-    // Gray-900 for Dark Mode Background to match index.css #111827
-    const DARK_BG = '#111827'; 
-    const LIGHT_BG = '#ffffff';
+    // 2. Get iOS Status Bar Style Meta Tag
+    let metaStatusStyle = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
+    if (!metaStatusStyle) {
+      metaStatusStyle = document.createElement('meta');
+      metaStatusStyle.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
+      document.head.appendChild(metaStatusStyle);
+    }
+
+    // COLORS
+    const HEADER_DARK = '#1f2937'; // Gray 800 (Matches Header)
+    const BODY_DARK = '#111827';   // Gray 900 (Matches Chat)
+    const WHITE = '#ffffff';
 
     if (darkMode) { 
       html.classList.add('dark');
       
-      // FIXED: Actually USE the DARK_BG variable to force the body background
-      // This fixes the VS Code warning and the "overscroll" issue on mobile
-      body.style.backgroundColor = DARK_BG;
+      // CRITICAL FIX: Make the HTML bg match the HEADER (for top bounce/status bar)
+      html.style.backgroundColor = HEADER_DARK; 
+      // Make the BODY bg match the CHAT (for the rest of the app)
+      body.style.backgroundColor = BODY_DARK;
 
-      // Sync Address Bar with Dark Header (Gray 800 - #1f2937) for nice contrast
-      metaThemeColor.setAttribute('content', '#1f2937'); 
+      // Update Browser Address Bar to match HEADER
+      metaThemeColor.setAttribute('content', HEADER_DARK); 
+      // Update iOS Status Bar to allow white text
+      metaStatusStyle.setAttribute('content', 'black-translucent'); 
+      
     } else { 
       html.classList.remove('dark'); 
       
-      // Force Body to White
-      body.style.backgroundColor = LIGHT_BG;
+      html.style.backgroundColor = WHITE;
+      body.style.backgroundColor = WHITE;
 
-      // Sync Address Bar with White Header
-      metaThemeColor.setAttribute('content', LIGHT_BG); 
+      metaThemeColor.setAttribute('content', WHITE); 
+      metaStatusStyle.setAttribute('content', 'default'); 
     }
   }, [darkMode]);
 
@@ -265,7 +277,7 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // Main background toggles between White and Gray-900 (matches index.css)
+  // Main background toggles between White and Gray-900
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
       <div className={`
@@ -279,7 +291,7 @@ export default function ChatItNow() {
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
               <p className="text-xs text-gray-500 mb-2">Advertisement</p>
-              {/* FIXED: Ad Container ALWAYS Light/White so ad is visible */}
+              {/* Ad Container ALWAYS Light so ad is visible */}
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_VERTICAL} />
               </div>
@@ -297,7 +309,7 @@ export default function ChatItNow() {
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-4`}>Looking in {field || 'All Fields'}</p>
               <div className={`${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-200'} border rounded-lg p-2`}>
                 <p className={`text-[10px] mb-1 opacity-50 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Advertisement</p>
-                {/* FIXED: Ad Container ALWAYS Light/White so ad is visible */}
+                {/* Ad Container ALWAYS Light so ad is visible */}
                 <div className="bg-white h-64 rounded flex items-center justify-center overflow-hidden">
                   <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_SQUARE} />
                 </div>
@@ -306,7 +318,7 @@ export default function ChatItNow() {
           </div>
         )}
 
-        {/* HEADER - Uses Gray-800 in Dark Mode (Lighter than background) for separation */}
+        {/* HEADER - Uses Gray-800 in Dark Mode (Matches Top Status Bar) */}
         <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
@@ -323,7 +335,7 @@ export default function ChatItNow() {
         {/* CHAT AREA - Uses Gray-900 (Darker) */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD - FIXED: Always White/Gray-100 Background */}
+          {/* TOP BANNER AD - ALWAYS White Background */}
           <div className="w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg bg-gray-100">
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
@@ -379,7 +391,7 @@ export default function ChatItNow() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* INPUT BAR - Uses Gray-800 in Dark Mode (Lighter than background) for separation */}
+        {/* INPUT BAR */}
         <div className={`absolute bottom-0 left-0 right-0 h-[60px] p-2 border-t z-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
           <div className="flex gap-2 items-center h-full">
             {partnerStatus === 'disconnected' ? (
