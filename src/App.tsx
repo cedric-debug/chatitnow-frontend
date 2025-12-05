@@ -32,7 +32,7 @@ export default function ChatItNow() {
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
   
-  // DEFAULT: Light Mode
+  // DEFAULT: Light Mode (starts white/native)
   const [darkMode, setDarkMode] = useState(false);
 
   const [showNextConfirm, setShowNextConfirm] = useState(false);
@@ -89,45 +89,39 @@ export default function ChatItNow() {
     const html = document.documentElement;
     const body = document.body;
 
-    // Mobile Notch/Status Colors
-    const HEADER_DARK = '#1f2937'; // Gray 800
-    const HEADER_LIGHT = '#ffffff'; // White
+    // COLOR DEFINITIONS
+    // Background matches HEADER/FOOTER (Gray-800) for seamless look
+    const DARK_THEME_COLOR = '#1f2937'; 
+    const LIGHT_THEME_COLOR = '#ffffff';
     
-    // Background Colors
-    const DESKTOP_BG_DARK = '#000000'; // Pitch Black for Desktop Contrast
-    const BG_LIGHT = '#ffffff'; // White
+    const activeColor = darkMode ? DARK_THEME_COLOR : LIGHT_THEME_COLOR;
+    const activeStatusText = darkMode ? 'black-translucent' : 'default';
 
-    const isMobile = window.innerWidth <= 768;
-    const targetBg = darkMode ? (isMobile ? HEADER_DARK : DESKTOP_BG_DARK) : BG_LIGHT;
-    const metaColor = darkMode ? HEADER_DARK : HEADER_LIGHT;
-
-    // 1. Force Tailwind Class
+    // 1. UPDATE CSS CLASSES
     if (darkMode) {
       html.classList.add('dark');
     } else {
       html.classList.remove('dark');
     }
 
-    // 2. Force Background on HTML/Body
-    body.style.backgroundColor = targetBg;
-    html.style.backgroundColor = targetBg;
+    // 2. FORCE BROWSER BACKGROUND (Matches UI Color)
+    // Using style.backgroundColor directly ensures it paints immediately
+    body.style.backgroundColor = activeColor;
+    html.style.backgroundColor = activeColor;
 
-    // 3. Update Meta Tag (Address Bar)
-    // Remove existing to ensure browser repaint
-    const existingMeta = document.querySelector('meta[name="theme-color"]');
-    if (existingMeta) existingMeta.remove();
-    const meta = document.createElement('meta');
-    meta.name = 'theme-color';
-    meta.content = metaColor;
-    document.head.appendChild(meta);
+    // 3. UPDATE META TAGS (For Browser Bars)
+    const updateMeta = (name: string, content: string) => {
+      let meta = document.querySelector(`meta[name='${name}']`);
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', name);
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', content);
+    };
 
-    // 4. Update iOS Status Bar Text
-    const existingStatus = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
-    if (existingStatus) existingStatus.remove();
-    const status = document.createElement('meta');
-    status.name = 'apple-mobile-web-app-status-bar-style';
-    status.content = darkMode ? 'black-translucent' : 'default';
-    document.head.appendChild(status);
+    updateMeta('theme-color', activeColor);
+    updateMeta('apple-mobile-web-app-status-bar-style', activeStatusText);
 
   }, [darkMode]);
 
@@ -274,14 +268,14 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  <div className={`fixed inset-0 flex flex-col items-center justify-center transition-colors duration-200 ${darkMode ? 'bg-zinc-950' : 'bg-white'}`}>
+  // Main background toggles between White and Gray-800 (Header/Footer Color)
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
       
-      {/* Updated Container with Combined Logic for Linter Happiness */}
+      {/* 2. RESTORED EXACT SIZE STRUCTURE */}
       <div className={`
-        relative w-full h-[100dvh] overflow-hidden flex flex-col
-        sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl 
-        border transition-colors duration-200
-        ${darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}
+        relative w-full h-[100dvh] overflow-hidden
+        sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl sm:border-x
+        ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}
       `}>
         
         {/* Fullscreen Ad Overlay */}
@@ -289,6 +283,7 @@ export default function ChatItNow() {
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
               <p className="text-xs text-gray-500 mb-2">Advertisement</p>
+              {/* Ad Container ALWAYS Light */}
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_VERTICAL} />
               </div>
@@ -306,6 +301,7 @@ export default function ChatItNow() {
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-4`}>Looking in {field || 'All Fields'}</p>
               <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-200'} border rounded-lg p-2`}>
                 <p className={`text-[10px] mb-1 opacity-50 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Advertisement</p>
+                {/* Fixed White Ad Background */}
                 <div className="bg-white h-64 rounded flex items-center justify-center overflow-hidden">
                   <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_SQUARE} />
                 </div>
@@ -314,8 +310,8 @@ export default function ChatItNow() {
           </div>
         )}
 
-        {/* HEADER - Explicit Color Class matching activeColor logic */}
-        <div className={`h-[60px] px-4 flex justify-between items-center shadow-sm z-20 shrink-0 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
+        {/* HEADER - Gray-800 (Matches External Body for Mobile Blending) */}
+        <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
               src="/logo.png" 
@@ -328,10 +324,10 @@ export default function ChatItNow() {
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* CHAT AREA */}
-        <div className={`flex-1 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        {/* CHAT AREA - Gray-900 (Darker for Contrast) */}
+        <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD */}
+          {/* TOP BANNER AD (FIXED) */}
           <div className="w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg bg-gray-100">
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
@@ -387,8 +383,8 @@ export default function ChatItNow() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* INPUT BAR */}
-        <div className={`h-[60px] p-2 border-t z-20 shrink-0 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+        {/* INPUT BAR - Gray-800 (Matches External Body for Mobile Blending) */}
+        <div className={`absolute bottom-0 left-0 right-0 h-[60px] p-2 border-t z-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
           <div className="flex gap-2 items-center h-full">
             {partnerStatus === 'disconnected' ? (
               <button onClick={handleStartSearch} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl h-full shadow-md transition text-sm">Find New Partner</button>

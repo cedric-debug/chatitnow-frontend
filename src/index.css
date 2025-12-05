@@ -1,18 +1,3 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* 1. LOCK VIEWPORT to prevent "static" bounce backgrounds */
-html, body {
-  height: 100%;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  overflow: hidden; /* Stops the whole page from bouncing */
-  -webkit-tap-highlight-color: transparent;
-}
-
-#root {
-  height: 100%;
-  width: 100%;
-}
