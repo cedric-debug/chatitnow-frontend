@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 declare global {
   interface Window {
@@ -6,13 +6,12 @@ declare global {
   }
 }
 
-// Updated to allow size controls
 interface AdUnitProps {
   slotId: string;
   client: string;
-  format?: string; // Optional: allows us to say 'horizontal'
-  responsive?: string; // Optional
-  style?: React.CSSProperties; // Optional: allows us to set max-height
+  format?: string;
+  responsive?: string;
+  style?: React.CSSProperties;
 }
 
 export default function AdUnit({ 
@@ -23,17 +22,26 @@ export default function AdUnit({
   style = { display: 'block', width: '100%', height: '100%' }
 }: AdUnitProps) {
   
+  // 1. Create a reference to the actual <ins> element
+  const adRef = useRef<HTMLModElement>(null);
+
   useEffect(() => {
     try {
-      (window.adsbygoogle = window.adsbygoogle || []).push({});
+      // 2. SAFETY CHECK: Only push if the ad hasn't loaded yet
+      // When AdSense loads, it changes the innerHTML of the <ins> tag.
+      // If it's empty, we know it's safe to push.
+      if (adRef.current && adRef.current.innerHTML === "") {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      }
     } catch (e) {
-      console.error(e);
+      console.error("AdSense Error:", e);
     }
   }, []);
 
   return (
     <div style={{ overflow: 'hidden', width: '100%', height: '100%', display: 'flex', justifyContent: 'center' }}>
       <ins
+        ref={adRef} // 3. Attach the ref here
         className="adsbygoogle"
         style={style}
         data-ad-client={client}
