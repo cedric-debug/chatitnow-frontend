@@ -1,3 +1,23 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* 1. LOCK THE VIEWPORT */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* This KILLS the static black footer/white header */
+  background-color: var(--app-bg); /* Controlled by CSS variable */
+}
+
+/* 2. DEFAULT COLOR VARIABLE */
+:root {
+  --app-bg: #ffffff;
+}
+
+/* 3. DARK MODE OVERRIDE */
+.dark {
+  --app-bg: #111827;
+}
