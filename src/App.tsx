@@ -89,10 +89,11 @@ export default function ChatItNow() {
     const html = document.documentElement;
     const body = document.body;
 
-    const DARK_THEME_COLOR = '#1f2937'; 
-    const LIGHT_THEME_COLOR = '#ffffff';
+    // Header Color (#1f2937) is used for Mobile Browser Chrome (Notch/Bottom)
+    const NOTCH_COLOR_DARK = '#1f2937'; 
+    const NOTCH_COLOR_LIGHT = '#ffffff';
     
-    const activeColor = darkMode ? DARK_THEME_COLOR : LIGHT_THEME_COLOR;
+    const activeColor = darkMode ? NOTCH_COLOR_DARK : NOTCH_COLOR_LIGHT;
     const activeStatusText = darkMode ? 'black-translucent' : 'default';
 
     if (darkMode) {
@@ -101,6 +102,8 @@ export default function ChatItNow() {
       html.classList.remove('dark');
     }
 
+    // Force Body/HTML to match the Notch color (Seamless on Mobile)
+    // On Desktop, the outer div below covers this anyway
     body.style.backgroundColor = activeColor;
     html.style.backgroundColor = activeColor;
 
@@ -209,7 +212,6 @@ export default function ChatItNow() {
   if (showWelcome) {
     return (
       <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
-        {/* MODIFIED UI: Wider width (700px) on desktop to prevent scrolling */}
         <div className="bg-white rounded-lg shadow-2xl p-10 max-w-[420px] sm:max-w-[700px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-8">
              <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
@@ -226,7 +228,6 @@ export default function ChatItNow() {
   if (!isLoggedIn) {
     return (
       <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
-        {/* MODIFIED UI: Wider width (650px) on desktop for consistency */}
         <div className="bg-white rounded-2xl shadow-2xl px-10 py-12 max-w-[420px] sm:max-w-[650px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1>
@@ -274,13 +275,16 @@ export default function ChatItNow() {
   }
 
   // --- MAIN CHAT INTERFACE ---
+  // FIXED CONTRAST: Zinc-950 background for Desktop (Very dark)
+  // FIXED CONTRAST: Gray-900 card background with Gray-700 border
   return (
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-zinc-950' : 'bg-white'}`}>
       
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
-        sm:w-[650px] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl sm:border-x
-        ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}
+        sm:w-[650px] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl 
+        border transition-colors duration-200
+        ${darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}
       `}>
         
         {/* Fullscreen Ad Overlay */}
@@ -314,6 +318,7 @@ export default function ChatItNow() {
         )}
 
         {/* HEADER */}
+        {/* Changed Text color to Purple-600 (Dark: Purple-500) to match button */}
         <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
@@ -322,7 +327,8 @@ export default function ChatItNow() {
               className="w-8 h-8 rounded-full object-cover shadow-sm"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
-            <span className={`font-bold text-lg ${darkMode ? 'text-white' : 'text-purple-900'}`}>ChatItNow</span>
+            {/* LOGO COLOR FIX: Uses Purple-600 normally, and slightly lighter Purple-500 on dark background for readability */}
+            <span className={`font-bold text-lg ${darkMode ? 'text-purple-500' : 'text-purple-600'}`}>ChatItNow</span>
           </div>
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
@@ -330,7 +336,7 @@ export default function ChatItNow() {
         {/* CHAT AREA */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD (FIXED) */}
+          {/* TOP BANNER AD */}
           <div className="w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg bg-gray-100">
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
