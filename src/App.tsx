@@ -50,7 +50,6 @@ export default function ChatItNow() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activityTimerRef = useRef<number | null>(null);
   const partnerNameRef = useRef(''); 
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
@@ -65,7 +64,6 @@ export default function ChatItNow() {
       partnerNameRef.current = data.name; 
       setMessages([{ type: 'system', data: { name: data.name, field: data.field, action: 'connected' } }]);
       resetActivity();
-      setTimeout(() => inputRef.current?.focus(), 100);
     });
 
     socket.on('receive_message', (data: any) => {
@@ -96,13 +94,10 @@ export default function ChatItNow() {
     const html = document.documentElement;
     const body = document.body;
 
-    // UI COLORS
-    // Gray 800 (#1f2937) matches Header & Footer.
-    // We use this for the Browser Background so the Notch/Home bar areas blend in.
-    const SAFE_AREA_DARK = '#1f2937'; 
-    const SAFE_AREA_LIGHT = '#ffffff';
+    const DARK_THEME_COLOR = '#1f2937'; 
+    const LIGHT_THEME_COLOR = '#ffffff';
     
-    const activeSafeArea = darkMode ? SAFE_AREA_DARK : SAFE_AREA_LIGHT;
+    const activeColor = darkMode ? DARK_THEME_COLOR : LIGHT_THEME_COLOR;
     const activeStatusText = darkMode ? 'black-translucent' : 'default';
 
     if (darkMode) {
@@ -111,9 +106,8 @@ export default function ChatItNow() {
       html.classList.remove('dark');
     }
 
-    // Force Body/HTML Background to match Safe Area (Header/Footer color)
-    body.style.backgroundColor = activeSafeArea;
-    html.style.backgroundColor = activeSafeArea;
+    body.style.backgroundColor = activeColor;
+    html.style.backgroundColor = activeColor;
 
     const updateMeta = (name: string, content: string) => {
       let meta = document.querySelector(`meta[name='${name}']`);
@@ -125,7 +119,7 @@ export default function ChatItNow() {
       meta.setAttribute('content', content);
     };
 
-    updateMeta('theme-color', activeSafeArea);
+    updateMeta('theme-color', activeColor);
     updateMeta('apple-mobile-web-app-status-bar-style', activeStatusText);
 
   }, [darkMode]);
@@ -188,6 +182,12 @@ export default function ChatItNow() {
     }
   };
 
+  // FIX: Wrapper for Form Submission
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault(); // Prevents page refresh
+    handleLogin();
+  };
+
   const startSearch = () => {
     setPartnerStatus('searching');
     setShowSearching(true);
@@ -201,8 +201,6 @@ export default function ChatItNow() {
       socket.emit('send_message', { text: currentMessage });
       setCurrentMessage('');
       resetActivity();
-      // Focus fix
-      setTimeout(() => inputRef.current?.focus(), 10);
     }
   };
 
@@ -221,8 +219,8 @@ export default function ChatItNow() {
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        isLoggedIn ? handleSendMessage() : handleLogin();
+        // Only handle chat sending here. Login is handled by the form.
+        if (isLoggedIn) handleSendMessage();
     }
   };
 
@@ -268,10 +266,13 @@ export default function ChatItNow() {
             <h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1>
             <p className="text-sm text-gray-600">Chat with Fellow Filipinos</p>
           </div>
-          <div className="space-y-6">
+          
+          {/* FIX: Wrapped inputs in <form> so Enter/Go key triggers submit */}
+          <form className="space-y-6" onSubmit={handleLoginSubmit}>
             <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Choose a Username</label>
-                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} onKeyPress={handleKeyPress} placeholder="Enter username..." className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm" maxLength={20} />
+                {/* Removed onKeyPress to let Form handle submission */}
+                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Enter username..." className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm" maxLength={20} />
             </div>
             <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Field/Profession (Optional)</label>
@@ -280,15 +281,17 @@ export default function ChatItNow() {
             </div>
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 space-y-4">
               <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={confirmedAdult} onChange={(e) => setConfirmedAdult(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5"><strong>I confirm that I am 18 years of age or older.</strong></span></label>
-              <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5">I accept the{' '}<button onClick={() => setShowTerms(true)} className="text-purple-600 hover:underline font-bold">Terms & Conditions</button></span></label>
+              <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5">I accept the{' '}<button type="button" onClick={() => setShowTerms(true)} className="text-purple-600 hover:underline font-bold">Terms & Conditions</button></span></label>
             </div>
-            <button onClick={handleLogin} disabled={!username.trim() || !acceptedTerms || !confirmedAdult} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg shadow-lg mt-2">Start Chatting</button>
-          </div>
+            
+            {/* FIX: Added type="submit" to trigger form via keyboard */}
+            <button type="submit" disabled={!username.trim() || !acceptedTerms || !confirmedAdult} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg shadow-lg mt-2">Start Chatting</button>
+          </form>
         </div>
         
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-2xl max-w-[700px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
               <div className="space-y-4 text-sm text-gray-700">
                 <p>Last updated: December 5, 2025</p>
@@ -311,13 +314,12 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-zinc-950' : 'bg-white'}`}>
       
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[650px] sm:rounded-2xl sm:shadow-2xl 
-        transition-colors duration-200
-        border-0 sm:border-x
+        border transition-colors duration-200
         ${darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}
       `}>
         
@@ -441,24 +443,8 @@ export default function ChatItNow() {
             ) : !showNextConfirm ? (
               <>
                 <button onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full aspect-square rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'} disabled:opacity-50`}><SkipForward size={18} /></button>
-                <input 
-                  ref={inputRef}
-                  type="text" 
-                  value={currentMessage} 
-                  onChange={handleTyping} 
-                  onKeyPress={handleKeyPress} 
-                  placeholder={isConnected ? "Say something..." : "Waiting..."} 
-                  disabled={!isConnected} 
-                  className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} 
-                />
-                <button 
-                  onMouseDown={(e) => e.preventDefault()} 
-                  onClick={handleSendMessage} 
-                  disabled={!isConnected || !currentMessage.trim()} 
-                  className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm"
-                >
-                  Send
-                </button>
+                <input type="text" value={currentMessage} onChange={handleTyping} onKeyPress={handleKeyPress} placeholder={isConnected ? "Say something..." : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
+                <button onClick={handleSendMessage} disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
               </>
             ) : (
               <>
