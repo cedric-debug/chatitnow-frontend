@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { SkipForward, Moon, Sun } from 'lucide-react';
 import io, { Socket } from 'socket.io-client';
 import AdUnit from './AdUnit';
@@ -84,56 +84,63 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME LOGIC (FIXED) ---
-  useEffect(() => {
+  // --- FORCE THEME OVERRIDE (Resolves Static Headers/Footers) ---
+  useLayoutEffect(() => {
     const html = document.documentElement;
     const body = document.body;
-
-    // 1. COLORS MATCHING TAILWIND & INDEX.CSS
-    const HEADER_DARK = '#1f2937'; // Gray 800 (Header Color)
-    const BODY_DARK = '#111827';   // Gray 900 (Chat Body)
-    const LIGHT_BG = '#ffffff';
-
-    // 2. META TAG MANAGEMENT (Prevents Duplicates)
-    // We try to find the tag that ALREADY exists in index.html
+    
+    // Find or Create Meta Tags
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
+    if (!metaThemeColor) {
+      metaThemeColor = document.createElement('meta');
+      metaThemeColor.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaThemeColor);
+    }
+
     let metaStatusBar = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
+    if (!metaStatusBar) {
+      metaStatusBar = document.createElement('meta');
+      metaStatusBar.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
+      document.head.appendChild(metaStatusBar);
+    }
+
+    // COLORS
+    // Gray-800 (#1f2937) matches your Header & Footer. 
+    // We set HTML/BODY to this color so the "Overscroll" (Rubber band effect) matches the UI.
+    const UI_DARK = '#1f2937'; 
+    const UI_LIGHT = '#ffffff';
 
     if (darkMode) { 
-      // --- DARK MODE ON ---
+      // --- DARK MODE ---
       html.classList.add('dark');
 
-      // Force HTML bg to match HEADER (Fixes top status bar bounce color)
-      html.style.backgroundColor = HEADER_DARK;
-      // Force Body bg to match CHAT (Fixes bottom bounce color)
-      body.style.backgroundColor = BODY_DARK;
+      // FORCE OVERWRITE index.css using 'important'
+      html.style.setProperty('background-color', UI_DARK, 'important');
+      body.style.setProperty('background-color', UI_DARK, 'important');
 
-      // Update Browser Address Bar to match HEADER (Gray 800)
-      if (metaThemeColor) metaThemeColor.setAttribute('content', HEADER_DARK);
-      
-      // Update iOS Status Bar Text to White
-      if (metaStatusBar) metaStatusBar.setAttribute('content', 'black-translucent');
+      // Browser UI
+      metaThemeColor.setAttribute('content', UI_DARK); 
+      metaStatusBar.setAttribute('content', 'black-translucent'); 
 
     } else { 
-      // --- DARK MODE OFF ---
+      // --- LIGHT MODE ---
       html.classList.remove('dark');
       
-      // Reset backgrounds to White
-      html.style.backgroundColor = LIGHT_BG;
-      body.style.backgroundColor = LIGHT_BG;
+      // FORCE OVERWRITE index.css using 'important'
+      html.style.setProperty('background-color', UI_LIGHT, 'important');
+      body.style.setProperty('background-color', UI_LIGHT, 'important');
 
-      // Update Browser Address Bar to White
-      if (metaThemeColor) metaThemeColor.setAttribute('content', LIGHT_BG);
-      
-      // Update iOS Status Bar Text to Dark
-      if (metaStatusBar) metaStatusBar.setAttribute('content', 'default');
+      // Browser UI
+      metaThemeColor.setAttribute('content', UI_LIGHT); 
+      metaStatusBar.setAttribute('content', 'default'); 
     }
   }, [darkMode]);
 
-  // Clean start on mount
-  useEffect(() => {
+  // Clean Start
+  useLayoutEffect(() => {
     document.documentElement.classList.remove('dark');
-    document.body.style.backgroundColor = '#ffffff';
+    document.documentElement.style.setProperty('background-color', '#ffffff', 'important');
+    document.body.style.setProperty('background-color', '#ffffff', 'important');
   }, []);
 
   useEffect(() => {
@@ -273,7 +280,7 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // Main background toggles between White and Gray-900
+  // Main background toggles between White and Gray-900 (matches index.css)
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
       <div className={`
