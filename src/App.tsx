@@ -186,6 +186,12 @@ export default function ChatItNow() {
     }
   };
 
+  // FIX: Robust Form Handler
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault(); // This prevents the reload
+    handleLogin();      // This triggers the actual login logic
+  };
+
   const startSearch = () => {
     setPartnerStatus('searching');
     setShowSearching(true);
@@ -216,7 +222,10 @@ export default function ChatItNow() {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) isLoggedIn ? handleSendMessage() : handleLogin();
+    // ONLY handle Chat Enter here. Login is handled by the Form onSubmit now.
+    if (e.key === 'Enter' && !e.shiftKey && isLoggedIn) {
+        handleSendMessage();
+    }
   };
 
   const renderSystemMessage = (msg: Message) => {
@@ -261,10 +270,21 @@ export default function ChatItNow() {
             <h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1>
             <p className="text-sm text-gray-600">Chat with Fellow Filipinos</p>
           </div>
-          <div className="space-y-6">
+          
+          {/* FIX: FORM WRAPPER */}
+          <form className="space-y-6" onSubmit={handleLoginSubmit}>
             <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Choose a Username</label>
-                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} onKeyPress={handleKeyPress} placeholder="Enter username..." className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm" maxLength={20} />
+                {/* FIX: Added enterKeyHint and removed manual onKeyPress */}
+                <input 
+                  type="text" 
+                  value={username} 
+                  onChange={(e) => setUsername(e.target.value)} 
+                  placeholder="Enter username..." 
+                  className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm" 
+                  maxLength={20} 
+                  enterKeyHint="go"
+                />
             </div>
             <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Field/Profession (Optional)</label>
@@ -273,10 +293,11 @@ export default function ChatItNow() {
             </div>
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 space-y-4">
               <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={confirmedAdult} onChange={(e) => setConfirmedAdult(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5"><strong>I confirm that I am 18 years of age or older.</strong></span></label>
-              <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5">I accept the{' '}<button onClick={() => setShowTerms(true)} className="text-purple-600 hover:underline font-bold">Terms & Conditions</button></span></label>
+              <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5">I accept the{' '}<button type="button" onClick={() => setShowTerms(true)} className="text-purple-600 hover:underline font-bold">Terms & Conditions</button></span></label>
             </div>
-            <button onClick={handleLogin} disabled={!username.trim() || !acceptedTerms || !confirmedAdult} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg shadow-lg mt-2">Start Chatting</button>
-          </div>
+            {/* FIX: Type Submit */}
+            <button type="submit" disabled={!username.trim() || !acceptedTerms || !confirmedAdult} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg shadow-lg mt-2">Start Chatting</button>
+          </form>
         </div>
         
         {showTerms && (
@@ -308,11 +329,9 @@ export default function ChatItNow() {
       
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
-        sm:w-[650px] sm:shadow-2xl 
+        sm:w-[650px] sm:rounded-2xl sm:shadow-2xl 
         border transition-colors duration-200
-        /* FIXED: Removed rounded corners (sm:rounded-none) */
-        /* FIXED: Border is 1px (border) */
-        ${darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}
+        ${darkMode ? 'bg-gray-900 border-gray-600' : 'bg-white border-gray-200'}
       `}>
         
         {/* Fullscreen Ad Overlay */}
@@ -400,8 +419,7 @@ export default function ChatItNow() {
                   </div>
                 ) : (
                   <div className={`max-w-[85%] ${msg.type === 'you' ? 'items-end' : 'items-start'}`}>
-                    {/* FIXED BUBBLE STYLING: Solid Gray-700 for received messages in Dark Mode */}
-                    <div className={`px-4 py-2.5 rounded-2xl text-[15px] shadow-sm leading-snug ${
+                    <div className={`px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
                       msg.type === 'you'
                         ? 'bg-purple-600 text-white rounded-br-none' 
                         : `${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
@@ -416,7 +434,7 @@ export default function ChatItNow() {
           
           {isTyping && (
             <div className="flex justify-start w-full">
-              <div className={`${darkMode ? 'bg-gray-700' : 'bg-white'} px-4 py-3 rounded-2xl rounded-bl-none shadow-sm`}>
+              <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border border-gray-100`}>
                 <div className="flex gap-1">
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></div>
