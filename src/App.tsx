@@ -7,11 +7,11 @@ import AdUnit from './AdUnit';
 const PROD_URL = "https://chatitnow-server.onrender.com"; 
 const ADSENSE_CLIENT_ID = "ca-pub-1806664183023369"; 
 
-// --- AD SLOT CONFIGURATION (4 ADS) ---
-const AD_SLOT_SQUARE = "4725306503";        // Searching Screen
-const AD_SLOT_TOP_BANNER = "9658354392";    // Top of Chat
-const AD_SLOT_INACTIVITY = "2655630641";    // 7-Min Idle Pop-up
-const AD_SLOT_VERTICAL = "1701533824";      // Tab Return (Welcome Back) Pop-up
+// --- AD SLOTS ---
+const AD_SLOT_SQUARE = "4725306503"; 
+const AD_SLOT_VERTICAL = "1701533824"; 
+const AD_SLOT_TOP_BANNER = "9658354392"; 
+const AD_SLOT_INACTIVITY = "2655630641"; 
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 const socket: Socket = io(SERVER_URL, { autoConnect: false });
@@ -42,7 +42,7 @@ export default function ChatItNow() {
   const [showSearching, setShowSearching] = useState(false);
   const [isTyping, setIsTyping] = useState(false); 
   
-  // --- INACTIVITY TRACKING STATE ---
+  // --- INACTIVITY TRACKING ---
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [showInactivityAd, setShowInactivityAd] = useState(false);
   const [showTabReturnAd, setShowTabReturnAd] = useState(false);
@@ -50,6 +50,7 @@ export default function ChatItNow() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activityTimerRef = useRef<number | null>(null);
   const partnerNameRef = useRef(''); 
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
@@ -64,6 +65,7 @@ export default function ChatItNow() {
       partnerNameRef.current = data.name; 
       setMessages([{ type: 'system', data: { name: data.name, field: data.field, action: 'connected' } }]);
       resetActivity();
+      setTimeout(() => inputRef.current?.focus(), 100);
     });
 
     socket.on('receive_message', (data: any) => {
@@ -97,8 +99,8 @@ export default function ChatItNow() {
     const APP_NOTCH_DARK = '#1f2937'; 
     const APP_NOTCH_LIGHT = '#ffffff';
     
-    // Background color for Desktop
-    const DESKTOP_BG_DARK = '#09090b'; 
+    // Background color matches the UI Dark Mode now
+    const DESKTOP_BG_DARK = '#111827'; // Gray 900
     const DESKTOP_BG_LIGHT = '#ffffff';
 
     const currentMetaColor = darkMode ? APP_NOTCH_DARK : APP_NOTCH_LIGHT;
@@ -111,7 +113,6 @@ export default function ChatItNow() {
       html.classList.remove('dark');
     }
 
-    // Force Body/HTML Background
     body.style.backgroundColor = currentBgColor;
     html.style.backgroundColor = currentBgColor;
 
@@ -135,31 +136,20 @@ export default function ChatItNow() {
     document.body.style.backgroundColor = '#ffffff';
   }, []);
 
-  // --- INACTIVITY MONITOR (7 Minutes) ---
+  // --- INACTIVITY MONITOR ---
   const resetActivity = () => {
-    // Only reset timer if no ad is currently showing
     if (!showInactivityAd && !showTabReturnAd) {
       setLastActivity(Date.now());
     }
   };
 
-  // 1. Listen for ALL user interactions
   useEffect(() => {
     const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
     const handleUserInteraction = () => resetActivity();
-
-    activityEvents.forEach(event => {
-      window.addEventListener(event, handleUserInteraction);
-    });
-
-    return () => {
-      activityEvents.forEach(event => {
-        window.removeEventListener(event, handleUserInteraction);
-      });
-    };
+    activityEvents.forEach(event => window.addEventListener(event, handleUserInteraction));
+    return () => activityEvents.forEach(event => window.removeEventListener(event, handleUserInteraction));
   }, [showInactivityAd, showTabReturnAd]);
 
-  // 2. Timer Check (7 Minutes)
   useEffect(() => {
     if (isConnected) {
       activityTimerRef.current = window.setInterval(() => {
@@ -175,7 +165,6 @@ export default function ChatItNow() {
     }
   }, [isConnected, lastActivity, showInactivityAd, showTabReturnAd]);
 
-  // 3. Tab Return Monitor
   useEffect(() => {
     const handleVis = () => { 
         if (!document.hidden && isConnected && !showInactivityAd) {
@@ -213,6 +202,7 @@ export default function ChatItNow() {
       socket.emit('send_message', { text: currentMessage });
       setCurrentMessage('');
       resetActivity();
+      setTimeout(() => inputRef.current?.focus(), 10);
     }
   };
 
@@ -230,7 +220,10 @@ export default function ChatItNow() {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) isLoggedIn ? handleSendMessage() : handleLogin();
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      isLoggedIn ? handleSendMessage() : handleLogin();
+    }
   };
 
   const renderSystemMessage = (msg: Message) => {
@@ -295,7 +288,7 @@ export default function ChatItNow() {
         
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl max-w-[700px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
               <div className="space-y-4 text-sm text-gray-700">
                 <p>Last updated: December 5, 2025</p>
@@ -318,30 +311,23 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-zinc-950' : 'bg-white'}`}>
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
       <div className={`
-        relative w-full h-[100dvh] overflow-hidden
-        sm:w-[650px] sm:rounded-2xl sm:shadow-2xl 
-        border transition-colors duration-200
-        ${darkMode ? 'bg-gray-900 border-4 border-gray-600' : 'bg-white border-2 border-gray-200'}
+        relative w-full h-full overflow-hidden
+        sm:w-[650px] sm:shadow-2xl 
+        border-x-0 border-y-0 sm:border-x-4
+        transition-colors duration-200
+        ${darkMode ? 'bg-gray-900 border-gray-600' : 'bg-white border-gray-200'}
       `}>
         
-        {/* Fullscreen Ad Overlay (HANDLES 2 DIFFERENT ADS) */}
+        {/* Fullscreen Ad Overlay */}
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
               <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
-                {/* 
-                   DYNAMIC AD SELECTION: 
-                   - If Inactive: Use AD_SLOT_INACTIVITY
-                   - If Tab Return: Use AD_SLOT_VERTICAL
-                */}
-                <AdUnit 
-                  client={ADSENSE_CLIENT_ID} 
-                  slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} 
-                />
+                <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
               <button 
                 onClick={() => { 
@@ -455,8 +441,24 @@ export default function ChatItNow() {
             ) : !showNextConfirm ? (
               <>
                 <button onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full aspect-square rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'} disabled:opacity-50`}><SkipForward size={18} /></button>
-                <input type="text" value={currentMessage} onChange={handleTyping} onKeyPress={handleKeyPress} placeholder={isConnected ? "Say something..." : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
-                <button onClick={handleSendMessage} disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
+                <input 
+                  ref={inputRef}
+                  type="text" 
+                  value={currentMessage} 
+                  onChange={handleTyping} 
+                  onKeyPress={handleKeyPress} 
+                  placeholder={isConnected ? "Say something..." : "Waiting..."} 
+                  disabled={!isConnected} 
+                  className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} 
+                />
+                <button 
+                  onMouseDown={(e) => e.preventDefault()} 
+                  onClick={handleSendMessage} 
+                  disabled={!isConnected || !currentMessage.trim()} 
+                  className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm"
+                >
+                  Send
+                </button>
               </>
             ) : (
               <>
