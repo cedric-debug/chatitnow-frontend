@@ -32,7 +32,7 @@ export default function ChatItNow() {
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
   
-  // FIXED: Default is now strictly FALSE (White/Light mode) regardless of system settings
+  // FIXED: Default is strictly FALSE (White/Light mode)
   const [darkMode, setDarkMode] = useState(false);
 
   const [showNextConfirm, setShowNextConfirm] = useState(false);
@@ -86,12 +86,13 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME CONTROLLER (FIXED FOR CLEAN TOGGLE) ---
+  // --- THEME CONTROLLER (FIXED) ---
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
-    let metaThemeColor = document.querySelector("meta[name='theme-color']");
     
+    // Find or create the meta tag that controls the browser address bar color
+    let metaThemeColor = document.querySelector("meta[name='theme-color']");
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
       metaThemeColor.setAttribute('name', 'theme-color');
@@ -100,14 +101,15 @@ export default function ChatItNow() {
 
     if (darkMode) { 
       html.classList.add('dark');
-      // FIXED: Force the actual BODY background to Gray-800 to match the Header/Footer
-      // This eliminates the "Static Black" or "Mixed" bars at the top/bottom of the phone
-      body.style.backgroundColor = '#1f2937'; 
-      metaThemeColor.setAttribute('content', '#1f2937');
+      // FIXED: Force Body Background to #111827 (Gray-900) to match the dark app theme
+      body.style.backgroundColor = '#111827'; 
+      // FIXED: Tell browser (Safari/Chrome) to make the address bar dark
+      metaThemeColor.setAttribute('content', '#111827');
     } else { 
       html.classList.remove('dark'); 
-      // FIXED: Force Body to White
+      // FIXED: Force Body Background to White to kill the black bar at the bottom
       body.style.backgroundColor = '#ffffff';
+      // FIXED: Tell browser (Safari/Chrome) to make the address bar White
       metaThemeColor.setAttribute('content', '#ffffff'); 
     }
   }, [darkMode]);
@@ -116,6 +118,9 @@ export default function ChatItNow() {
   useEffect(() => {
     document.body.style.backgroundColor = '#ffffff';
     document.documentElement.classList.remove('dark');
+    // Ensure meta tag starts white
+    const meta = document.querySelector("meta[name='theme-color']");
+    if (meta) meta.setAttribute('content', '#ffffff');
   }, []);
 
   useEffect(() => {
@@ -255,8 +260,8 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // Outer Wrapper: bg-gray-800 in Dark Mode (matches header/footer) for seamless look
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+  // Outer Wrapper: bg-gray-900 in Dark Mode (matches chat area), bg-white in Light Mode
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
@@ -311,7 +316,7 @@ export default function ChatItNow() {
         {/* CHAT AREA */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD (Sizes Strictly Preserved from your correct code) */}
+          {/* TOP BANNER AD - LOCKED SIZE */}
           <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
