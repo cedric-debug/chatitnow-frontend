@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { SkipForward, Moon, Sun, Volume2, VolumeX, X, Reply } from 'lucide-react';
-import io from 'socket.io-client'; // FIX: No { Socket } import to avoid type errors
+import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 
 // --- CONFIGURATION ---
@@ -15,7 +15,6 @@ const AD_SLOT_INACTIVITY = "2655630641";
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
-// --- SESSION ID HELPER ---
 const getSessionID = () => {
   if (typeof window === 'undefined') return '';
   let sessionID = localStorage.getItem("chat_session_id");
@@ -26,7 +25,6 @@ const getSessionID = () => {
   return sessionID;
 };
 
-// --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
   autoConnect: false,
   reconnection: true,             
@@ -39,6 +37,7 @@ const socket: any = io(SERVER_URL, {
 
 interface ReplyData {
   text: string;
+  name: string; // Added Name field
   isYou: boolean;
 }
 
@@ -203,7 +202,6 @@ export default function ChatItNow() {
     if(audioReceivedRef.current) audioReceivedRef.current.volume = 0.5;
   }, []);
 
-  // --- AUDIO UNLOCK (For Mobile) ---
   const unlockAudio = () => {
     if (audioSentRef.current) {
         audioSentRef.current.play().then(() => {
@@ -236,7 +234,6 @@ export default function ChatItNow() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); 
   }, [messages, isTyping, replyingTo]); 
 
-  // --- SOCKET LISTENERS ---
   useEffect(() => {
     socket.on('matched', (data: any) => {
       setShowSearching(false);
@@ -261,7 +258,6 @@ export default function ChatItNow() {
       resetActivity();
     });
 
-    // When PARTNER disconnects
     socket.on('partner_disconnected', () => {
       setIsConnected(false);
       setPartnerStatus('disconnected');
@@ -273,14 +269,12 @@ export default function ChatItNow() {
 
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
 
-    // Network Disconnect (Local)
     socket.on('disconnect', () => {
       if (partnerNameRef.current && isConnected) {
         setPartnerStatus('reconnecting');
       }
     });
 
-    // Reconnected (Generic)
     socket.on('connect', () => {
       if (partnerNameRef.current) {
         setPartnerStatus('connected');
@@ -288,7 +282,6 @@ export default function ChatItNow() {
       }
     });
 
-    // Reconnected (Explicit Session Restore)
     socket.on('session_restored', () => {
       if (partnerNameRef.current) {
         setPartnerStatus('connected');
@@ -408,34 +401,36 @@ export default function ChatItNow() {
     }
   };
 
-  // --- MANUAL DISCONNECT HANDLER ---
   const handleNext = () => {
     if (!showNextConfirm) { setShowNextConfirm(true); return; }
-    
-    // 1. Tell Server we are leaving
     socket.emit('disconnect_partner');
-    
-    // 2. Update Local State immediately
     setIsConnected(false);
     setShowNextConfirm(false);
     setPartnerStatus('disconnected');
-    setIsTyping(false); // Stop typing
-    setReplyingTo(null); // Clear reply
-    
-    // 3. Add "You disconnected" message
     setMessages(prev => [...prev, { type: 'system', data: { name: username, action: 'disconnected' } }]);
+    setIsTyping(false);
+    setReplyingTo(null);
   };
 
   const handleStartSearch = () => {
     startSearch();
   };
 
+  // --- UPDATED: REPLY LOGIC (With proper name) ---
   const initiateReply = (text: any, type: string) => {
     if (!isConnected) return;
+    
+    // Determine the name based on who sent the message
+    // If type is 'you', it's your name (username)
+    // If type is 'stranger', it's their name (partnerNameRef)
+    const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
+
     setReplyingTo({
       text: typeof text === 'string' ? text : 'Content',
+      name: senderName,
       isYou: type === 'you'
     });
+    
     const input = document.querySelector('input[type="text"]') as HTMLInputElement;
     if(input) input.focus();
   };
@@ -450,10 +445,8 @@ export default function ChatItNow() {
     
     if (msg.data.action === 'disconnected') {
       if (msg.data.name === username) {
-        // Shown when YOU call handleNext()
         return <span><span style={boldStyle}>You</span> disconnected from the chat.</span>;
       }
-      // Shown when PARTNER calls disconnect
       return <span><span style={boldStyle}>{msg.data.name}</span> disconnected from the chat.</span>;
     }
     
@@ -519,7 +512,7 @@ export default function ChatItNow() {
               
               <div className="text-center pt-2">
                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking advices from strangers. Do your due diligence.
+                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking strangers' advice. Do your due diligence.
                  </p>
               </div>
 
@@ -585,7 +578,7 @@ export default function ChatItNow() {
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Advertisement"}</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
@@ -679,9 +672,11 @@ export default function ChatItNow() {
                 ) : (
                   <SwipeableMessage onReply={() => initiateReply(msg.text, msg.type)} isSystem={false}>
                      <div className={`flex flex-col ${msg.type === 'you' ? 'items-end ml-auto' : 'items-start'} max-w-[85%]`}>
+                        
+                        {/* UPDATED: Reply Quote with Correct Name */}
                         {msg.replyTo && (
                           <div className={`mb-1 text-xs opacity-75 px-3 py-1.5 rounded-lg border-l-4 ${msg.type === 'you' ? 'bg-purple-700 text-purple-100 border-purple-300' : (darkMode ? 'bg-gray-800 text-gray-400 border-gray-500' : 'bg-gray-200 text-gray-600 border-gray-400')}`}>
-                             <span className="font-bold block mb-0.5">{msg.replyTo.isYou ? 'You' : 'Stranger'}</span>
+                             <span className="font-bold block mb-0.5">{msg.replyTo.name}</span>
                              <span className="line-clamp-1">{msg.replyTo.text}</span>
                           </div>
                         )}
@@ -727,10 +722,11 @@ export default function ChatItNow() {
         {/* INPUT BAR */}
         <div className={`absolute bottom-0 left-0 right-0 p-2 border-t z-20 flex flex-col justify-end ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
           
+          {/* UPDATED: Reply Preview with Correct Name */}
           {replyingTo && (
             <div className={`flex items-center justify-between px-4 py-2 mb-1 rounded-lg text-xs border-l-4 ${darkMode ? 'bg-gray-700 text-gray-300 border-purple-500' : 'bg-gray-100 text-gray-700 border-purple-500'}`}>
               <div>
-                <span className="font-bold block text-purple-500 mb-0.5">Replying to {replyingTo.isYou ? 'yourself' : 'Partner'}</span>
+                <span className="font-bold block text-purple-500 mb-0.5">Replying to {replyingTo.name}</span>
                 <span className="line-clamp-1 opacity-80">{replyingTo.text}</span>
               </div>
               <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full">
@@ -752,7 +748,7 @@ export default function ChatItNow() {
           ) : (
             <form className="flex gap-2 items-center h-[60px]" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
               <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full aspect-square rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'} disabled:opacity-50`}><SkipForward size={18} /></button>
-              <input type="text" value={currentMessage} onChange={handleTyping} enterKeyHint="send" placeholder={isConnected ? (replyingTo ? "Type your reply..." : "Say something...") : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
+              <input type="text" value={currentMessage} onChange={handleTyping} enterKeyHint="send" placeholder={isConnected ? (replyingTo ? `Replying to ${replyingTo.name}...` : "Say something...") : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
               <button type="submit" disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
             </form>
           )}
