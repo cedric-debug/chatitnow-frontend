@@ -83,7 +83,7 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME CONTROLLER ---
+  // --- THEME CONTROLLER (FIXED) ---
   useEffect(() => {
     const html = document.documentElement;
     
@@ -96,10 +96,13 @@ export default function ChatItNow() {
     }
 
     if (darkMode) { 
-      // Add class for CSS to pick up
+      // Add class for CSS
       html.classList.add('dark'); 
-      // Update Browser UI to Dark Blue
-      metaThemeColor.setAttribute('content', '#111827'); 
+      
+      // --- FIX IS HERE ---
+      // Changed from #111827 (gray-900) to #1f2937 (gray-800)
+      // This matches the header color exactly, removing the line.
+      metaThemeColor.setAttribute('content', '#1f2937'); 
     } else { 
       // Remove class for CSS
       html.classList.remove('dark'); 
@@ -203,7 +206,7 @@ export default function ChatItNow() {
              <h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1>
              <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
           </div>
-          <div className="space-y-4 text-gray-700 text-sm sm:text-base"><p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p><p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p><p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p><p className="text-gray-600">ChatItNow is completely free, anonymous, and designed with your safety in mind. Connect with fellow Filipinos, one conversation at a time.</p></div>
+          <div className="space-y-4 text-gray-700 text-sm sm:text-base"><p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p><p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p><p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p><p className="text-gray-600">ChatItNow is completely free and anonymous. Connect with fellow Filipinos, one conversation at a time.</p></div>
           <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
         </div>
       </div>
@@ -303,14 +306,11 @@ export default function ChatItNow() {
         {/* CHAT AREA */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD */}
+          {/* TOP BANNER AD (Sizes preserved as requested) */}
           <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
                 slotId={AD_SLOT_TOP_BANNER} 
-                format="horizontal" 
-                responsive="false"
-                style={{ display: 'block', maxHeight: '50px', width: '100%' }}
              />
           </div>
 
@@ -361,6 +361,16 @@ export default function ChatItNow() {
 
         {/* INPUT BAR */}
         <div className={`absolute bottom-0 left-0 right-0 h-[60px] p-2 border-t z-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+          
+          {/* CAUTION MESSAGE */}
+          {isConnected && (
+            <div className="absolute -top-8 left-0 right-0 flex justify-center pointer-events-none">
+               <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-[10px] px-2 py-0.5 rounded shadow-sm">
+                 ⚠️ Caution: Always verify professional advice from strangers.
+               </div>
+            </div>
+          )}
+
           <div className="flex gap-2 items-center h-full">
             {partnerStatus === 'disconnected' ? (
               <button onClick={handleStartSearch} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl h-full shadow-md transition text-sm">Find New Partner</button>
