@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { SkipForward, Moon, Sun, Volume2, VolumeX, X, Reply } from 'lucide-react';
-import io from 'socket.io-client'; // Removed { Socket } import to avoid type conflicts
+import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 
 // --- CONFIGURATION ---
-const PROD_URL = "https://chatitnow-backend.onrender.com"; 
+const PROD_URL = "https://chatitnow-server.onrender.com"; 
 const ADSENSE_CLIENT_ID = "ca-pub-1806664183023369"; 
 
 // --- AD SLOTS ---
@@ -15,11 +15,8 @@ const AD_SLOT_INACTIVITY = "2655630641";
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
-// --- SESSION ID GENERATOR ---
 const getSessionID = () => {
-  // Check if window exists (SSR safety)
   if (typeof window === 'undefined') return '';
-  
   let sessionID = localStorage.getItem("chat_session_id");
   if (!sessionID) {
     sessionID = Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -28,8 +25,6 @@ const getSessionID = () => {
   return sessionID;
 };
 
-// --- SOCKET INITIALIZATION ---
-// Using 'any' type to prevent TypeScript version conflicts
 const socket: any = io(SERVER_URL, { 
   autoConnect: false,
   reconnection: true,             
@@ -199,12 +194,24 @@ export default function ChatItNow() {
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
+  // Initialize Audio
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
     if(audioSentRef.current) audioSentRef.current.volume = 0.5;
     if(audioReceivedRef.current) audioReceivedRef.current.volume = 0.5;
   }, []);
+
+  // --- MOBILE AUDIO UNLOCKER ---
+  const unlockAudio = () => {
+    // Attempt to play and immediately pause to "warm up" the audio context on mobile
+    if (audioSentRef.current) {
+        audioSentRef.current.play().then(() => {
+            audioSentRef.current?.pause();
+            audioSentRef.current!.currentTime = 0;
+        }).catch(() => {}); // Ignore error if already unlocked or failed
+    }
+  };
 
   const playSound = (type: 'sent' | 'received') => {
     if (isMuted) return;
@@ -246,7 +253,7 @@ export default function ChatItNow() {
         type: 'stranger', 
         text: data.text, 
         replyTo: replyInfo,
-        timestamp: data.timestamp || getCurrentTime() // Use server timestamp if avail
+        timestamp: data.timestamp || getCurrentTime()
       }]);
       setIsTyping(false);
       playSound('received');
@@ -262,13 +269,23 @@ export default function ChatItNow() {
 
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
 
+    // --- CONNECTION HANDLERS ---
     socket.on('disconnect', () => {
       if (partnerNameRef.current && isConnected) {
         setPartnerStatus('reconnecting');
       }
     });
 
+    // Handle generic connection
     socket.on('connect', () => {
+      if (partnerNameRef.current) {
+        setPartnerStatus('connected');
+        setIsConnected(true);
+      }
+    });
+
+    // Handle specific session restoration event from server
+    socket.on('session_restored', () => {
       if (partnerNameRef.current) {
         setPartnerStatus('connected');
         setIsConnected(true);
@@ -290,6 +307,7 @@ export default function ChatItNow() {
       socket.off('partner_typing'); 
       socket.off('disconnect');
       socket.off('connect');
+      socket.off('session_restored'); // New listener
       socket.off('partner_reconnecting_server'); 
       socket.off('partner_connected'); 
     };
@@ -347,6 +365,7 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
+      unlockAudio(); // Unlocks audio context on mobile
       socket.connect();
       startSearch();
     } else {
@@ -486,7 +505,7 @@ export default function ChatItNow() {
               
               <div className="text-center pt-2">
                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking advices from strangers. Always verify.
+                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking strangers' advice.
                  </p>
               </div>
 
@@ -551,7 +570,7 @@ export default function ChatItNow() {
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Advertisement"}</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
@@ -722,4 +741,3 @@ export default function ChatItNow() {
     </div>
   );
 }
-//
