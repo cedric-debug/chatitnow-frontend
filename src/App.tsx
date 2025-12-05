@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { SkipForward, Moon, Sun, Volume2, VolumeX, X, Reply } from 'lucide-react';
-import io from 'socket.io-client';
+import io from 'socket.io-client'; // FIX: Removed { Socket } to solve the error
 import AdUnit from './AdUnit';
 
 // --- CONFIGURATION ---
-const PROD_URL = "https://chatitnow-server.onrender.com"; 
+const PROD_URL = "https://chatitnow-backend.onrender.com"; 
 const ADSENSE_CLIENT_ID = "ca-pub-1806664183023369"; 
 
 // --- AD SLOTS ---
@@ -15,6 +15,7 @@ const AD_SLOT_INACTIVITY = "2655630641";
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
+// --- SESSION ID HELPER (Placed Here) ---
 const getSessionID = () => {
   if (typeof window === 'undefined') return '';
   let sessionID = localStorage.getItem("chat_session_id");
@@ -25,6 +26,7 @@ const getSessionID = () => {
   return sessionID;
 };
 
+// --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
   autoConnect: false,
   reconnection: true,             
@@ -501,7 +503,7 @@ export default function ChatItNow() {
               
               <div className="text-center pt-2">
                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking advice from strangers. Do your due diligence.
+                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking strangers' advice.
                  </p>
               </div>
 
@@ -567,7 +569,7 @@ export default function ChatItNow() {
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Advertisement"}</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
