@@ -50,12 +50,12 @@ interface ReplyData {
 }
 
 interface Message {
-  id: string; // Unique ID for reactions
+  id: string; 
   type: 'system' | 'you' | 'stranger' | 'warning';
   text?: React.ReactNode;
   replyTo?: ReplyData;
   timestamp?: string;
-  reaction?: string; // Emoji
+  reaction?: string; 
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; };
 }
 
@@ -439,12 +439,11 @@ export default function ChatItNow() {
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-    <p><strong>ChatItNow</strong> was created to give Filipinos a simple and safe place to connect with others from anywhere in the country. Whether you're a student, a professional, or just someone looking to talk, this platform is for anyone who wants to meet new people or share their experiences with others.</p>
-    <p>Sometimes, it's hard to find someone to talk to—whether its about life, school, work, or anything you're going through. That's why ChatItNow exists. Here, you can have real conversations, make new friends, or just chill and chat with someone who might understand what you're feeling. Everything is anonymous, so you can open up without worrying about being judged.</p>
-    <p>This platform was built by a university student who knows how important it is to have a space where people can feel heard. In a world that's becoming more digital and less personal, ChatItNow aims to give Filipinos a chance to express themselves freely, find support, and connect with others who get what they're going through.</p>
-    <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is free and completely anonymous. Enjoy meeting new people and starting meaningful conversations—one chat at a time.</p>
+                <p><strong>ChatItNow</strong> was created to give Filipinos a simple and safe place to connect with others from anywhere in the country. Whether you're a student, a professional, or just someone looking to talk, this platform is for anyone who wants to meet new people or share their experiences with others.</p>
+                <p>Sometimes, it's hard to find someone to talk to—whether its about life, school, work, or anything you're going through. That's why ChatItNow exists. Here, you can have real conversations, make new friends, or just chill and chat with someone who might understand what you're feeling. Everything is anonymous, so you can open up without worrying about being judged.</p>
+                <p>This platform was built by a university student who knows how important it is to have a space where people can feel heard. In a world that's becoming more digital and less personal, ChatItNow aims to give Filipinos a chance to express themselves freely, find support, and connect with others who get what they're going through.</p>
+                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is free and completely anonymous. Enjoy meeting new people and starting meaningful conversations—one chat at a time.</p>
             </div>
-
             <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
           </div>
         </div>
@@ -546,7 +545,7 @@ export default function ChatItNow() {
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Advertisement"}</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
@@ -643,57 +642,62 @@ export default function ChatItNow() {
                   </div>
                 ) : (
                   <SwipeableMessage onReply={() => initiateReply(msg.text, msg.type)} isSystem={false}>
-                     <div className={`flex flex-col ${msg.type === 'you' ? 'items-end ml-auto' : 'items-start'} max-w-[85%] relative`}>
+                     {/* WRAPPED in Flex Row to keep Smiley Next to Bubble */}
+                     <div className={`max-w-[85%] relative flex items-center gap-2 ${msg.type === 'you' ? 'flex-row-reverse ml-auto' : 'flex-row'}`}>
                         
-                        {/* --- REACTION SELECTOR BAR --- */}
-                        {activeReactionId === msg.id && (
-                          <div className={`absolute z-30 bottom-full mb-1 flex gap-1 p-1 rounded-full shadow-xl border animate-in fade-in zoom-in duration-200 ${darkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`} style={{ left: msg.type === 'you' ? 'auto' : 0, right: msg.type === 'you' ? 0 : 'auto' }}>
-                            {REACTIONS.map(emoji => (
-                               <button key={emoji} onClick={() => sendReaction(msg.id!, emoji)} className="hover:scale-125 transition text-lg p-1">{emoji}</button>
-                            ))}
-                            <button onClick={() => setActiveReactionId(null)} className="text-gray-400 hover:text-red-500 p-1"><X size={14} /></button>
-                          </div>
-                        )}
-                        {/* ------------------------------------ */}
-
                         {/* --- SMILEY TRIGGER --- */}
-                        <div className={`absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity ${msg.type === 'you' ? '-left-8' : '-right-8'}`}>
+                        <div className={`opacity-0 group-hover:opacity-100 transition-opacity`}>
                            <button onClick={() => setActiveReactionId(activeReactionId === msg.id ? null : msg.id!)} className={`p-1 rounded-full ${darkMode ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-400 hover:bg-gray-100'}`}>
                              <Smile size={16} />
                            </button>
                         </div>
-
-                        {msg.replyTo && (
-                          <div className={`mb-1 text-xs opacity-75 px-3 py-1.5 rounded-lg border-l-4 ${msg.type === 'you' ? 'bg-purple-700 text-purple-100 border-purple-300' : (darkMode ? 'bg-gray-800 text-gray-400 border-gray-500' : 'bg-gray-200 text-gray-600 border-gray-400')}`}>
-                             <span className="font-bold block mb-0.5">{msg.replyTo.name}</span>
-                             <span className="line-clamp-1">{msg.replyTo.text}</span>
-                          </div>
-                        )}
-
-                        <div className={`relative px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
-                          msg.type === 'you'
-                            ? 'bg-purple-600 text-white rounded-br-none' 
-                            : `${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
-                        }`}>
-                          {msg.text}
-                          {msg.timestamp && (
-                            <span className={`text-[10px] block mt-1 select-none ${
-                              msg.type === 'you' 
-                                ? 'text-right text-white/70' 
-                                : (darkMode ? 'text-left text-gray-400' : 'text-left text-gray-500')
-                            }`}>
-                              {msg.timestamp}
-                            </span>
-                          )}
-
-                          {/* --- REACTION BADGE --- */}
-                          {msg.reaction && (
-                            <div className={`absolute -bottom-2 ${msg.type === 'you' ? '-left-2' : '-right-2'} text-sm bg-gray-100 dark:bg-gray-800 border dark:border-gray-600 border-gray-300 rounded-full w-6 h-6 flex items-center justify-center shadow-sm`}>
-                              {msg.reaction}
+                        
+                        {/* --- BUBBLE CONTAINER --- */}
+                        <div className={`flex flex-col ${msg.type === 'you' ? 'items-end' : 'items-start'} relative`}>
+                          
+                          {/* REACTION SELECTOR BAR */}
+                          {activeReactionId === msg.id && (
+                            <div className={`absolute z-30 bottom-full mb-1 flex gap-1 p-1 rounded-full shadow-xl border animate-in fade-in zoom-in duration-200 ${darkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`} style={{ left: msg.type === 'you' ? 'auto' : 0, right: msg.type === 'you' ? 0 : 'auto' }}>
+                              {REACTIONS.map(emoji => (
+                                <button key={emoji} onClick={() => sendReaction(msg.id!, emoji)} className="hover:scale-125 transition text-lg p-1">{emoji}</button>
+                              ))}
+                              <button onClick={() => setActiveReactionId(null)} className="text-gray-400 hover:text-red-500 p-1"><X size={14} /></button>
                             </div>
                           )}
 
+                          {msg.replyTo && (
+                            <div className={`mb-1 text-xs opacity-75 px-3 py-1.5 rounded-lg border-l-4 ${msg.type === 'you' ? 'bg-purple-700 text-purple-100 border-purple-300' : (darkMode ? 'bg-gray-800 text-gray-400 border-gray-500' : 'bg-gray-200 text-gray-600 border-gray-400')}`}>
+                               <span className="font-bold block mb-0.5">{msg.replyTo.name}</span>
+                               <span className="line-clamp-1">{msg.replyTo.text}</span>
+                            </div>
+                          )}
+
+                          <div className={`relative px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
+                            msg.type === 'you'
+                              ? 'bg-purple-600 text-white rounded-br-none' 
+                              : `${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
+                          }`}>
+                            {msg.text}
+                            {msg.timestamp && (
+                              <span className={`text-[10px] block mt-1 select-none ${
+                                msg.type === 'you' 
+                                  ? 'text-right text-white/70' 
+                                  : (darkMode ? 'text-left text-gray-400' : 'text-left text-gray-500')
+                              }`}>
+                                {msg.timestamp}
+                              </span>
+                            )}
+
+                            {/* --- REACTION BADGE --- */}
+                            {msg.reaction && (
+                              <div className={`absolute -bottom-2 ${msg.type === 'you' ? '-left-2' : '-right-2'} text-sm bg-gray-100 dark:bg-gray-800 border dark:border-gray-600 border-gray-300 rounded-full w-6 h-6 flex items-center justify-center shadow-sm`}>
+                                {msg.reaction}
+                              </div>
+                            )}
+
+                          </div>
                         </div>
+
                      </div>
                   </SwipeableMessage>
                 )}
