@@ -46,6 +46,9 @@ export default function ChatItNow() {
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [showInactivityAd, setShowInactivityAd] = useState(false);
   const [showTabReturnAd, setShowTabReturnAd] = useState(false);
+
+  // --- ERROR STATE FOR LOGIN ---
+  const [formError, setFormError] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activityTimerRef = useRef<number | null>(null);
@@ -185,6 +188,9 @@ export default function ChatItNow() {
       setIsLoggedIn(true);
       socket.connect();
       startSearch();
+    } else {
+      setFormError(true);
+      setTimeout(() => setFormError(false), 2000);
     }
   };
 
@@ -217,10 +223,6 @@ export default function ChatItNow() {
     startSearch();
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) isLoggedIn ? handleSendMessage() : handleLogin();
-  };
-
   const renderSystemMessage = (msg: Message) => {
     if (!msg.data) return null;
     const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
@@ -241,7 +243,6 @@ export default function ChatItNow() {
 
   if (showWelcome) {
     return (
-      // UPDATED: UI Structure to match Native Chat Interface (Full height, no floating modal)
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-gray-50">
         <div className="relative w-full h-[100dvh] sm:w-[650px] bg-white sm:shadow-2xl border-0 sm:border-x sm:border-gray-200 flex flex-col justify-center overflow-y-auto">
           <div className="p-10 w-full max-w-[700px] mx-auto">
@@ -265,7 +266,6 @@ export default function ChatItNow() {
 
   if (!isLoggedIn) {
     return (
-      // UPDATED: UI Structure to match Native Chat Interface (Full height, no floating modal)
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-gray-50">
         <div className="relative w-full h-[100dvh] sm:w-[650px] bg-white sm:shadow-2xl border-0 sm:border-x sm:border-gray-200 flex flex-col justify-center overflow-y-auto">
           <div className="px-10 py-12 w-full max-w-[650px] mx-auto">
@@ -273,26 +273,27 @@ export default function ChatItNow() {
               <h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1>
               <p className="text-sm text-gray-600">Chat with Fellow Filipinos</p>
             </div>
-            <div className="space-y-6">
+            
+            <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
               <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Choose a Username</label>
-                  <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} onKeyPress={handleKeyPress} placeholder="Enter username..." className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm" maxLength={20} />
+                  <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} enterKeyHint="go" placeholder="Enter username..." className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm" maxLength={20} />
               </div>
               <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Field/Profession (Optional)</label>
                   <select value={field} onChange={(e) => setField(e.target.value)} className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-base shadow-sm"><option value="">Select your field (or leave blank)</option>{fields.slice(1).map((f) => (<option key={f} value={f}>{f}</option>))}</select>
                   <p className="text-xs text-gray-500 mt-2">We'll try to match you with someone in the same field when possible</p>
               </div>
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 space-y-4">
+              <div className={`border rounded-xl p-5 space-y-4 transition-colors duration-300 ${formError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : 'border-yellow-200 bg-yellow-50'}`}>
                 <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={confirmedAdult} onChange={(e) => setConfirmedAdult(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5"><strong>I confirm that I am 18 years of age or older.</strong></span></label>
-                <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5">I accept the{' '}<button onClick={() => setShowTerms(true)} className="text-purple-600 hover:underline font-bold">Terms & Conditions</button></span></label>
+                <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5">I accept the{' '}<button type="button" onClick={() => setShowTerms(true)} className="text-purple-600 hover:underline font-bold">Terms & Conditions</button></span></label>
               </div>
-              <button onClick={handleLogin} disabled={!username.trim() || !acceptedTerms || !confirmedAdult} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg shadow-lg mt-2">Start Chatting</button>
-            </div>
+              <button type="submit" disabled={!username.trim() || !acceptedTerms || !confirmedAdult} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg shadow-lg mt-2">Start Chatting</button>
+            </form>
+
           </div>
         </div>
         
-        {/* Modal for Terms remains an overlay */}
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
             <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
@@ -454,23 +455,23 @@ export default function ChatItNow() {
 
         {/* INPUT BAR */}
         <div className={`absolute bottom-0 left-0 right-0 h-[60px] p-2 border-t z-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-          <div className="flex gap-2 items-center h-full">
+          <form className="flex gap-2 items-center h-full" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
             {partnerStatus === 'disconnected' ? (
-              <button onClick={handleStartSearch} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl h-full shadow-md transition text-sm">Find New Partner</button>
+              <button type="button" onClick={handleStartSearch} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl h-full shadow-md transition text-sm">Find New Partner</button>
             ) : !showNextConfirm ? (
               <>
-                <button onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full aspect-square rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'} disabled:opacity-50`}><SkipForward size={18} /></button>
-                <input type="text" value={currentMessage} onChange={handleTyping} onKeyPress={handleKeyPress} placeholder={isConnected ? "Say something..." : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
-                <button onClick={handleSendMessage} disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
+                <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full aspect-square rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'} disabled:opacity-50`}><SkipForward size={18} /></button>
+                <input type="text" value={currentMessage} onChange={handleTyping} enterKeyHint="send" placeholder={isConnected ? "Say something..." : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
+                <button type="submit" disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
               </>
             ) : (
               <>
-                <button onClick={handleNext} className="h-full px-4 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition shadow-sm text-sm">End</button>
+                <button type="button" onClick={handleNext} className="h-full px-4 bg-red-500 text-white rounded-xl font-bold hover:bg-red-600 transition shadow-sm text-sm">End</button>
                 <div className="flex-1 flex justify-center items-center text-sm font-bold text-gray-600 dark:text-gray-300">Are you sure?</div>
-                <button onClick={() => setShowNextConfirm(false)} className="h-full px-4 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition text-sm">Cancel</button>
+                <button type="button" onClick={() => setShowNextConfirm(false)} className="h-full px-4 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition text-sm">Cancel</button>
               </>
             )}
-          </div>
+          </form>
         </div>
 
       </div>
