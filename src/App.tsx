@@ -29,13 +29,12 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; };
 }
 
-// --- UPDATED SWIPEABLE MESSAGE COMPONENT ---
+// --- SWIPEABLE MESSAGE COMPONENT ---
 const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.ReactNode, onReply: () => void, isSystem: boolean }) => {
   const [offsetX, setOffsetX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startX = useRef(0);
   
-  // UPDATED: Extremely short threshold for "easy" swipe
   const SWIPE_THRESHOLD = 25; 
   const MAX_DRAG = 70;
 
@@ -51,16 +50,12 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
     const currentX = e.touches[0].clientX;
     const diff = currentX - startX.current;
     
-    // UPDATED: No resistance until threshold is met for "buttery smooth" feel
     if (diff > 0) {
       let finalDrag = diff;
-      
-      // Only apply resistance AFTER the user has already swiped enough to trigger
       if (diff > SWIPE_THRESHOLD) {
         const extra = diff - SWIPE_THRESHOLD;
-        finalDrag = SWIPE_THRESHOLD + (extra * 0.4); // 0.4 friction
+        finalDrag = SWIPE_THRESHOLD + (extra * 0.4); 
       }
-
       setOffsetX(Math.min(finalDrag, MAX_DRAG));
     }
   };
@@ -71,7 +66,6 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
     setOffsetX(0);
   };
 
-  // Desktop Mouse Events
   const handleMouseDown = (e: React.MouseEvent) => {
     startX.current = e.clientX;
     setIsDragging(true);
@@ -111,11 +105,9 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Icon Indicator */}
       <div 
         className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400"
         style={{ 
-          // UPDATED: Icon fades in quicker
           opacity: offsetX > 10 ? 1 : 0,
           transform: `translateY(-50%) scale(${offsetX > 15 ? 1 : 0.8})`,
           transition: 'opacity 0.1s ease, transform 0.1s ease'
@@ -123,12 +115,9 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
       >
         <Reply size={20} />
       </div>
-
-      {/* Message Bubble */}
       <div 
         style={{ 
           transform: `translateX(${offsetX}px)`, 
-          // UPDATED: Standard ease-out for smoother return
           transition: isDragging ? 'none' : 'transform 0.3s ease-out' 
         }}
       >
@@ -187,7 +176,6 @@ export default function ChatItNow() {
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
-  // Initialize Audio
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
@@ -259,7 +247,6 @@ export default function ChatItNow() {
     };
   }, [isMuted]); 
 
-  // --- THEME SYNC ---
   useLayoutEffect(() => {
     const html = document.documentElement;
     const body = document.body;
@@ -270,7 +257,6 @@ export default function ChatItNow() {
     html.style.backgroundColor = currentBgColor;
   }, [darkMode]);
 
-  // --- INACTIVITY MONITOR ---
   const resetActivity = () => {
     if (!showInactivityAd && !showTabReturnAd) setLastActivity(Date.now());
   };
@@ -486,13 +472,20 @@ export default function ChatItNow() {
   return (
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
+      {/* UPDATED: Smoother & Subtler Typing Animation */}
       <style>{`
-        @keyframes wave {
-          0%, 60%, 100% { transform: translateY(0); }
-          30% { transform: translateY(-5px); }
+        @keyframes typing-bounce {
+          0%, 100% {
+            transform: translateY(0);
+            opacity: 0.5;
+          }
+          50% {
+            transform: translateY(-4px); /* Smaller jump for smoothness */
+            opacity: 1;
+          }
         }
-        .animate-wave {
-          animation: wave 1.3s linear infinite;
+        .animate-typing {
+          animation: typing-bounce 1.4s infinite ease-in-out both;
         }
       `}</style>
 
@@ -607,7 +600,6 @@ export default function ChatItNow() {
                             : `${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
                         }`}>
                           {msg.text}
-                          {/* UPDATED: Timestamp correctly placed at bottom corners */}
                           {msg.timestamp && (
                             <span className={`text-[10px] block mt-1 select-none ${
                               msg.type === 'you' 
@@ -625,13 +617,14 @@ export default function ChatItNow() {
             );
           })}
           
+          {/* UPDATED TYPING INDICATOR TO USE NEW ANIMATION */}
           {isTyping && (
             <div className="flex justify-start w-full">
               <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border-0 flex items-center`}>
                 <div className="flex gap-1 h-[21px] items-center">
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-wave" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-wave" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-wave" style={{ animationDelay: '300ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-typing" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-typing" style={{ animationDelay: '160ms' }}></div>
+                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-typing" style={{ animationDelay: '320ms' }}></div>
                 </div>
               </div>
             </div>
