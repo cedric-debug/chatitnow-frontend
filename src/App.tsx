@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { SkipForward, Moon, Sun, Volume2, VolumeX, X, Reply } from 'lucide-react';
+import { SkipForward, Moon, Sun, Volume2, VolumeX, X, Reply, Smile } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 
@@ -26,6 +26,12 @@ const getSessionID = () => {
   return sessionID;
 };
 
+// --- UTILS ---
+const generateMessageID = () => {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
+
+// --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
   autoConnect: false,
   reconnection: true,             
@@ -36,6 +42,7 @@ const socket: any = io(SERVER_URL, {
   }
 });
 
+// --- TYPES ---
 interface ReplyData {
   text: string;
   name: string;
@@ -43,10 +50,12 @@ interface ReplyData {
 }
 
 interface Message {
+  id: string; // Unique ID for reactions
   type: 'system' | 'you' | 'stranger' | 'warning';
   text?: React.ReactNode;
   replyTo?: ReplyData;
   timestamp?: string;
+  reaction?: string; // Emoji
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; };
 }
 
@@ -163,6 +172,7 @@ export default function ChatItNow() {
   
   const [isMuted, setIsMuted] = useState(false);
   const [replyingTo, setReplyingTo] = useState<ReplyData | null>(null);
+  const [activeReactionId, setActiveReactionId] = useState<string | null>(null);
 
   const audioSentRef = useRef<HTMLAudioElement | null>(null);
   const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
@@ -195,34 +205,20 @@ export default function ChatItNow() {
   const partnerNameRef = useRef(''); 
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
+  const REACTIONS = ['❤️', '😆', '😮', '😢', '😡', '👍'];
 
   // Initialize Audio
   useEffect(() => {
-    // Standardizing sounds across Desktop and Mobile
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
-    
-    // UPDATED: Set volume to 1.0 (Max) for mobile clarity
-    // Added preload to ensure immediate playback
-    if(audioSentRef.current) {
-        audioSentRef.current.volume = 1.0; 
-        audioSentRef.current.preload = 'auto';
-    }
-    if(audioReceivedRef.current) {
-        audioReceivedRef.current.volume = 1.0;
-        audioReceivedRef.current.preload = 'auto';
-    }
+    if(audioSentRef.current) { audioSentRef.current.volume = 1.0; audioSentRef.current.preload = 'auto'; }
+    if(audioReceivedRef.current) { audioReceivedRef.current.volume = 1.0; audioReceivedRef.current.preload = 'auto'; }
   }, []);
 
-  // --- UPDATED: MOBILE AUDIO UNLOCKER ---
-  // Unlocks BOTH sounds so "Receive" works even when app is backgrounded/idle
   const unlockAudio = () => {
     const unlock = (audio: HTMLAudioElement | null) => {
         if (audio) {
-            audio.play().then(() => {
-                audio.pause();
-                audio.currentTime = 0;
-            }).catch(() => {});
+            audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
         }
     };
     unlock(audioSentRef.current);
@@ -239,20 +235,14 @@ export default function ChatItNow() {
         audioReceivedRef.current.currentTime = 0;
         audioReceivedRef.current.play().catch(() => {});
       }
-    } catch (e) {
-      console.error("Audio play failed", e);
-    }
+    } catch (e) { console.error("Audio play failed", e); }
   };
 
-  const getCurrentTime = () => {
-    return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  };
+  const getCurrentTime = () => new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
-  useEffect(() => { 
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); 
-  }, [messages, isTyping, replyingTo]); 
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTyping, replyingTo]); 
 
-  // --- SOCKET EVENT HANDLERS ---
+  // --- SOCKET HANDLERS ---
   useEffect(() => {
     socket.on('matched', (data: any) => {
       setShowSearching(false);
@@ -260,21 +250,28 @@ export default function ChatItNow() {
       setIsConnected(true);
       setShowNextConfirm(false);
       partnerNameRef.current = data.name; 
-      setMessages([{ type: 'system', data: { name: data.name, field: data.field, action: 'connected' } }]);
+      setMessages([{ id: 'sys-start', type: 'system', data: { name: data.name, field: data.field, action: 'connected' } }]);
       resetActivity();
     });
 
     socket.on('receive_message', (data: any) => {
-      const replyInfo = data.replyTo || undefined;
+      const msgId = data.id || generateMessageID();
       setMessages(prev => [...prev, { 
+        id: msgId,
         type: 'stranger', 
         text: data.text, 
-        replyTo: replyInfo,
+        replyTo: data.replyTo,
         timestamp: data.timestamp || getCurrentTime()
       }]);
       setIsTyping(false);
       playSound('received');
       resetActivity();
+    });
+
+    socket.on('receive_reaction', (data: { messageID: string, reaction: string }) => {
+      setMessages(prev => prev.map(msg => 
+        msg.id === data.messageID ? { ...msg, reaction: data.reaction } : msg
+      ));
     });
 
     socket.on('partner_disconnected', () => {
@@ -283,43 +280,21 @@ export default function ChatItNow() {
       setIsTyping(false); 
       setReplyingTo(null); 
       const nameToShow = partnerNameRef.current || 'Partner';
-      setMessages(prev => [...prev, { type: 'system', data: { name: nameToShow, action: 'disconnected' } }]);
+      setMessages(prev => [...prev, { id: 'sys-end', type: 'system', data: { name: nameToShow, action: 'disconnected' } }]);
     });
 
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
 
-    // Connection Events
-    socket.on('disconnect', () => {
-      if (partnerNameRef.current && isConnected) {
-        setPartnerStatus('reconnecting');
-      }
-    });
-
-    socket.on('connect', () => {
-      if (partnerNameRef.current) {
-        setPartnerStatus('connected');
-        setIsConnected(true);
-      }
-    });
-
-    socket.on('session_restored', () => {
-      if (partnerNameRef.current) {
-        setPartnerStatus('connected');
-        setIsConnected(true);
-      }
-    });
-
-    socket.on('partner_reconnecting_server', () => {
-      setPartnerStatus('reconnecting'); 
-    });
-
-    socket.on('partner_connected', () => {
-      setPartnerStatus('connected');
-    });
+    socket.on('disconnect', () => { if (partnerNameRef.current && isConnected) setPartnerStatus('reconnecting'); });
+    socket.on('connect', () => { if (partnerNameRef.current) { setPartnerStatus('connected'); setIsConnected(true); } });
+    socket.on('session_restored', () => { if (partnerNameRef.current) { setPartnerStatus('connected'); setIsConnected(true); } });
+    socket.on('partner_reconnecting_server', () => setPartnerStatus('reconnecting'));
+    socket.on('partner_connected', () => setPartnerStatus('connected'));
     
     return () => { 
       socket.off('matched'); 
       socket.off('receive_message'); 
+      socket.off('receive_reaction');
       socket.off('partner_disconnected'); 
       socket.off('partner_typing'); 
       socket.off('disconnect');
@@ -334,16 +309,13 @@ export default function ChatItNow() {
     const html = document.documentElement;
     const body = document.body;
     const currentBgColor = darkMode ? '#111827' : '#ffffff';
-    if (darkMode) html.classList.add('dark');
-    else html.classList.remove('dark');
+    if (darkMode) html.classList.add('dark'); else html.classList.remove('dark');
     body.style.backgroundColor = currentBgColor;
     html.style.backgroundColor = currentBgColor;
   }, [darkMode]);
 
-  const resetActivity = () => {
-    if (!showInactivityAd && !showTabReturnAd) setLastActivity(Date.now());
-  };
-
+  const resetActivity = () => { if (!showInactivityAd && !showTabReturnAd) setLastActivity(Date.now()); };
+  
   useEffect(() => {
     const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
     const handleUserInteraction = () => resetActivity();
@@ -355,20 +327,14 @@ export default function ChatItNow() {
     if (isConnected) {
       activityTimerRef.current = window.setInterval(() => {
         const now = Date.now();
-        const timeDiff = now - lastActivity;
-        const SEVEN_MINUTES = 7 * 60 * 1000; 
-        if (timeDiff > SEVEN_MINUTES && !showInactivityAd && !showTabReturnAd) {
-          setShowInactivityAd(true);
-        }
+        if (now - lastActivity > 7 * 60 * 1000 && !showInactivityAd && !showTabReturnAd) setShowInactivityAd(true);
       }, 5000); 
       return () => { if (activityTimerRef.current) clearInterval(activityTimerRef.current); };
     }
   }, [isConnected, lastActivity, showInactivityAd, showTabReturnAd]);
 
   useEffect(() => {
-    const handleVis = () => { 
-        if (!document.hidden && isConnected && !showInactivityAd) setShowTabReturnAd(true);
-    };
+    const handleVis = () => { if (!document.hidden && isConnected && !showInactivityAd) setShowTabReturnAd(true); };
     document.addEventListener('visibilitychange', handleVis);
     return () => document.removeEventListener('visibilitychange', handleVis);
   }, [isConnected, showInactivityAd]);
@@ -382,7 +348,7 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
-      unlockAudio(); // Trigger audio unlock on both channels
+      unlockAudio(); 
       socket.connect();
       startSearch();
     } else {
@@ -400,13 +366,16 @@ export default function ChatItNow() {
 
   const handleSendMessage = () => {
     if (currentMessage.trim() && isConnected) {
+      const msgID = generateMessageID(); 
       const msgData: any = { 
+        id: msgID,
         text: currentMessage,
         timestamp: getCurrentTime()
       };
       if (replyingTo) msgData.replyTo = replyingTo;
 
       setMessages(prev => [...prev, { 
+        id: msgID,
         type: 'you', 
         text: currentMessage, 
         replyTo: replyingTo || undefined,
@@ -423,52 +392,39 @@ export default function ChatItNow() {
 
   const handleNext = () => {
     if (!showNextConfirm) { setShowNextConfirm(true); return; }
-    
     socket.emit('disconnect_partner');
-    
     setIsConnected(false);
     setShowNextConfirm(false);
     setPartnerStatus('disconnected');
     setIsTyping(false);
     setReplyingTo(null);
-    
-    setMessages(prev => [...prev, { type: 'system', data: { name: username, action: 'disconnected' } }]);
+    setMessages(prev => [...prev, { id: 'sys-end-me', type: 'system', data: { name: username, action: 'disconnected' } }]);
   };
 
-  const handleStartSearch = () => {
-    startSearch();
-  };
+  const handleStartSearch = () => { startSearch(); };
 
   const initiateReply = (text: any, type: string) => {
     if (!isConnected) return;
-    
     const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
-
-    setReplyingTo({
-      text: typeof text === 'string' ? text : 'Content',
-      name: senderName,
-      isYou: type === 'you'
-    });
-    
+    setReplyingTo({ text: typeof text === 'string' ? text : 'Content', name: senderName, isYou: type === 'you' });
     const input = document.querySelector('input[type="text"]') as HTMLInputElement;
     if(input) input.focus();
+  };
+
+  const sendReaction = (msgID: string, emoji: string) => {
+    setMessages(prev => prev.map(msg => msg.id === msgID ? { ...msg, reaction: emoji } : msg));
+    setActiveReactionId(null);
+    socket.emit('send_reaction', { messageID: msgID, reaction: emoji });
   };
 
   const renderSystemMessage = (msg: Message) => {
     if (!msg.data) return null;
     const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
-    
-    if (msg.data.action === 'connected') {
-      return <span>You are now chatting with <span style={boldStyle}>{msg.data.name}</span>{msg.data.field ? <> who is in <span style={boldStyle}>{msg.data.field}</span></> : "."}</span>;
-    }
-    
+    if (msg.data.action === 'connected') return <span>You are now chatting with <span style={boldStyle}>{msg.data.name}</span>{msg.data.field ? <> who is in <span style={boldStyle}>{msg.data.field}</span></> : "."}</span>;
     if (msg.data.action === 'disconnected') {
-      if (msg.data.name === username) {
-        return <span><span style={boldStyle}>You</span> disconnected from the chat.</span>;
-      }
+      if (msg.data.name === username) return <span><span style={boldStyle}>You</span> disconnected from the chat.</span>;
       return <span><span style={boldStyle}>{msg.data.name}</span> disconnected from the chat.</span>;
     }
-    
     return null;
   };
 
@@ -483,10 +439,10 @@ export default function ChatItNow() {
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-    <p><strong>ChatItNow</strong> was created to give Filipinos a simple and safe place to connect with others from anywhere in the country. Whether you're a student, a professional, or just someone looking to talk, this platform is for anyone who wants to meet new people or share their experiences with others.</p>
-    <p>Sometimes, it's hard to find someone to talk to—whether its about life, school, work, or anything you're going through. That's why ChatItNow exists. Here, you can have real conversations, make new friends, or just chill and chat with someone who might understand what you're feeling. Everything is anonymous, so you can open up without worrying about being judged.</p>
-    <p>This platform was built by a university student who knows how important it is to have a space where people can feel heard. In a world that's becoming more digital and less personal, ChatItNow aims to give Filipinos a chance to express themselves freely, find support, and connect with others who get what they're going through.</p>
-    <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is free and completely anonymous. Enjoy meeting new people and starting meaningful conversations—one chat at a time.</p>
+                <p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p>
+                <p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p>
+                <p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p>
+                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is completely free and anonymous. Connect with fellow Filipinos, one conversation at a time.</p>
             </div>
             <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
           </div>
@@ -531,7 +487,7 @@ export default function ChatItNow() {
               
               <div className="text-center pt-2">
                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking advices from a strangers. Do your due diligence.
+                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking strangers' advice. Do your due diligence.
                  </p>
               </div>
 
@@ -571,18 +527,10 @@ export default function ChatItNow() {
       {/* Wave Keyframes */}
       <style>{`
         @keyframes typing-bounce {
-          0%, 100% {
-            transform: translateY(0);
-            opacity: 0.5;
-          }
-          50% {
-            transform: translateY(-4px); 
-            opacity: 1;
-          }
+          0%, 100% { transform: translateY(0); opacity: 0.5; }
+          50% { transform: translateY(-4px); opacity: 1; }
         }
-        .animate-typing {
-          animation: typing-bounce 1.4s infinite ease-in-out both;
-        }
+        .animate-typing { animation: typing-bounce 1.4s infinite ease-in-out both; }
       `}</style>
 
       <div className={`
@@ -597,7 +545,7 @@ export default function ChatItNow() {
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Advertisement"}</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
@@ -679,7 +627,18 @@ export default function ChatItNow() {
           {messages.map((msg, idx) => {
             let justifyClass = 'justify-center'; if (msg.type === 'you') justifyClass = 'justify-end'; if (msg.type === 'stranger') justifyClass = 'justify-start';
             return (
-              <div key={idx} className={`flex w-full ${justifyClass}`}>
+              <div key={idx} className={`flex w-full ${justifyClass} group relative`}>
+                
+                {/* --- REACTION SELECTOR --- */}
+                {activeReactionId === msg.id && (
+                  <div className={`absolute z-30 bottom-full mb-1 flex gap-1 p-1 rounded-full shadow-xl border animate-in fade-in zoom-in duration-200 ${darkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`} style={{ left: msg.type === 'you' ? 'auto' : 0, right: msg.type === 'you' ? 0 : 'auto' }}>
+                    {REACTIONS.map(emoji => (
+                       <button key={emoji} onClick={() => sendReaction(msg.id!, emoji)} className="hover:scale-125 transition text-lg p-1">{emoji}</button>
+                    ))}
+                    <button onClick={() => setActiveReactionId(null)} className="text-gray-400 hover:text-red-500 p-1"><X size={14} /></button>
+                  </div>
+                )}
+
                 {msg.type === 'warning' ? (
                   <div className="w-[90%] text-center my-2">
                     <div className="bg-yellow-100 border border-yellow-300 text-yellow-900 text-xs px-3 py-2 rounded-lg font-semibold">{msg.text}</div>
@@ -690,9 +649,15 @@ export default function ChatItNow() {
                   </div>
                 ) : (
                   <SwipeableMessage onReply={() => initiateReply(msg.text, msg.type)} isSystem={false}>
-                     <div className={`flex flex-col ${msg.type === 'you' ? 'items-end ml-auto' : 'items-start'} max-w-[85%]`}>
+                     <div className={`flex flex-col ${msg.type === 'you' ? 'items-end ml-auto' : 'items-start'} max-w-[85%] relative`}>
                         
-                        {/* UPDATED: Reply Quote with Correct Name */}
+                        {/* --- SMILEY TRIGGER --- */}
+                        <div className={`absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity ${msg.type === 'you' ? '-left-8' : '-right-8'}`}>
+                           <button onClick={() => setActiveReactionId(activeReactionId === msg.id ? null : msg.id!)} className={`p-1 rounded-full ${darkMode ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-400 hover:bg-gray-100'}`}>
+                             <Smile size={16} />
+                           </button>
+                        </div>
+
                         {msg.replyTo && (
                           <div className={`mb-1 text-xs opacity-75 px-3 py-1.5 rounded-lg border-l-4 ${msg.type === 'you' ? 'bg-purple-700 text-purple-100 border-purple-300' : (darkMode ? 'bg-gray-800 text-gray-400 border-gray-500' : 'bg-gray-200 text-gray-600 border-gray-400')}`}>
                              <span className="font-bold block mb-0.5">{msg.replyTo.name}</span>
@@ -700,7 +665,7 @@ export default function ChatItNow() {
                           </div>
                         )}
 
-                        <div className={`px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
+                        <div className={`relative px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
                           msg.type === 'you'
                             ? 'bg-purple-600 text-white rounded-br-none' 
                             : `${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
@@ -715,6 +680,14 @@ export default function ChatItNow() {
                               {msg.timestamp}
                             </span>
                           )}
+
+                          {/* --- REACTION BADGE --- */}
+                          {msg.reaction && (
+                            <div className={`absolute -bottom-2 ${msg.type === 'you' ? '-left-2' : '-right-2'} text-sm bg-gray-100 dark:bg-gray-800 border dark:border-gray-600 border-gray-300 rounded-full w-6 h-6 flex items-center justify-center shadow-sm`}>
+                              {msg.reaction}
+                            </div>
+                          )}
+
                         </div>
                      </div>
                   </SwipeableMessage>
@@ -723,7 +696,6 @@ export default function ChatItNow() {
             );
           })}
           
-          {/* Typing Indicator */}
           {isTyping && (
             <div className="flex justify-start w-full">
               <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border-0 flex items-center`}>
@@ -741,7 +713,6 @@ export default function ChatItNow() {
         {/* INPUT BAR */}
         <div className={`absolute bottom-0 left-0 right-0 p-2 border-t z-20 flex flex-col justify-end ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
           
-          {/* UPDATED: Reply Preview with Correct Name */}
           {replyingTo && (
             <div className={`flex items-center justify-between px-4 py-2 mb-1 rounded-lg text-xs border-l-4 ${darkMode ? 'bg-gray-700 text-gray-300 border-purple-500' : 'bg-gray-100 text-gray-700 border-purple-500'}`}>
               <div>
