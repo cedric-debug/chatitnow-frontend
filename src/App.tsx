@@ -32,7 +32,7 @@ export default function ChatItNow() {
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
   
-  // DEFAULT: Light Mode (starts white/native)
+  // DEFAULT: Light Mode
   const [darkMode, setDarkMode] = useState(false);
 
   const [showNextConfirm, setShowNextConfirm] = useState(false);
@@ -89,7 +89,6 @@ export default function ChatItNow() {
     const html = document.documentElement;
     const body = document.body;
 
-    // COLOR DEFINITIONS
     const DARK_THEME_COLOR = '#1f2937'; 
     const LIGHT_THEME_COLOR = '#ffffff';
     
@@ -226,13 +225,13 @@ export default function ChatItNow() {
   if (!isLoggedIn) {
     return (
       <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
-        {/* MODIFIED UI: Taller Padding, larger gaps */}
+        {/* Adjusted padding for login card */}
         <div className="bg-white rounded-2xl shadow-2xl px-10 py-12 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1>
             <p className="text-sm text-gray-600">Chat with Fellow Filipinos</p>
           </div>
-          <div className="space-y-6"> {/* Increased gap from 4 to 6 */}
+          <div className="space-y-6">
             <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Choose a Username</label>
                 <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} onKeyPress={handleKeyPress} placeholder="Enter username..." className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm" maxLength={20} />
@@ -279,8 +278,9 @@ export default function ChatItNow() {
       
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
-        sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl sm:border-x
-        ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}
+        sm:w-[550px] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl 
+        border transition-colors duration-200
+        ${darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}
       `}>
         
         {/* Fullscreen Ad Overlay */}
