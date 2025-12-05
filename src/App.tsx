@@ -119,6 +119,7 @@ export default function ChatItNow() {
 
   }, [darkMode]);
 
+  // Clean Start
   useLayoutEffect(() => {
     document.documentElement.classList.remove('dark');
     document.body.style.backgroundColor = '#ffffff';
@@ -208,7 +209,8 @@ export default function ChatItNow() {
   if (showWelcome) {
     return (
       <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg shadow-2xl p-10 max-w-[420px] w-full max-h-full overflow-y-auto">
+        {/* MODIFIED UI: Wider width (700px) on desktop to prevent scrolling */}
+        <div className="bg-white rounded-lg shadow-2xl p-10 max-w-[420px] sm:max-w-[700px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-8">
              <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
              <h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1>
@@ -224,8 +226,8 @@ export default function ChatItNow() {
   if (!isLoggedIn) {
     return (
       <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
-        {/* LOGIN CARD */}
-        <div className="bg-white rounded-2xl shadow-2xl px-10 py-12 max-w-[420px] w-full max-h-full overflow-y-auto">
+        {/* MODIFIED UI: Wider width (650px) on desktop for consistency */}
+        <div className="bg-white rounded-2xl shadow-2xl px-10 py-12 max-w-[420px] sm:max-w-[650px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1>
             <p className="text-sm text-gray-600">Chat with Fellow Filipinos</p>
@@ -275,10 +277,6 @@ export default function ChatItNow() {
   return (
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
       
-      {/* 
-         - Width increased from 420px to 650px on desktop (sm:w-[650px])
-         - Height increased from 90vh to 92vh on desktop (sm:h-[92vh])
-      */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[650px] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl sm:border-x
