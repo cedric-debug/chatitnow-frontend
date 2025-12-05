@@ -31,7 +31,15 @@ export default function ChatItNow() {
   const [isConnected, setIsConnected] = useState(false);
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  
+  // FIXED: Initialize state based on System Preference to prevent "White Top / Black Footer" mismatch
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    return false;
+  });
+
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showSearching, setShowSearching] = useState(false);
   const [isTyping, setIsTyping] = useState(false); 
@@ -83,7 +91,7 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME CONTROLLER ---
+  // --- THEME CONTROLLER (FIXED) ---
   useEffect(() => {
     const html = document.documentElement;
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
@@ -94,17 +102,23 @@ export default function ChatItNow() {
     }
 
     if (darkMode) { 
-      html.classList.add('dark'); 
-      // Force status bar to match header (gray-800)
-      metaThemeColor.setAttribute('content', '#1f2937'); 
+      html.classList.add('dark');
+      // Set Browser UI color to Dark Gray (matching header)
+      metaThemeColor.setAttribute('content', '#1f2937');
+      // FIXED: Force body background to match to prevent static black bars
+      document.body.style.backgroundColor = '#1f2937';
     } else { 
       html.classList.remove('dark'); 
+      // Set Browser UI color to White
       metaThemeColor.setAttribute('content', '#ffffff'); 
+      // FIXED: Force body background to white
+      document.body.style.backgroundColor = '#ffffff';
     }
   }, [darkMode]);
 
   useEffect(() => {
-    window.document.documentElement.classList.remove('dark');
+    // Initial cleanup if needed, but the state initializer handles the logic now
+    if (!darkMode) window.document.documentElement.classList.remove('dark');
   }, []);
 
   useEffect(() => {
@@ -287,7 +301,7 @@ export default function ChatItNow() {
         <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
-              src="/apple-touch-icon.png" 
+              src="/logo.png" 
               alt="Logo" 
               className="w-8 h-8 rounded-full object-cover shadow-sm"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
@@ -300,11 +314,14 @@ export default function ChatItNow() {
         {/* CHAT AREA - Kept Gray-900 for Contrast */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD (FIXED SIZE) */}
-          <div className={`w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+          {/* TOP BANNER AD (FIXED SIZE & STYLE) */}
+          <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
-                slotId={AD_SLOT_TOP_BANNER} 
+                slotId={AD_SLOT_TOP_BANNER}
+                format="horizontal" 
+                responsive="false"
+                style={{ display: 'block', maxHeight: '50px', width: '100%' }}
              />
           </div>
 
