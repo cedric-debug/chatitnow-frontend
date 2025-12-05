@@ -251,18 +251,14 @@ export default function ChatItNow() {
 
   if (showWelcome) {
     return (
-      // UPDATED: Added dark mode classes for background
       <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-        {/* UPDATED: Added dark mode classes for container, text, and border */}
         <div className={`relative w-full h-[100dvh] sm:w-[650px] sm:shadow-2xl border-0 sm:border-x flex flex-col justify-center overflow-y-auto ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
           <div className="p-10 w-full max-w-[700px] mx-auto">
             <div className="text-center mb-8">
                <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
-               {/* UPDATED: Text colors */}
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
-            {/* UPDATED: Body text colors */}
             <div className={`space-y-4 text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 <p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p>
                 <p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p>
@@ -278,13 +274,10 @@ export default function ChatItNow() {
 
   if (!isLoggedIn) {
     return (
-      // UPDATED: Added dark mode background
       <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
-        {/* UPDATED: Container background and border */}
         <div className={`relative w-full h-[100dvh] sm:w-[650px] sm:shadow-2xl border-0 sm:border-x flex flex-col justify-center overflow-y-auto ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
           <div className="px-10 py-12 w-full max-w-[650px] mx-auto">
             <div className="text-center mb-8">
-              {/* UPDATED: Header text */}
               <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>ChatItNow.com</h1>
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Chat with Fellow Filipinos</p>
             </div>
@@ -292,19 +285,16 @@ export default function ChatItNow() {
             <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
               <div>
                   <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Choose a Username</label>
-                  {/* UPDATED: Input styling for dark mode */}
                   <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} enterKeyHint="go" placeholder="Enter username..." className={`w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900'}`} maxLength={20} />
               </div>
               <div>
                   <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Field/Profession (Optional)</label>
-                  {/* UPDATED: Select styling for dark mode */}
                   <select value={field} onChange={(e) => setField(e.target.value)} className={`w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}>
                     <option value="">Select your field (or leave blank)</option>
                     {fields.slice(1).map((f) => (<option key={f} value={f}>{f}</option>))}
                   </select>
                   <p className={`text-xs mt-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>We'll try to match you with someone in the same field when possible</p>
               </div>
-              {/* UPDATED: Terms box styling - yellow in light mode, dark gray in dark mode */}
               <div className={`border rounded-xl p-5 space-y-4 transition-colors duration-300 ${formError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : darkMode ? 'bg-gray-700 border-gray-600' : 'border-yellow-200 bg-yellow-50'}`}>
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input type="checkbox" checked={confirmedAdult} onChange={(e) => setConfirmedAdult(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" />
@@ -315,13 +305,20 @@ export default function ChatItNow() {
                   <span className={`text-xs sm:text-sm pt-0.5 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>I accept the{' '}<button type="button" onClick={() => setShowTerms(true)} className="text-purple-600 hover:underline font-bold">Terms & Conditions</button></span>
                 </label>
               </div>
+              
+              {/* --- ADDED: Caution Warning Message --- */}
+              <div className="text-center pt-2">
+                 <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking strangers' advice.
+                 </p>
+              </div>
+
               <button type="submit" disabled={!username.trim() || !acceptedTerms || !confirmedAdult} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg shadow-lg mt-2">Start Chatting</button>
             </form>
 
           </div>
         </div>
         
-        {/* UPDATED: Terms Modal Dark Mode */}
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
             <div className={`rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
@@ -372,7 +369,7 @@ export default function ChatItNow() {
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Advertisement"}</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
