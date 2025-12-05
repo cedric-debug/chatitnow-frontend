@@ -32,7 +32,7 @@ export default function ChatItNow() {
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
   
-  // DEFAULT: Light Mode
+  // DEFAULT: Light Mode (starts white/native)
   const [darkMode, setDarkMode] = useState(false);
 
   const [showNextConfirm, setShowNextConfirm] = useState(false);
@@ -84,54 +84,43 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- DEFINITIVE THEME & COLOR CONTROLLER ---
+  // --- THEME SYNC ---
   useLayoutEffect(() => {
     const html = document.documentElement;
     const body = document.body;
-    const root = document.getElementById('root');
 
-    // COLORS
-    // Gray-800 (#1f2937) matches your App Header & Footer. 
-    // This color ensures that any overscroll on mobile looks like an extension of the app bars.
-    const COLOR_INTERFACE_DARK = '#1f2937'; 
-    const COLOR_INTERFACE_LIGHT = '#ffffff'; // White for light mode
+    // COLOR DEFINITIONS
+    const DARK_THEME_COLOR = '#1f2937'; 
+    const LIGHT_THEME_COLOR = '#ffffff';
+    
+    const activeColor = darkMode ? DARK_THEME_COLOR : LIGHT_THEME_COLOR;
+    const activeStatusText = darkMode ? 'black-translucent' : 'default';
 
-    const activeColor = darkMode ? COLOR_INTERFACE_DARK : COLOR_INTERFACE_LIGHT;
-    const statusText = darkMode ? 'black-translucent' : 'default';
-
-    // 1. SET CLASS (Trigger Tailwind)
     if (darkMode) {
       html.classList.add('dark');
     } else {
       html.classList.remove('dark');
     }
 
-    // 2. SET BACKGROUNDS (Forcefully Override "Static" defaults)
-    // We apply this to HTML, BODY, and ROOT to catch any browser variance
-    [html, body, root].forEach(el => {
-      if (el) el.style.setProperty('background-color', activeColor, 'important');
-    });
+    body.style.backgroundColor = activeColor;
+    html.style.backgroundColor = activeColor;
 
-    // 3. SET META TAGS (Forcefully Delete & Recreate for immediate effect)
-    // Address Bar Color
-    const existingMeta = document.querySelector('meta[name="theme-color"]');
-    if (existingMeta) existingMeta.remove();
-    const newMeta = document.createElement('meta');
-    newMeta.name = 'theme-color';
-    newMeta.content = activeColor;
-    document.head.appendChild(newMeta);
+    const updateMeta = (name: string, content: string) => {
+      let meta = document.querySelector(`meta[name='${name}']`);
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', name);
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', content);
+    };
 
-    // Status Bar Style
-    const existingStatus = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
-    if (existingStatus) existingStatus.remove();
-    const newStatus = document.createElement('meta');
-    newStatus.name = 'apple-mobile-web-app-status-bar-style';
-    newStatus.content = statusText;
-    document.head.appendChild(newStatus);
+    updateMeta('theme-color', activeColor);
+    updateMeta('apple-mobile-web-app-status-bar-style', activeStatusText);
 
   }, [darkMode]);
 
-  // Cleanup on Mount (Ensure Clean Slate)
+  // Clean Start
   useLayoutEffect(() => {
     document.documentElement.classList.remove('dark');
     document.body.style.backgroundColor = '#ffffff';
@@ -221,8 +210,8 @@ export default function ChatItNow() {
   if (showWelcome) {
     return (
       <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
-          <div className="text-center mb-6">
+        <div className="bg-white rounded-lg shadow-2xl p-10 max-w-[420px] w-full max-h-full overflow-y-auto">
+          <div className="text-center mb-8">
              <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
              <h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1>
              <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
@@ -237,18 +226,30 @@ export default function ChatItNow() {
   if (!isLoggedIn) {
     return (
       <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg shadow-2xl p-8 max-w-[420px] w-full max-h-full overflow-y-auto">
-          <div className="text-center mb-6"><h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1><p className="text-sm text-gray-600">Chat with Fellow Filipinos</p></div>
-          <div className="space-y-4">
-            <div><label className="block text-sm font-semibold text-gray-700 mb-1.5">Choose a Username</label><input type="text" value={username} onChange={(e) => setUsername(e.target.value)} onKeyPress={handleKeyPress} placeholder="Enter username..." className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm" maxLength={20} /></div>
-            <div><label className="block text-sm font-semibold text-gray-700 mb-1.5">Field/Profession (Optional)</label><select value={field} onChange={(e) => setField(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-base shadow-sm"><option value="">Select your field (or leave blank)</option>{fields.slice(1).map((f) => (<option key={f} value={f}>{f}</option>))}</select><p className="text-xs text-gray-500 mt-1">We'll try to match you with someone in the same field when possible</p></div>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 space-y-3">
+        {/* MODIFIED UI: Taller Padding, larger gaps */}
+        <div className="bg-white rounded-2xl shadow-2xl px-10 py-12 max-w-[420px] w-full max-h-full overflow-y-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1>
+            <p className="text-sm text-gray-600">Chat with Fellow Filipinos</p>
+          </div>
+          <div className="space-y-6"> {/* Increased gap from 4 to 6 */}
+            <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Choose a Username</label>
+                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} onKeyPress={handleKeyPress} placeholder="Enter username..." className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm" maxLength={20} />
+            </div>
+            <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Field/Profession (Optional)</label>
+                <select value={field} onChange={(e) => setField(e.target.value)} className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-base shadow-sm"><option value="">Select your field (or leave blank)</option>{fields.slice(1).map((f) => (<option key={f} value={f}>{f}</option>))}</select>
+                <p className="text-xs text-gray-500 mt-2">We'll try to match you with someone in the same field when possible</p>
+            </div>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 space-y-4">
               <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={confirmedAdult} onChange={(e) => setConfirmedAdult(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5"><strong>I confirm that I am 18 years of age or older.</strong></span></label>
               <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5">I accept the{' '}<button onClick={() => setShowTerms(true)} className="text-purple-600 hover:underline font-bold">Terms & Conditions</button></span></label>
             </div>
-            <button onClick={handleLogin} disabled={!username.trim() || !acceptedTerms || !confirmedAdult} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-base shadow-lg mt-2">Start Chatting</button>
+            <button onClick={handleLogin} disabled={!username.trim() || !acceptedTerms || !confirmedAdult} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg shadow-lg mt-2">Start Chatting</button>
           </div>
         </div>
+        
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
             <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
@@ -274,20 +275,12 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // Main Wrapper
-  // Desktop: Fixed White/Dark Gray BG with centering
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
       
       <div className={`
-        relative w-full h-[100dvh] overflow-hidden flex flex-col
-        sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl 
-        ${
-          // BORDER THICKNESS & CONTRAST FIX
-          // Desktop Light: Light border, White container
-          !darkMode ? 'bg-white border-2 border-gray-100' : 
-          // Desktop Dark: Gray-900 (darker) Container, Gray-600 (3px) border for Contrast
-          'bg-gray-900 sm:border-[3px] border-gray-600' 
-        }
+        relative w-full h-[100dvh] overflow-hidden
+        sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl sm:border-x
+        ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}
       `}>
         
         {/* Fullscreen Ad Overlay */}
@@ -295,7 +288,6 @@ export default function ChatItNow() {
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
               <p className="text-xs text-gray-500 mb-2">Advertisement</p>
-              {/* Ad Container ALWAYS Light */}
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_VERTICAL} />
               </div>
@@ -313,7 +305,6 @@ export default function ChatItNow() {
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-4`}>Looking in {field || 'All Fields'}</p>
               <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-200'} border rounded-lg p-2`}>
                 <p className={`text-[10px] mb-1 opacity-50 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Advertisement</p>
-                {/* Fixed White Ad Background */}
                 <div className="bg-white h-64 rounded flex items-center justify-center overflow-hidden">
                   <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_SQUARE} />
                 </div>
@@ -322,7 +313,7 @@ export default function ChatItNow() {
           </div>
         )}
 
-        {/* HEADER - Absolute Position as Requested */}
+        {/* HEADER */}
         <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
@@ -336,7 +327,7 @@ export default function ChatItNow() {
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* CHAT AREA - Absolute Position as Requested */}
+        {/* CHAT AREA */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
           {/* TOP BANNER AD (FIXED) */}
@@ -395,7 +386,7 @@ export default function ChatItNow() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* INPUT BAR - Absolute Position */}
+        {/* INPUT BAR */}
         <div className={`absolute bottom-0 left-0 right-0 h-[60px] p-2 border-t z-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
           <div className="flex gap-2 items-center h-full">
             {partnerStatus === 'disconnected' ? (
