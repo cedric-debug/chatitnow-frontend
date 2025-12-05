@@ -6,9 +6,12 @@ import AdUnit from './AdUnit';
 // --- CONFIGURATION ---
 const PROD_URL = "https://chatitnow-server.onrender.com"; 
 const ADSENSE_CLIENT_ID = "ca-pub-1806664183023369"; 
-const AD_SLOT_SQUARE = "4725306503"; 
-const AD_SLOT_VERTICAL = "1701533824"; 
-const AD_SLOT_TOP_BANNER = "9658354392"; 
+
+// --- AD SLOT CONFIGURATION (4 ADS) ---
+const AD_SLOT_SQUARE = "4725306503";        // Searching Screen
+const AD_SLOT_TOP_BANNER = "9658354392";    // Top of Chat
+const AD_SLOT_INACTIVITY = "2655630641";    // 7-Min Idle Pop-up
+const AD_SLOT_VERTICAL = "1701533824";      // Tab Return (Welcome Back) Pop-up
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 const socket: Socket = io(SERVER_URL, { autoConnect: false });
@@ -39,7 +42,7 @@ export default function ChatItNow() {
   const [showSearching, setShowSearching] = useState(false);
   const [isTyping, setIsTyping] = useState(false); 
   
-  // --- INACTIVITY TRACKING ---
+  // --- INACTIVITY TRACKING STATE ---
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [showInactivityAd, setShowInactivityAd] = useState(false);
   const [showTabReturnAd, setShowTabReturnAd] = useState(false);
@@ -91,17 +94,15 @@ export default function ChatItNow() {
     const html = document.documentElement;
     const body = document.body;
 
-    // BACKGROUND COLOR LOGIC
-    // Reverted desktop background to match Dark Mode UI (#111827 / gray-900)
-    const BG_DARK = '#111827'; 
-    const BG_LIGHT = '#ffffff';
+    const APP_NOTCH_DARK = '#1f2937'; 
+    const APP_NOTCH_LIGHT = '#ffffff';
     
-    // Header/Notch Color
-    const NOTCH_DARK = '#1f2937'; // Gray 800
-    const NOTCH_LIGHT = '#ffffff';
+    // Background color for Desktop
+    const DESKTOP_BG_DARK = '#09090b'; 
+    const DESKTOP_BG_LIGHT = '#ffffff';
 
-    const activeBg = darkMode ? BG_DARK : BG_LIGHT;
-    const activeMeta = darkMode ? NOTCH_DARK : NOTCH_LIGHT;
+    const currentMetaColor = darkMode ? APP_NOTCH_DARK : APP_NOTCH_LIGHT;
+    const currentBgColor = darkMode ? DESKTOP_BG_DARK : DESKTOP_BG_LIGHT;
     const activeStatusText = darkMode ? 'black-translucent' : 'default';
 
     if (darkMode) {
@@ -111,8 +112,8 @@ export default function ChatItNow() {
     }
 
     // Force Body/HTML Background
-    body.style.backgroundColor = activeBg;
-    html.style.backgroundColor = activeBg;
+    body.style.backgroundColor = currentBgColor;
+    html.style.backgroundColor = currentBgColor;
 
     const updateMeta = (name: string, content: string) => {
       let meta = document.querySelector(`meta[name='${name}']`);
@@ -124,20 +125,20 @@ export default function ChatItNow() {
       meta.setAttribute('content', content);
     };
 
-    updateMeta('theme-color', activeMeta);
+    updateMeta('theme-color', currentMetaColor);
     updateMeta('apple-mobile-web-app-status-bar-style', activeStatusText);
 
   }, [darkMode]);
 
-  // Clean Start
   useLayoutEffect(() => {
     document.documentElement.classList.remove('dark');
     document.body.style.backgroundColor = '#ffffff';
   }, []);
 
-  // --- 7-MINUTE INACTIVITY LOGIC ---
+  // --- INACTIVITY MONITOR (7 Minutes) ---
   const resetActivity = () => {
-    if (!showInactivityAd) {
+    // Only reset timer if no ad is currently showing
+    if (!showInactivityAd && !showTabReturnAd) {
       setLastActivity(Date.now());
     }
   };
@@ -145,7 +146,6 @@ export default function ChatItNow() {
   // 1. Listen for ALL user interactions
   useEffect(() => {
     const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
-    
     const handleUserInteraction = () => resetActivity();
 
     activityEvents.forEach(event => {
@@ -157,7 +157,7 @@ export default function ChatItNow() {
         window.removeEventListener(event, handleUserInteraction);
       });
     };
-  }, [showInactivityAd]);
+  }, [showInactivityAd, showTabReturnAd]);
 
   // 2. Timer Check (7 Minutes)
   useEffect(() => {
@@ -167,25 +167,28 @@ export default function ChatItNow() {
         const timeDiff = now - lastActivity;
         const SEVEN_MINUTES = 7 * 60 * 1000; 
 
-        if (timeDiff > SEVEN_MINUTES && !showInactivityAd) {
+        if (timeDiff > SEVEN_MINUTES && !showInactivityAd && !showTabReturnAd) {
           setShowInactivityAd(true);
         }
-      }, 5000); // Check every 5 seconds
+      }, 5000); 
       return () => { if (activityTimerRef.current) clearInterval(activityTimerRef.current); };
     }
-  }, [isConnected, lastActivity, showInactivityAd]);
+  }, [isConnected, lastActivity, showInactivityAd, showTabReturnAd]);
 
+  // 3. Tab Return Monitor
   useEffect(() => {
-    const handleVis = () => { if (!document.hidden && isConnected) setShowTabReturnAd(true); };
+    const handleVis = () => { 
+        if (!document.hidden && isConnected && !showInactivityAd) {
+            setShowTabReturnAd(true);
+        } 
+    };
     document.addEventListener('visibilitychange', handleVis);
     return () => document.removeEventListener('visibilitychange', handleVis);
-  }, [isConnected]);
+  }, [isConnected, showInactivityAd]);
 
-  
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCurrentMessage(e.target.value);
-    // Typing counts as activity
-    resetActivity();
+    resetActivity(); 
     if (isConnected) socket.emit('typing', e.target.value.length > 0);
   };
 
@@ -251,7 +254,7 @@ export default function ChatItNow() {
   if (showWelcome) {
     return (
       <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg shadow-2xl p-10 max-w-[420px] sm:max-w-[700px] w-full max-h-full overflow-y-auto">
+        <div className="bg-white rounded-lg shadow-2xl p-10 max-w-[700px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-8">
              <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
              <h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1>
@@ -267,7 +270,7 @@ export default function ChatItNow() {
   if (!isLoggedIn) {
     return (
       <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl px-10 py-12 max-w-[420px] sm:max-w-[650px] w-full max-h-full overflow-y-auto">
+        <div className="bg-white rounded-2xl shadow-2xl px-10 py-12 max-w-[650px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1>
             <p className="text-sm text-gray-600">Chat with Fellow Filipinos</p>
@@ -315,13 +318,8 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-zinc-950' : 'bg-white'}`}>
       
-      {/* 
-         - Reverted Background: Outer 'bg-gray-900' now matches Inner 'bg-gray-900'
-         - Vertical Height: h-[100dvh] (100% Dynamic Height) to fill gaps 
-         - Width: 650px on desktop
-      */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[650px] sm:rounded-2xl sm:shadow-2xl 
@@ -329,15 +327,32 @@ export default function ChatItNow() {
         ${darkMode ? 'bg-gray-900 border-4 border-gray-600' : 'bg-white border-2 border-gray-200'}
       `}>
         
-        {/* Fullscreen Ad Overlay */}
+        {/* Fullscreen Ad Overlay (HANDLES 2 DIFFERENT ADS) */}
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">Advertisement</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
-                <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_VERTICAL} />
+                {/* 
+                   DYNAMIC AD SELECTION: 
+                   - If Inactive: Use AD_SLOT_INACTIVITY
+                   - If Tab Return: Use AD_SLOT_VERTICAL
+                */}
+                <AdUnit 
+                  client={ADSENSE_CLIENT_ID} 
+                  slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} 
+                />
               </div>
-              <button onClick={() => { setShowInactivityAd(false); setShowTabReturnAd(false); resetActivity(); }} className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold">Close Ad</button>
+              <button 
+                onClick={() => { 
+                  setShowInactivityAd(false); 
+                  setShowTabReturnAd(false); 
+                  setLastActivity(Date.now()); 
+                }} 
+                className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold"
+              >
+                Close Ad
+              </button>
             </div>
           </div>
         )}
