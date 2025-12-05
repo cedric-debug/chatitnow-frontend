@@ -89,12 +89,16 @@ export default function ChatItNow() {
     const html = document.documentElement;
     const body = document.body;
 
-    // Header Color (#1f2937) is used for Mobile Browser Chrome (Notch/Bottom)
-    const NOTCH_COLOR_DARK = '#1f2937'; 
-    const NOTCH_COLOR_LIGHT = '#ffffff';
+    const DARK_THEME_COLOR = '#1f2937'; 
+    const LIGHT_THEME_COLOR = '#ffffff';
     
-    const activeColor = darkMode ? NOTCH_COLOR_DARK : NOTCH_COLOR_LIGHT;
+    const activeColor = darkMode ? DARK_THEME_COLOR : LIGHT_THEME_COLOR;
     const activeStatusText = darkMode ? 'black-translucent' : 'default';
+
+    // 1. DESKTOP BACKGROUND
+    const BG_DESKTOP = '#111827'; // Gray 900 (Dark) or Pitch Black depending on taste
+    const BG_LIGHT = '#ffffff';
+    const desktopBg = darkMode ? BG_DESKTOP : BG_LIGHT;
 
     if (darkMode) {
       html.classList.add('dark');
@@ -102,11 +106,11 @@ export default function ChatItNow() {
       html.classList.remove('dark');
     }
 
-    // Force Body/HTML to match the Notch color (Seamless on Mobile)
-    // On Desktop, the outer div below covers this anyway
-    body.style.backgroundColor = activeColor;
-    html.style.backgroundColor = activeColor;
+    // Force Body/HTML Background (Handles mobile/desktop voids)
+    body.style.backgroundColor = desktopBg;
+    html.style.backgroundColor = desktopBg;
 
+    // Mobile Notch Sync (Only updates mobile address bar)
     const updateMeta = (name: string, content: string) => {
       let meta = document.querySelector(`meta[name='${name}']`);
       if (!meta) {
@@ -275,16 +279,18 @@ export default function ChatItNow() {
   }
 
   // --- MAIN CHAT INTERFACE ---
-  // FIXED CONTRAST: Zinc-950 background for Desktop (Very dark)
-  // FIXED CONTRAST: Gray-900 card background with Gray-700 border
   return (
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-zinc-950' : 'bg-white'}`}>
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
+      {/* 
+         - Updated: Removes "border" from the main list. 
+         - Logic: Uses "border-4" for dark mode (intense border) and "border-2" for light mode.
+      */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[650px] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl 
-        border transition-colors duration-200
-        ${darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}
+        transition-colors duration-200
+        ${darkMode ? 'bg-gray-900 border-4 border-gray-600' : 'bg-white border-2 border-gray-200'}
       `}>
         
         {/* Fullscreen Ad Overlay */}
@@ -318,7 +324,6 @@ export default function ChatItNow() {
         )}
 
         {/* HEADER */}
-        {/* Changed Text color to Purple-600 (Dark: Purple-500) to match button */}
         <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
@@ -327,7 +332,7 @@ export default function ChatItNow() {
               className="w-8 h-8 rounded-full object-cover shadow-sm"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
-            {/* LOGO COLOR FIX: Uses Purple-600 normally, and slightly lighter Purple-500 on dark background for readability */}
+            {/* PURPLE LOGO COLOR */}
             <span className={`font-bold text-lg ${darkMode ? 'text-purple-500' : 'text-purple-600'}`}>ChatItNow</span>
           </div>
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
@@ -336,7 +341,7 @@ export default function ChatItNow() {
         {/* CHAT AREA */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD */}
+          {/* TOP BANNER AD (FIXED) */}
           <div className="w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg bg-gray-100">
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
