@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { SkipForward, Moon, Sun } from 'lucide-react';
+import { SkipForward, Moon, Sun, Volume2, VolumeX, X, Reply } from 'lucide-react';
 import io, { Socket } from 'socket.io-client';
 import AdUnit from './AdUnit';
 
@@ -16,11 +16,116 @@ const AD_SLOT_INACTIVITY = "2655630641";
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 const socket: Socket = io(SERVER_URL, { autoConnect: false });
 
+interface ReplyData {
+  text: string;
+  isYou: boolean;
+}
+
 interface Message {
   type: 'system' | 'you' | 'stranger' | 'warning';
-  text?: React.ReactNode; 
+  text?: React.ReactNode;
+  replyTo?: ReplyData;
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; };
 }
+
+// --- NEW COMPONENT: SWIPEABLE MESSAGE ---
+// Handles both Mobile Touch Swipe and Desktop Mouse Drag
+const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.ReactNode, onReply: () => void, isSystem: boolean }) => {
+  const [offsetX, setOffsetX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const startX = useRef(0);
+
+  // Threshold to trigger reply
+  const SWIPE_THRESHOLD = 50;
+
+  if (isSystem) return <div>{children}</div>;
+
+  // --- TOUCH EVENTS (Mobile) ---
+  const handleTouchStart = (e: React.TouchEvent) => {
+    startX.current = e.touches[0].clientX;
+    setIsDragging(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging) return;
+    const currentX = e.touches[0].clientX;
+    const diff = currentX - startX.current;
+    // Only allow swiping right (positive diff) and cap it at 100px
+    if (diff > 0 && diff < 100) {
+      setOffsetX(diff);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (offsetX > SWIPE_THRESHOLD) onReply();
+    setIsDragging(false);
+    setOffsetX(0);
+  };
+
+  // --- MOUSE EVENTS (Desktop "Click and Drag") ---
+  const handleMouseDown = (e: React.MouseEvent) => {
+    startX.current = e.clientX;
+    setIsDragging(true);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const currentX = e.clientX;
+    const diff = currentX - startX.current;
+    if (diff > 0 && diff < 100) {
+      setOffsetX(diff);
+    }
+  };
+
+  const handleMouseUp = () => {
+    if (isDragging) {
+      if (offsetX > SWIPE_THRESHOLD) onReply();
+      setIsDragging(false);
+      setOffsetX(0);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (isDragging) {
+      setIsDragging(false);
+      setOffsetX(0);
+    }
+  };
+
+  return (
+    <div 
+      className="relative w-full select-none"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseLeave}
+    >
+      {/* Reply Icon Indicator behind the message */}
+      <div 
+        className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400 transition-opacity duration-200"
+        style={{ 
+          opacity: offsetX > 20 ? 1 : 0,
+          transform: `translateX(${offsetX > 20 ? 10 : 0}px) translateY(-50%)`
+        }}
+      >
+        <Reply size={20} />
+      </div>
+
+      {/* The Message Bubble */}
+      <div 
+        style={{ 
+          transform: `translateX(${offsetX}px)`, 
+          transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' 
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
 
 export default function ChatItNow() {
   const [showWelcome, setShowWelcome] = useState(true);
@@ -35,7 +140,13 @@ export default function ChatItNow() {
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
   
-  // --- UPDATED: Auto-detect System Dark Mode Preference ---
+  const [isMuted, setIsMuted] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<ReplyData | null>(null);
+
+  const audioSentRef = useRef<HTMLAudioElement | null>(null);
+  const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
+
+  // --- DARK MODE ---
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -43,7 +154,6 @@ export default function ChatItNow() {
     return false;
   });
 
-  // --- UPDATED: Listen for System Dark Mode Changes ---
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => setDarkMode(e.matches);
@@ -55,12 +165,9 @@ export default function ChatItNow() {
   const [showSearching, setShowSearching] = useState(false);
   const [isTyping, setIsTyping] = useState(false); 
   
-  // --- INACTIVITY TRACKING ---
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [showInactivityAd, setShowInactivityAd] = useState(false);
   const [showTabReturnAd, setShowTabReturnAd] = useState(false);
-
-  // --- ERROR STATE FOR LOGIN ---
   const [formError, setFormError] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -69,9 +176,32 @@ export default function ChatItNow() {
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
+  // Initialize Audio
+  useEffect(() => {
+    audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
+    audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
+    if(audioSentRef.current) audioSentRef.current.volume = 0.5;
+    if(audioReceivedRef.current) audioReceivedRef.current.volume = 0.5;
+  }, []);
+
+  const playSound = (type: 'sent' | 'received') => {
+    if (isMuted) return;
+    try {
+      if (type === 'sent' && audioSentRef.current) {
+        audioSentRef.current.currentTime = 0;
+        audioSentRef.current.play().catch(() => {});
+      } else if (type === 'received' && audioReceivedRef.current) {
+        audioReceivedRef.current.currentTime = 0;
+        audioReceivedRef.current.play().catch(() => {});
+      }
+    } catch (e) {
+      console.error("Audio play failed", e);
+    }
+  };
+
   useEffect(() => { 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); 
-  }, [messages, isTyping]);
+  }, [messages, isTyping, replyingTo]); 
 
   useEffect(() => {
     socket.on('matched', (data: any) => {
@@ -85,8 +215,10 @@ export default function ChatItNow() {
     });
 
     socket.on('receive_message', (data: any) => {
-      setMessages(prev => [...prev, { type: 'stranger', text: data.text }]);
+      const replyInfo = data.replyTo || undefined;
+      setMessages(prev => [...prev, { type: 'stranger', text: data.text, replyTo: replyInfo }]);
       setIsTyping(false);
+      playSound('received');
       resetActivity();
     });
 
@@ -105,52 +237,22 @@ export default function ChatItNow() {
       socket.off('partner_disconnected'); 
       socket.off('partner_typing'); 
     };
-  }, []);
+  }, [isMuted]); 
 
   // --- THEME SYNC ---
   useLayoutEffect(() => {
     const html = document.documentElement;
     const body = document.body;
-
-    const APP_NOTCH_DARK = '#1f2937'; 
-    const APP_NOTCH_LIGHT = '#ffffff';
-    
-    const DESKTOP_BG_DARK = '#111827'; 
-    const DESKTOP_BG_LIGHT = '#ffffff';
-
-    const currentMetaColor = darkMode ? APP_NOTCH_DARK : APP_NOTCH_LIGHT;
-    const currentBgColor = darkMode ? DESKTOP_BG_DARK : DESKTOP_BG_LIGHT;
-    const activeStatusText = darkMode ? 'black-translucent' : 'default';
-
-    if (darkMode) {
-      html.classList.add('dark');
-    } else {
-      html.classList.remove('dark');
-    }
-
+    const currentBgColor = darkMode ? '#111827' : '#ffffff';
+    if (darkMode) html.classList.add('dark');
+    else html.classList.remove('dark');
     body.style.backgroundColor = currentBgColor;
     html.style.backgroundColor = currentBgColor;
-
-    const updateMeta = (name: string, content: string) => {
-      let meta = document.querySelector(`meta[name='${name}']`);
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute('name', name);
-        document.head.appendChild(meta);
-      }
-      meta.setAttribute('content', content);
-    };
-
-    updateMeta('theme-color', currentMetaColor);
-    updateMeta('apple-mobile-web-app-status-bar-style', activeStatusText);
-
   }, [darkMode]);
 
   // --- INACTIVITY MONITOR ---
   const resetActivity = () => {
-    if (!showInactivityAd && !showTabReturnAd) {
-      setLastActivity(Date.now());
-    }
+    if (!showInactivityAd && !showTabReturnAd) setLastActivity(Date.now());
   };
 
   useEffect(() => {
@@ -166,7 +268,6 @@ export default function ChatItNow() {
         const now = Date.now();
         const timeDiff = now - lastActivity;
         const SEVEN_MINUTES = 7 * 60 * 1000; 
-
         if (timeDiff > SEVEN_MINUTES && !showInactivityAd && !showTabReturnAd) {
           setShowInactivityAd(true);
         }
@@ -177,9 +278,7 @@ export default function ChatItNow() {
 
   useEffect(() => {
     const handleVis = () => { 
-        if (!document.hidden && isConnected && !showInactivityAd) {
-            setShowTabReturnAd(true);
-        } 
+        if (!document.hidden && isConnected && !showInactivityAd) setShowTabReturnAd(true);
     };
     document.addEventListener('visibilitychange', handleVis);
     return () => document.removeEventListener('visibilitychange', handleVis);
@@ -211,9 +310,15 @@ export default function ChatItNow() {
 
   const handleSendMessage = () => {
     if (currentMessage.trim() && isConnected) {
-      setMessages(prev => [...prev, { type: 'you', text: currentMessage }]);
-      socket.emit('send_message', { text: currentMessage });
+      const msgData: any = { text: currentMessage };
+      if (replyingTo) msgData.replyTo = replyingTo;
+
+      setMessages(prev => [...prev, { type: 'you', text: currentMessage, replyTo: replyingTo || undefined }]);
+      socket.emit('send_message', msgData);
+      
       setCurrentMessage('');
+      setReplyingTo(null);
+      playSound('sent');
       resetActivity();
     }
   };
@@ -225,10 +330,22 @@ export default function ChatItNow() {
     setShowNextConfirm(false);
     setPartnerStatus('disconnected');
     setMessages(prev => [...prev, { type: 'system', data: { name: username, action: 'disconnected' } }]);
+    setReplyingTo(null);
   };
 
   const handleStartSearch = () => {
     startSearch();
+  };
+
+  // --- REPLY HANDLER ---
+  const initiateReply = (text: any, type: string) => {
+    if (!isConnected) return;
+    setReplyingTo({
+      text: typeof text === 'string' ? text : 'Content',
+      isYou: type === 'you'
+    });
+    const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+    if(input) input.focus();
   };
 
   const renderSystemMessage = (msg: Message) => {
@@ -306,10 +423,9 @@ export default function ChatItNow() {
                 </label>
               </div>
               
-              {/* --- ADDED: Caution Warning Message --- */}
               <div className="text-center pt-2">
                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking someones advice. Verify information.
+                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking strangers' advice.
                  </p>
               </div>
 
@@ -346,7 +462,6 @@ export default function ChatItNow() {
   return (
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
-      {/* Wave Keyframes */}
       <style>{`
         @keyframes wave {
           0%, 60%, 100% { transform: translateY(0); }
@@ -369,7 +484,7 @@ export default function ChatItNow() {
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Advertisement"}</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
@@ -415,13 +530,18 @@ export default function ChatItNow() {
             />
             <span className={`font-bold text-lg ${darkMode ? 'text-purple-500' : 'text-purple-600'}`}>ChatItNow</span>
           </div>
-          <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
+          <div className="flex items-center gap-2">
+            {/* Mute Toggle */}
+            <button onClick={() => setIsMuted(!isMuted)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+              {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            </button>
+            <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
+          </div>
         </div>
 
         {/* CHAT AREA */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 pb-4 space-y-3 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD */}
           <div className="w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg bg-gray-100">
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
@@ -449,21 +569,31 @@ export default function ChatItNow() {
                     <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{msg.data ? renderSystemMessage(msg) : msg.text}</span>
                   </div>
                 ) : (
-                  <div className={`max-w-[85%] ${msg.type === 'you' ? 'items-end' : 'items-start'}`}>
-                    <div className={`px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
-                      msg.type === 'you'
-                        ? 'bg-purple-600 text-white rounded-br-none' 
-                        : `${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
-                    }`}>
-                      {msg.text}
-                    </div>
-                  </div>
+                  // --- SWIPEABLE MESSAGE WRAPPER ---
+                  <SwipeableMessage onReply={() => initiateReply(msg.text, msg.type)} isSystem={false}>
+                     <div className={`flex flex-col ${msg.type === 'you' ? 'items-end' : 'items-start'} max-w-[85%]`}>
+                        {/* Render Reply Quote if exists */}
+                        {msg.replyTo && (
+                          <div className={`mb-1 text-xs opacity-75 px-3 py-1.5 rounded-lg border-l-4 ${msg.type === 'you' ? 'bg-purple-700 text-purple-100 border-purple-300' : (darkMode ? 'bg-gray-800 text-gray-400 border-gray-500' : 'bg-gray-200 text-gray-600 border-gray-400')}`}>
+                             <span className="font-bold block mb-0.5">{msg.replyTo.isYou ? 'You' : 'Stranger'}</span>
+                             <span className="line-clamp-1">{msg.replyTo.text}</span>
+                          </div>
+                        )}
+
+                        <div className={`px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
+                          msg.type === 'you'
+                            ? 'bg-purple-600 text-white rounded-br-none' 
+                            : `${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
+                        }`}>
+                          {msg.text}
+                        </div>
+                     </div>
+                  </SwipeableMessage>
                 )}
               </div>
             );
           })}
           
-          {/* UPDATED: Matches exact padding (px-3 py-2) and height of text message bubbles */}
           {isTyping && (
             <div className="flex justify-start w-full">
               <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border-0 flex items-center`}>
@@ -479,14 +609,28 @@ export default function ChatItNow() {
         </div>
 
         {/* INPUT BAR */}
-        <div className={`absolute bottom-0 left-0 right-0 h-[60px] p-2 border-t z-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-          <form className="flex gap-2 items-center h-full" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
+        <div className={`absolute bottom-0 left-0 right-0 p-2 border-t z-20 flex flex-col justify-end ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+          
+          {/* Reply Preview Bar */}
+          {replyingTo && (
+            <div className={`flex items-center justify-between px-4 py-2 mb-1 rounded-lg text-xs border-l-4 ${darkMode ? 'bg-gray-700 text-gray-300 border-purple-500' : 'bg-gray-100 text-gray-700 border-purple-500'}`}>
+              <div>
+                <span className="font-bold block text-purple-500 mb-0.5">Replying to {replyingTo.isYou ? 'yourself' : 'Partner'}</span>
+                <span className="line-clamp-1 opacity-80">{replyingTo.text}</span>
+              </div>
+              <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
+          <form className="flex gap-2 items-center h-[60px]" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
             {partnerStatus === 'disconnected' ? (
               <button type="button" onClick={handleStartSearch} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl h-full shadow-md transition text-sm">Find New Partner</button>
             ) : !showNextConfirm ? (
               <>
                 <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full aspect-square rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'} disabled:opacity-50`}><SkipForward size={18} /></button>
-                <input type="text" value={currentMessage} onChange={handleTyping} enterKeyHint="send" placeholder={isConnected ? "Say something..." : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
+                <input type="text" value={currentMessage} onChange={handleTyping} enterKeyHint="send" placeholder={isConnected ? (replyingTo ? "Type your reply..." : "Say something...") : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
                 <button type="submit" disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
               </>
             ) : (
