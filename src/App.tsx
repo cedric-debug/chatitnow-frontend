@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SkipForward, Moon, Sun } from 'lucide-react';
 import io, { Socket } from 'socket.io-client';
 import AdUnit from './AdUnit';
@@ -84,64 +84,58 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- FORCE THEME OVERRIDE (Resolves Static Headers/Footers) ---
-  useLayoutEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
+  // --- NEW METHOD: DYNAMIC STYLE INJECTION ---
+  useEffect(() => {
+    // 1. Define Colors
+    // We use Gray-800 (#1f2937) for the "Safe Areas" (Status Bar/Bottom Scroll)
+    // This matches the App Header, eliminating the white/black bar issues.
+    const SAFE_AREA_COLOR = darkMode ? '#1f2937' : '#ffffff';
+    const STATUS_BAR_TEXT = darkMode ? 'black-translucent' : 'default';
+
+    // 2. Create/Update a <style> tag to BRUTE FORCE the CSS
+    const styleId = 'dynamic-theme-override';
+    let styleTag = document.getElementById(styleId);
     
-    // Find or Create Meta Tags
-    let metaThemeColor = document.querySelector("meta[name='theme-color']");
-    if (!metaThemeColor) {
-      metaThemeColor = document.createElement('meta');
-      metaThemeColor.setAttribute('name', 'theme-color');
-      document.head.appendChild(metaThemeColor);
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = styleId;
+      document.head.appendChild(styleTag);
     }
 
-    let metaStatusBar = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
-    if (!metaStatusBar) {
-      metaStatusBar = document.createElement('meta');
-      metaStatusBar.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
-      document.head.appendChild(metaStatusBar);
-    }
+    // This CSS overrides EVERYTHING in index.css
+    styleTag.innerHTML = `
+      :root, html, body, #root {
+        background-color: ${SAFE_AREA_COLOR} !important;
+      }
+    `;
 
-    // COLORS
-    // Gray-800 (#1f2937) matches your Header & Footer. 
-    // We set HTML/BODY to this color so the "Overscroll" (Rubber band effect) matches the UI.
-    const UI_DARK = '#1f2937'; 
-    const UI_LIGHT = '#ffffff';
-
-    if (darkMode) { 
-      // --- DARK MODE ---
-      html.classList.add('dark');
-
-      // FORCE OVERWRITE index.css using 'important'
-      html.style.setProperty('background-color', UI_DARK, 'important');
-      body.style.setProperty('background-color', UI_DARK, 'important');
-
-      // Browser UI
-      metaThemeColor.setAttribute('content', UI_DARK); 
-      metaStatusBar.setAttribute('content', 'black-translucent'); 
-
-    } else { 
-      // --- LIGHT MODE ---
-      html.classList.remove('dark');
+    // 3. Update Meta Tags (Browser UI)
+    // We remove them and re-add them to force the browser to acknowledge the change
+    const metaThemeName = "theme-color";
+    const metaStatusName = "apple-mobile-web-app-status-bar-style";
+    
+    // Helper to replace meta tags
+    const updateMeta = (name: string, content: string) => {
+      const oldTag = document.querySelector(`meta[name='${name}']`);
+      if (oldTag) oldTag.remove();
       
-      // FORCE OVERWRITE index.css using 'important'
-      html.style.setProperty('background-color', UI_LIGHT, 'important');
-      body.style.setProperty('background-color', UI_LIGHT, 'important');
+      const newTag = document.createElement('meta');
+      newTag.setAttribute('name', name);
+      newTag.setAttribute('content', content);
+      document.head.appendChild(newTag);
+    };
 
-      // Browser UI
-      metaThemeColor.setAttribute('content', UI_LIGHT); 
-      metaStatusBar.setAttribute('content', 'default'); 
+    updateMeta(metaThemeName, SAFE_AREA_COLOR);
+    updateMeta(metaStatusName, STATUS_BAR_TEXT);
+
+    // 4. Toggle Tailwind Class
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
-  }, [darkMode]);
 
-  // Clean Start
-  useLayoutEffect(() => {
-    document.documentElement.classList.remove('dark');
-    document.documentElement.style.setProperty('background-color', '#ffffff', 'important');
-    document.body.style.setProperty('background-color', '#ffffff', 'important');
-  }, []);
+  }, [darkMode]);
 
   useEffect(() => {
     if (isConnected) {
@@ -280,8 +274,9 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // Main background toggles between White and Gray-900 (matches index.css)
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+  // Main background toggles between White and Gray-800 (Header/Footer Color)
+  // We use Gray-800 for the background so gaps match the header/footer
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
       
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
@@ -321,7 +316,7 @@ export default function ChatItNow() {
           </div>
         )}
 
-        {/* HEADER - Uses Gray-800 in Dark Mode (Matches Top Status Bar) */}
+        {/* HEADER - Gray-800 in Dark Mode (Matches the SAFE AREA COLOR) */}
         <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
@@ -335,7 +330,7 @@ export default function ChatItNow() {
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* CHAT AREA - Uses Gray-900 (Darker) */}
+        {/* CHAT AREA - Gray-900 (Darker than Header/Background) for contrast */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
           {/* TOP BANNER AD - ALWAYS White Background */}
