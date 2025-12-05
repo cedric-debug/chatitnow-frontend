@@ -32,7 +32,7 @@ export default function ChatItNow() {
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
   
-  // DEFAULT: Light Mode (starts white/native)
+  // DEFAULT: Light Mode
   const [darkMode, setDarkMode] = useState(false);
 
   const [showNextConfirm, setShowNextConfirm] = useState(false);
@@ -84,48 +84,54 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME SYNC ---
+  // --- DEFINITIVE THEME & COLOR CONTROLLER ---
   useLayoutEffect(() => {
     const html = document.documentElement;
     const body = document.body;
+    const root = document.getElementById('root');
 
-    // COLOR DEFINITIONS
-    // Background matches HEADER/FOOTER (Gray-800) for seamless look
-    const DARK_THEME_COLOR = '#1f2937'; 
-    const LIGHT_THEME_COLOR = '#ffffff';
-    
-    const activeColor = darkMode ? DARK_THEME_COLOR : LIGHT_THEME_COLOR;
-    const activeStatusText = darkMode ? 'black-translucent' : 'default';
+    // COLORS
+    // Gray-800 (#1f2937) matches your App Header & Footer. 
+    // This color ensures that any overscroll on mobile looks like an extension of the app bars.
+    const COLOR_INTERFACE_DARK = '#1f2937'; 
+    const COLOR_INTERFACE_LIGHT = '#ffffff'; // White for light mode
 
-    // 1. UPDATE CSS CLASSES
+    const activeColor = darkMode ? COLOR_INTERFACE_DARK : COLOR_INTERFACE_LIGHT;
+    const statusText = darkMode ? 'black-translucent' : 'default';
+
+    // 1. SET CLASS (Trigger Tailwind)
     if (darkMode) {
       html.classList.add('dark');
     } else {
       html.classList.remove('dark');
     }
 
-    // 2. FORCE BROWSER BACKGROUND (Matches UI Color)
-    // Using style.backgroundColor directly ensures it paints immediately
-    body.style.backgroundColor = activeColor;
-    html.style.backgroundColor = activeColor;
+    // 2. SET BACKGROUNDS (Forcefully Override "Static" defaults)
+    // We apply this to HTML, BODY, and ROOT to catch any browser variance
+    [html, body, root].forEach(el => {
+      if (el) el.style.setProperty('background-color', activeColor, 'important');
+    });
 
-    // 3. UPDATE META TAGS (For Browser Bars)
-    const updateMeta = (name: string, content: string) => {
-      let meta = document.querySelector(`meta[name='${name}']`);
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute('name', name);
-        document.head.appendChild(meta);
-      }
-      meta.setAttribute('content', content);
-    };
+    // 3. SET META TAGS (Forcefully Delete & Recreate for immediate effect)
+    // Address Bar Color
+    const existingMeta = document.querySelector('meta[name="theme-color"]');
+    if (existingMeta) existingMeta.remove();
+    const newMeta = document.createElement('meta');
+    newMeta.name = 'theme-color';
+    newMeta.content = activeColor;
+    document.head.appendChild(newMeta);
 
-    updateMeta('theme-color', activeColor);
-    updateMeta('apple-mobile-web-app-status-bar-style', activeStatusText);
+    // Status Bar Style
+    const existingStatus = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (existingStatus) existingStatus.remove();
+    const newStatus = document.createElement('meta');
+    newStatus.name = 'apple-mobile-web-app-status-bar-style';
+    newStatus.content = statusText;
+    document.head.appendChild(newStatus);
 
   }, [darkMode]);
 
-  // Clean Start
+  // Cleanup on Mount (Ensure Clean Slate)
   useLayoutEffect(() => {
     document.documentElement.classList.remove('dark');
     document.body.style.backgroundColor = '#ffffff';
@@ -268,14 +274,20 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // Main background toggles between White and Gray-800 (Header/Footer Color)
+  // Main Wrapper
+  // Desktop: Fixed White/Dark Gray BG with centering
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
       
-      {/* 2. RESTORED EXACT SIZE STRUCTURE */}
       <div className={`
-        relative w-full h-[100dvh] overflow-hidden
-        sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl sm:border-x
-        ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}
+        relative w-full h-[100dvh] overflow-hidden flex flex-col
+        sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl 
+        ${
+          // BORDER THICKNESS & CONTRAST FIX
+          // Desktop Light: Light border, White container
+          !darkMode ? 'bg-white border-2 border-gray-100' : 
+          // Desktop Dark: Gray-900 (darker) Container, Gray-600 (3px) border for Contrast
+          'bg-gray-900 sm:border-[3px] border-gray-600' 
+        }
       `}>
         
         {/* Fullscreen Ad Overlay */}
@@ -310,7 +322,7 @@ export default function ChatItNow() {
           </div>
         )}
 
-        {/* HEADER - Gray-800 (Matches External Body for Mobile Blending) */}
+        {/* HEADER - Absolute Position as Requested */}
         <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
@@ -324,7 +336,7 @@ export default function ChatItNow() {
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* CHAT AREA - Gray-900 (Darker for Contrast) */}
+        {/* CHAT AREA - Absolute Position as Requested */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
           {/* TOP BANNER AD (FIXED) */}
@@ -383,7 +395,7 @@ export default function ChatItNow() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* INPUT BAR - Gray-800 (Matches External Body for Mobile Blending) */}
+        {/* INPUT BAR - Absolute Position */}
         <div className={`absolute bottom-0 left-0 right-0 h-[60px] p-2 border-t z-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
           <div className="flex gap-2 items-center h-full">
             {partnerStatus === 'disconnected' ? (
