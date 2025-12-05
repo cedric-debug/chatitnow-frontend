@@ -53,7 +53,6 @@ export default function ChatItNow() {
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
-  // Scroll to bottom when messages change OR when typing starts
   useEffect(() => { 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); 
   }, [messages, isTyping]);
@@ -242,15 +241,23 @@ export default function ChatItNow() {
 
   if (showWelcome) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg shadow-2xl p-10 max-w-[700px] w-full max-h-full overflow-y-auto">
-          <div className="text-center mb-8">
-             <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
-             <h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1>
-             <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
+      // UPDATED: UI Structure to match Native Chat Interface (Full height, no floating modal)
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-gray-50">
+        <div className="relative w-full h-[100dvh] sm:w-[650px] bg-white sm:shadow-2xl border-0 sm:border-x sm:border-gray-200 flex flex-col justify-center overflow-y-auto">
+          <div className="p-10 w-full max-w-[700px] mx-auto">
+            <div className="text-center mb-8">
+               <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
+               <h1 className="text-3xl font-bold text-purple-900 mb-4">Welcome to ChatItNow</h1>
+               <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
+            </div>
+            <div className="space-y-4 text-gray-700 text-sm sm:text-base">
+                <p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p>
+                <p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p>
+                <p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p>
+                <p className="text-gray-600">ChatItNow is completely free and anonymous. Connect with fellow Filipinos, one conversation at a time.</p>
+            </div>
+            <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
           </div>
-          <div className="space-y-4 text-gray-700 text-sm sm:text-base"><p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p><p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p><p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p><p className="text-gray-600">ChatItNow is completely free and anonymous. Connect with fellow Filipinos, one conversation at a time.</p></div>
-          <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
         </div>
       </div>
     );
@@ -258,30 +265,34 @@ export default function ChatItNow() {
 
   if (!isLoggedIn) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-2xl shadow-2xl px-10 py-12 max-w-[650px] w-full max-h-full overflow-y-auto">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1>
-            <p className="text-sm text-gray-600">Chat with Fellow Filipinos</p>
-          </div>
-          <div className="space-y-6">
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Choose a Username</label>
-                <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} onKeyPress={handleKeyPress} placeholder="Enter username..." className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm" maxLength={20} />
+      // UPDATED: UI Structure to match Native Chat Interface (Full height, no floating modal)
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-gray-50">
+        <div className="relative w-full h-[100dvh] sm:w-[650px] bg-white sm:shadow-2xl border-0 sm:border-x sm:border-gray-200 flex flex-col justify-center overflow-y-auto">
+          <div className="px-10 py-12 w-full max-w-[650px] mx-auto">
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1>
+              <p className="text-sm text-gray-600">Chat with Fellow Filipinos</p>
             </div>
-            <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Field/Profession (Optional)</label>
-                <select value={field} onChange={(e) => setField(e.target.value)} className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-base shadow-sm"><option value="">Select your field (or leave blank)</option>{fields.slice(1).map((f) => (<option key={f} value={f}>{f}</option>))}</select>
-                <p className="text-xs text-gray-500 mt-2">We'll try to match you with someone in the same field when possible</p>
+            <div className="space-y-6">
+              <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Choose a Username</label>
+                  <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} onKeyPress={handleKeyPress} placeholder="Enter username..." className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm" maxLength={20} />
+              </div>
+              <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Field/Profession (Optional)</label>
+                  <select value={field} onChange={(e) => setField(e.target.value)} className="w-full px-4 py-3.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-base shadow-sm"><option value="">Select your field (or leave blank)</option>{fields.slice(1).map((f) => (<option key={f} value={f}>{f}</option>))}</select>
+                  <p className="text-xs text-gray-500 mt-2">We'll try to match you with someone in the same field when possible</p>
+              </div>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 space-y-4">
+                <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={confirmedAdult} onChange={(e) => setConfirmedAdult(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5"><strong>I confirm that I am 18 years of age or older.</strong></span></label>
+                <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5">I accept the{' '}<button onClick={() => setShowTerms(true)} className="text-purple-600 hover:underline font-bold">Terms & Conditions</button></span></label>
+              </div>
+              <button onClick={handleLogin} disabled={!username.trim() || !acceptedTerms || !confirmedAdult} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg shadow-lg mt-2">Start Chatting</button>
             </div>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5 space-y-4">
-              <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={confirmedAdult} onChange={(e) => setConfirmedAdult(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5"><strong>I confirm that I am 18 years of age or older.</strong></span></label>
-              <label className="flex items-start gap-3 cursor-pointer"><input type="checkbox" checked={acceptedTerms} onChange={(e) => setAcceptedTerms(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" /><span className="text-xs sm:text-sm text-gray-700 pt-0.5">I accept the{' '}<button onClick={() => setShowTerms(true)} className="text-purple-600 hover:underline font-bold">Terms & Conditions</button></span></label>
-            </div>
-            <button onClick={handleLogin} disabled={!username.trim() || !acceptedTerms || !confirmedAdult} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-4 rounded-xl transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed text-lg shadow-lg mt-2">Start Chatting</button>
           </div>
         </div>
         
+        {/* Modal for Terms remains an overlay */}
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
             <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
