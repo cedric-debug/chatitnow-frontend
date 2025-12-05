@@ -86,7 +86,6 @@ export default function ChatItNow() {
   // --- THEME CONTROLLER ---
   useEffect(() => {
     const html = document.documentElement;
-    
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
@@ -96,16 +95,14 @@ export default function ChatItNow() {
 
     if (darkMode) { 
       html.classList.add('dark'); 
-      // FIXED: Changed to #1f2937 (matches tailwind gray-800 header)
+      // Force status bar to match header (gray-800)
       metaThemeColor.setAttribute('content', '#1f2937'); 
     } else { 
       html.classList.remove('dark'); 
-      // White for light mode
       metaThemeColor.setAttribute('content', '#ffffff'); 
     }
   }, [darkMode]);
 
-  // Ensure clean start
   useEffect(() => {
     window.document.documentElement.classList.remove('dark');
   }, []);
@@ -247,7 +244,8 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+  // FIXED: Changed main background to bg-gray-800 in dark mode to match Header/Footer
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
       
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
@@ -289,8 +287,8 @@ export default function ChatItNow() {
         <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-gray-800 border-b border-gray-700' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
-              src="/logo.png" 
-              alt="ChatItNow Logo" 
+              src="/apple-touch-icon.png" 
+              alt="Logo" 
               className="w-8 h-8 rounded-full object-cover shadow-sm"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
@@ -299,17 +297,14 @@ export default function ChatItNow() {
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* CHAT AREA */}
+        {/* CHAT AREA - Kept Gray-900 for Contrast */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD - REVERTED TO YOUR PREVIOUS CODE */}
-          <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+          {/* TOP BANNER AD (FIXED SIZE) */}
+          <div className={`w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
                 slotId={AD_SLOT_TOP_BANNER} 
-                format="horizontal" 
-                responsive="false"
-                style={{ display: 'block', maxHeight: '50px', width: '100%' }}
              />
           </div>
 
