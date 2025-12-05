@@ -50,7 +50,6 @@ export default function ChatItNow() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activityTimerRef = useRef<number | null>(null);
   const partnerNameRef = useRef(''); 
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
@@ -65,7 +64,6 @@ export default function ChatItNow() {
       partnerNameRef.current = data.name; 
       setMessages([{ type: 'system', data: { name: data.name, field: data.field, action: 'connected' } }]);
       resetActivity();
-      setTimeout(() => inputRef.current?.focus(), 100);
     });
 
     socket.on('receive_message', (data: any) => {
@@ -99,8 +97,7 @@ export default function ChatItNow() {
     const APP_NOTCH_DARK = '#1f2937'; 
     const APP_NOTCH_LIGHT = '#ffffff';
     
-    // Background color matches the UI Dark Mode now
-    const DESKTOP_BG_DARK = '#111827'; // Gray 900
+    const DESKTOP_BG_DARK = '#09090b'; 
     const DESKTOP_BG_LIGHT = '#ffffff';
 
     const currentMetaColor = darkMode ? APP_NOTCH_DARK : APP_NOTCH_LIGHT;
@@ -202,7 +199,6 @@ export default function ChatItNow() {
       socket.emit('send_message', { text: currentMessage });
       setCurrentMessage('');
       resetActivity();
-      setTimeout(() => inputRef.current?.focus(), 10);
     }
   };
 
@@ -220,10 +216,7 @@ export default function ChatItNow() {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      isLoggedIn ? handleSendMessage() : handleLogin();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) isLoggedIn ? handleSendMessage() : handleLogin();
   };
 
   const renderSystemMessage = (msg: Message) => {
@@ -311,14 +304,14 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-zinc-950' : 'bg-white'}`}>
       
       <div className={`
-        relative w-full h-full overflow-hidden
-        sm:w-[650px] sm:shadow-2xl 
-        border-x-0 border-y-0 sm:border-x-4
+        relative w-full h-[100dvh] overflow-hidden
+        sm:w-[650px] sm:rounded-2xl sm:shadow-2xl 
         transition-colors duration-200
-        ${darkMode ? 'bg-gray-900 border-gray-600' : 'bg-white border-gray-200'}
+        border-0 sm:border
+        ${darkMode ? 'bg-gray-900 sm:border-gray-700' : 'bg-white sm:border-gray-200'}
       `}>
         
         {/* Fullscreen Ad Overlay */}
@@ -441,24 +434,8 @@ export default function ChatItNow() {
             ) : !showNextConfirm ? (
               <>
                 <button onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full aspect-square rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'} disabled:opacity-50`}><SkipForward size={18} /></button>
-                <input 
-                  ref={inputRef}
-                  type="text" 
-                  value={currentMessage} 
-                  onChange={handleTyping} 
-                  onKeyPress={handleKeyPress} 
-                  placeholder={isConnected ? "Say something..." : "Waiting..."} 
-                  disabled={!isConnected} 
-                  className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} 
-                />
-                <button 
-                  onMouseDown={(e) => e.preventDefault()} 
-                  onClick={handleSendMessage} 
-                  disabled={!isConnected || !currentMessage.trim()} 
-                  className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm"
-                >
-                  Send
-                </button>
+                <input type="text" value={currentMessage} onChange={handleTyping} onKeyPress={handleKeyPress} placeholder={isConnected ? "Say something..." : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
+                <button onClick={handleSendMessage} disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
               </>
             ) : (
               <>
