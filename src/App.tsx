@@ -38,6 +38,8 @@ export default function ChatItNow() {
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showSearching, setShowSearching] = useState(false);
   const [isTyping, setIsTyping] = useState(false); 
+  
+  // --- INACTIVITY TRACKING STATE ---
   const [lastActivity, setLastActivity] = useState(Date.now());
   const [showInactivityAd, setShowInactivityAd] = useState(false);
   const [showTabReturnAd, setShowTabReturnAd] = useState(false);
@@ -89,10 +91,15 @@ export default function ChatItNow() {
     const html = document.documentElement;
     const body = document.body;
 
-    const DARK_THEME_COLOR = '#1f2937'; 
-    const LIGHT_THEME_COLOR = '#ffffff';
+    const APP_NOTCH_DARK = '#1f2937'; 
+    const APP_NOTCH_LIGHT = '#ffffff';
     
-    const activeColor = darkMode ? DARK_THEME_COLOR : LIGHT_THEME_COLOR;
+    // Background color for Desktop (Pitch Black vs White)
+    const DESKTOP_BG_DARK = '#09090b'; // Zinc-950 (Reverted to this per request)
+    const DESKTOP_BG_LIGHT = '#ffffff';
+
+    const currentMetaColor = darkMode ? APP_NOTCH_DARK : APP_NOTCH_LIGHT;
+    const currentBgColor = darkMode ? DESKTOP_BG_DARK : DESKTOP_BG_LIGHT;
     const activeStatusText = darkMode ? 'black-translucent' : 'default';
 
     if (darkMode) {
@@ -101,8 +108,9 @@ export default function ChatItNow() {
       html.classList.remove('dark');
     }
 
-    body.style.backgroundColor = activeColor;
-    html.style.backgroundColor = activeColor;
+    // Force Body/HTML Background
+    body.style.backgroundColor = currentBgColor;
+    html.style.backgroundColor = currentBgColor;
 
     const updateMeta = (name: string, content: string) => {
       let meta = document.querySelector(`meta[name='${name}']`);
@@ -114,7 +122,7 @@ export default function ChatItNow() {
       meta.setAttribute('content', content);
     };
 
-    updateMeta('theme-color', activeColor);
+    updateMeta('theme-color', currentMetaColor);
     updateMeta('apple-mobile-web-app-status-bar-style', activeStatusText);
 
   }, [darkMode]);
@@ -124,14 +132,36 @@ export default function ChatItNow() {
     document.body.style.backgroundColor = '#ffffff';
   }, []);
 
+  // --- INACTIVITY MONITOR (7 Minutes) ---
+  const resetActivity = () => {
+    if (!showInactivityAd) {
+      setLastActivity(Date.now());
+    }
+  };
+
+  // 1. Listen for user actions to reset timer
+  useEffect(() => {
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    const handleUserActivity = () => resetActivity();
+
+    events.forEach(event => window.addEventListener(event, handleUserActivity));
+    return () => events.forEach(event => window.removeEventListener(event, handleUserActivity));
+  }, [showInactivityAd]);
+
+  // 2. Check time every 10 seconds
   useEffect(() => {
     if (isConnected) {
       activityTimerRef.current = window.setInterval(() => {
-        if (Date.now() - lastActivity > 480000 && !showInactivityAd) setShowInactivityAd(true);
-      }, 30000);
+        const timeSinceLastActive = Date.now() - lastActivity;
+        const SEVEN_MINUTES = 7 * 60 * 1000; 
+
+        if (timeSinceLastActive > SEVEN_MINUTES && !showInactivityAd) {
+          setShowInactivityAd(true);
+        }
+      }, 10000); // Check every 10s
       return () => { if (activityTimerRef.current) clearInterval(activityTimerRef.current); };
     }
-  }, [isConnected, lastActivity]);
+  }, [isConnected, lastActivity, showInactivityAd]);
 
   useEffect(() => {
     const handleVis = () => { if (!document.hidden && isConnected) setShowTabReturnAd(true); };
@@ -139,7 +169,6 @@ export default function ChatItNow() {
     return () => document.removeEventListener('visibilitychange', handleVis);
   }, [isConnected]);
 
-  const resetActivity = () => { setLastActivity(Date.now()); setShowInactivityAd(false); };
   
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCurrentMessage(e.target.value);
@@ -274,6 +303,7 @@ export default function ChatItNow() {
   return (
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-zinc-950' : 'bg-white'}`}>
       
+      {/* APP CONTAINER */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[650px] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl 
@@ -281,15 +311,25 @@ export default function ChatItNow() {
         ${darkMode ? 'bg-gray-900 border-4 border-gray-700' : 'bg-white border-2 border-gray-200'}
       `}>
         
-        {/* Fullscreen Ad Overlay */}
+        {/* Fullscreen Ad Overlay (Inactivity / Tab Return) */}
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">Advertisement</p>
+              {/* Show different title based on which ad triggered */}
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_VERTICAL} />
               </div>
-              <button onClick={() => { setShowInactivityAd(false); setShowTabReturnAd(false); resetActivity(); }} className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold">Close Ad</button>
+              <button 
+                onClick={() => { 
+                  setShowInactivityAd(false); 
+                  setShowTabReturnAd(false); 
+                  setLastActivity(Date.now()); // Reset timer on close
+                }} 
+                className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold"
+              >
+                Close Ad
+              </button>
             </div>
           </div>
         )}
@@ -320,17 +360,16 @@ export default function ChatItNow() {
               className="w-8 h-8 rounded-full object-cover shadow-sm"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
-            {/* PURPLE LOGO COLOR */}
+            {/* Logo color is fixed to Purple in both modes now */}
             <span className="font-bold text-lg text-purple-600">ChatItNow</span>
           </div>
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
         {/* CHAT AREA */}
-        {/* Added space-y-3 for better bubble separation */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-3 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD (FIXED) */}
+          {/* TOP BANNER AD */}
           <div className="w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg bg-gray-100">
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
@@ -359,7 +398,6 @@ export default function ChatItNow() {
                   </div>
                 ) : (
                   <div className={`max-w-[85%] ${msg.type === 'you' ? 'items-end' : 'items-start'}`}>
-                    {/* BUBBLE STYLING: Improved Dark Mode Colors (Gray-700) */}
                     <div className={`px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
                       msg.type === 'you'
                         ? 'bg-purple-600 text-white rounded-br-none' 
@@ -395,7 +433,6 @@ export default function ChatItNow() {
             ) : !showNextConfirm ? (
               <>
                 <button onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full aspect-square rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'} disabled:opacity-50`}><SkipForward size={18} /></button>
-                {/* Lighter Input Background in Dark Mode for contrast */}
                 <input type="text" value={currentMessage} onChange={handleTyping} onKeyPress={handleKeyPress} placeholder={isConnected ? "Say something..." : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
                 <button onClick={handleSendMessage} disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
               </>
