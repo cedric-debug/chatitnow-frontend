@@ -53,7 +53,6 @@ export default function ChatItNow() {
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
-  // --- UPDATED: Added isTyping to dependency array so it scrolls when bubble appears ---
   useEffect(() => { 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); 
   }, [messages, isTyping]);
@@ -309,6 +308,17 @@ export default function ChatItNow() {
   return (
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
+      {/* --- ADDED: Custom CSS for wave animation --- */}
+      <style>{`
+        @keyframes wave {
+          0%, 60%, 100% { transform: translateY(0); }
+          30% { transform: translateY(-5px); }
+        }
+        .animate-wave {
+          animation: wave 1.3s linear infinite;
+        }
+      `}</style>
+
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[650px] sm:shadow-2xl 
@@ -372,7 +382,6 @@ export default function ChatItNow() {
         </div>
 
         {/* CHAT AREA */}
-        {/* UPDATED: Added pb-4 for breathing room at bottom */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 pb-4 space-y-3 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
           {/* TOP BANNER AD */}
@@ -417,13 +426,16 @@ export default function ChatItNow() {
             );
           })}
           
+          {/* --- UPDATED TYPING INDICATOR: WAVE ANIMATION & LARGER BUBBLE --- */}
           {isTyping && (
             <div className="flex justify-start w-full">
-              <div className={`${darkMode ? 'bg-gray-700' : 'bg-white'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border-0`}>
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-75"></div>
-                  <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-150"></div>
+              {/* Changed bg-white to bg-gray-100 to match stranger messages */}
+              {/* Increased padding to px-4 py-3 to match text bubble height */}
+              <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} px-4 py-3 rounded-2xl rounded-bl-none shadow-sm border-0 flex items-center`}>
+                <div className="flex gap-1.5 h-4 items-center">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-wave" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-wave" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-wave" style={{ animationDelay: '300ms' }}></div>
                 </div>
               </div>
             </div>
