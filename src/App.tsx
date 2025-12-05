@@ -32,13 +32,8 @@ export default function ChatItNow() {
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
   
-  // FIXED: Initialize state based on System Preference to prevent "White Top / Black Footer" mismatch
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    return false;
-  });
+  // FIXED: Default is now strictly FALSE (White/Light mode) regardless of system settings
+  const [darkMode, setDarkMode] = useState(false);
 
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showSearching, setShowSearching] = useState(false);
@@ -91,10 +86,12 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME CONTROLLER (FIXED) ---
+  // --- THEME CONTROLLER (FIXED FOR CLEAN TOGGLE) ---
   useEffect(() => {
     const html = document.documentElement;
+    const body = document.body;
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
+    
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
       metaThemeColor.setAttribute('name', 'theme-color');
@@ -103,22 +100,22 @@ export default function ChatItNow() {
 
     if (darkMode) { 
       html.classList.add('dark');
-      // Set Browser UI color to Dark Gray (matching header)
+      // FIXED: Force the actual BODY background to Gray-800 to match the Header/Footer
+      // This eliminates the "Static Black" or "Mixed" bars at the top/bottom of the phone
+      body.style.backgroundColor = '#1f2937'; 
       metaThemeColor.setAttribute('content', '#1f2937');
-      // FIXED: Force body background to match to prevent static black bars
-      document.body.style.backgroundColor = '#1f2937';
     } else { 
       html.classList.remove('dark'); 
-      // Set Browser UI color to White
+      // FIXED: Force Body to White
+      body.style.backgroundColor = '#ffffff';
       metaThemeColor.setAttribute('content', '#ffffff'); 
-      // FIXED: Force body background to white
-      document.body.style.backgroundColor = '#ffffff';
     }
   }, [darkMode]);
 
+  // Ensure clean start on mount (Forces white initially)
   useEffect(() => {
-    // Initial cleanup if needed, but the state initializer handles the logic now
-    if (!darkMode) window.document.documentElement.classList.remove('dark');
+    document.body.style.backgroundColor = '#ffffff';
+    document.documentElement.classList.remove('dark');
   }, []);
 
   useEffect(() => {
@@ -258,7 +255,7 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // FIXED: Changed main background to bg-gray-800 in dark mode to match Header/Footer
+  // Outer Wrapper: bg-gray-800 in Dark Mode (matches header/footer) for seamless look
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
       
       <div className={`
@@ -302,7 +299,7 @@ export default function ChatItNow() {
           <div className="flex items-center gap-2">
             <img 
               src="/logo.png" 
-              alt="Logo" 
+              alt="ChatItNow Logo" 
               className="w-8 h-8 rounded-full object-cover shadow-sm"
               onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
@@ -311,14 +308,14 @@ export default function ChatItNow() {
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* CHAT AREA - Kept Gray-900 for Contrast */}
+        {/* CHAT AREA */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD (FIXED SIZE & STYLE) */}
+          {/* TOP BANNER AD (Sizes Strictly Preserved from your correct code) */}
           <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
-                slotId={AD_SLOT_TOP_BANNER}
+                slotId={AD_SLOT_TOP_BANNER} 
                 format="horizontal" 
                 responsive="false"
                 style={{ display: 'block', maxHeight: '50px', width: '100%' }}
@@ -372,16 +369,6 @@ export default function ChatItNow() {
 
         {/* INPUT BAR */}
         <div className={`absolute bottom-0 left-0 right-0 h-[60px] p-2 border-t z-20 ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-          
-          {/* CAUTION MESSAGE */}
-          {isConnected && (
-            <div className="absolute -top-8 left-0 right-0 flex justify-center pointer-events-none">
-               <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-[10px] px-2 py-0.5 rounded shadow-sm">
-                 ⚠️ Caution: Always verify professional advice from strangers.
-               </div>
-            </div>
-          )}
-
           <div className="flex gap-2 items-center h-full">
             {partnerStatus === 'disconnected' ? (
               <button onClick={handleStartSearch} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl h-full shadow-md transition text-sm">Find New Partner</button>
