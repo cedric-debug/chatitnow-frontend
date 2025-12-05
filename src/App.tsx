@@ -50,6 +50,7 @@ export default function ChatItNow() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activityTimerRef = useRef<number | null>(null);
   const partnerNameRef = useRef(''); 
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
@@ -64,6 +65,7 @@ export default function ChatItNow() {
       partnerNameRef.current = data.name; 
       setMessages([{ type: 'system', data: { name: data.name, field: data.field, action: 'connected' } }]);
       resetActivity();
+      setTimeout(() => inputRef.current?.focus(), 100);
     });
 
     socket.on('receive_message', (data: any) => {
@@ -94,15 +96,13 @@ export default function ChatItNow() {
     const html = document.documentElement;
     const body = document.body;
 
-    const APP_NOTCH_DARK = '#1f2937'; // Header Color (Gray 800)
-    const APP_NOTCH_LIGHT = '#ffffff';
+    // UI COLORS
+    // Gray 800 (#1f2937) matches Header & Footer.
+    // We use this for the Browser Background so the Notch/Home bar areas blend in.
+    const SAFE_AREA_DARK = '#1f2937'; 
+    const SAFE_AREA_LIGHT = '#ffffff';
     
-    // UPDATED: Desktop Background now matches UI Dark Mode Color (Gray 900)
-    const DESKTOP_BG_DARK = '#111827'; 
-    const DESKTOP_BG_LIGHT = '#ffffff';
-
-    const currentMetaColor = darkMode ? APP_NOTCH_DARK : APP_NOTCH_LIGHT;
-    const currentBgColor = darkMode ? DESKTOP_BG_DARK : DESKTOP_BG_LIGHT;
+    const activeSafeArea = darkMode ? SAFE_AREA_DARK : SAFE_AREA_LIGHT;
     const activeStatusText = darkMode ? 'black-translucent' : 'default';
 
     if (darkMode) {
@@ -111,9 +111,9 @@ export default function ChatItNow() {
       html.classList.remove('dark');
     }
 
-    // Apply Background
-    body.style.backgroundColor = currentBgColor;
-    html.style.backgroundColor = currentBgColor;
+    // Force Body/HTML Background to match Safe Area (Header/Footer color)
+    body.style.backgroundColor = activeSafeArea;
+    html.style.backgroundColor = activeSafeArea;
 
     const updateMeta = (name: string, content: string) => {
       let meta = document.querySelector(`meta[name='${name}']`);
@@ -125,7 +125,7 @@ export default function ChatItNow() {
       meta.setAttribute('content', content);
     };
 
-    updateMeta('theme-color', currentMetaColor);
+    updateMeta('theme-color', activeSafeArea);
     updateMeta('apple-mobile-web-app-status-bar-style', activeStatusText);
 
   }, [darkMode]);
@@ -201,6 +201,8 @@ export default function ChatItNow() {
       socket.emit('send_message', { text: currentMessage });
       setCurrentMessage('');
       resetActivity();
+      // Focus fix
+      setTimeout(() => inputRef.current?.focus(), 10);
     }
   };
 
@@ -218,7 +220,10 @@ export default function ChatItNow() {
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) isLoggedIn ? handleSendMessage() : handleLogin();
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        isLoggedIn ? handleSendMessage() : handleLogin();
+    }
   };
 
   const renderSystemMessage = (msg: Message) => {
@@ -283,7 +288,7 @@ export default function ChatItNow() {
         
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-xl shadow-2xl max-w-[700px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto">
               <h2 className="text-2xl font-bold text-gray-900 mb-4 sticky top-0 bg-white pb-2">Terms & Conditions</h2>
               <div className="space-y-4 text-sm text-gray-700">
                 <p>Last updated: December 5, 2025</p>
@@ -306,13 +311,13 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // FIXED: Outer background now matches the App UI (Gray-900) instead of being Black
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
-        sm:w-[650px] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl 
-        border transition-colors duration-200
+        sm:w-[650px] sm:rounded-2xl sm:shadow-2xl 
+        transition-colors duration-200
+        border-0 sm:border-x
         ${darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}
       `}>
         
@@ -436,8 +441,24 @@ export default function ChatItNow() {
             ) : !showNextConfirm ? (
               <>
                 <button onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full aspect-square rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'} disabled:opacity-50`}><SkipForward size={18} /></button>
-                <input type="text" value={currentMessage} onChange={handleTyping} onKeyPress={handleKeyPress} placeholder={isConnected ? "Say something..." : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
-                <button onClick={handleSendMessage} disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
+                <input 
+                  ref={inputRef}
+                  type="text" 
+                  value={currentMessage} 
+                  onChange={handleTyping} 
+                  onKeyPress={handleKeyPress} 
+                  placeholder={isConnected ? "Say something..." : "Waiting..."} 
+                  disabled={!isConnected} 
+                  className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} 
+                />
+                <button 
+                  onMouseDown={(e) => e.preventDefault()} 
+                  onClick={handleSendMessage} 
+                  disabled={!isConnected || !currentMessage.trim()} 
+                  className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm"
+                >
+                  Send
+                </button>
               </>
             ) : (
               <>
