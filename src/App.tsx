@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { SkipForward, Moon, Sun, Volume2, VolumeX, X, Reply } from 'lucide-react';
-import io from 'socket.io-client';
+import io from 'socket.io-client'; // FIX: No { Socket } import to avoid type errors
 import AdUnit from './AdUnit';
 
 // --- CONFIGURATION ---
@@ -15,6 +15,7 @@ const AD_SLOT_INACTIVITY = "2655630641";
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
+// --- SESSION ID HELPER ---
 const getSessionID = () => {
   if (typeof window === 'undefined') return '';
   let sessionID = localStorage.getItem("chat_session_id");
@@ -25,6 +26,7 @@ const getSessionID = () => {
   return sessionID;
 };
 
+// --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
   autoConnect: false,
   reconnection: true,             
@@ -194,7 +196,6 @@ export default function ChatItNow() {
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
-  // Initialize Audio
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
@@ -202,7 +203,7 @@ export default function ChatItNow() {
     if(audioReceivedRef.current) audioReceivedRef.current.volume = 0.5;
   }, []);
 
-  // --- MOBILE AUDIO UNLOCKER ---
+  // --- AUDIO UNLOCK (For Mobile) ---
   const unlockAudio = () => {
     if (audioSentRef.current) {
         audioSentRef.current.play().then(() => {
@@ -235,6 +236,7 @@ export default function ChatItNow() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); 
   }, [messages, isTyping, replyingTo]); 
 
+  // --- SOCKET LISTENERS ---
   useEffect(() => {
     socket.on('matched', (data: any) => {
       setShowSearching(false);
@@ -259,24 +261,26 @@ export default function ChatItNow() {
       resetActivity();
     });
 
-    // --- UPDATED: HANDLE PARTNER DISCONNECT ---
+    // When PARTNER disconnects
     socket.on('partner_disconnected', () => {
       setIsConnected(false);
       setPartnerStatus('disconnected');
-      setIsTyping(false); // Stop typing bubble immediately
-      setReplyingTo(null); // Clear reply context
+      setIsTyping(false); 
+      setReplyingTo(null); 
       const nameToShow = partnerNameRef.current || 'Partner';
       setMessages(prev => [...prev, { type: 'system', data: { name: nameToShow, action: 'disconnected' } }]);
     });
 
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
 
+    // Network Disconnect (Local)
     socket.on('disconnect', () => {
       if (partnerNameRef.current && isConnected) {
         setPartnerStatus('reconnecting');
       }
     });
 
+    // Reconnected (Generic)
     socket.on('connect', () => {
       if (partnerNameRef.current) {
         setPartnerStatus('connected');
@@ -284,6 +288,7 @@ export default function ChatItNow() {
       }
     });
 
+    // Reconnected (Explicit Session Restore)
     socket.on('session_restored', () => {
       if (partnerNameRef.current) {
         setPartnerStatus('connected');
@@ -403,15 +408,22 @@ export default function ChatItNow() {
     }
   };
 
+  // --- MANUAL DISCONNECT HANDLER ---
   const handleNext = () => {
     if (!showNextConfirm) { setShowNextConfirm(true); return; }
+    
+    // 1. Tell Server we are leaving
     socket.emit('disconnect_partner');
+    
+    // 2. Update Local State immediately
     setIsConnected(false);
     setShowNextConfirm(false);
     setPartnerStatus('disconnected');
+    setIsTyping(false); // Stop typing
+    setReplyingTo(null); // Clear reply
+    
+    // 3. Add "You disconnected" message
     setMessages(prev => [...prev, { type: 'system', data: { name: username, action: 'disconnected' } }]);
-    setIsTyping(false); // Stop typing on manual disconnect
-    setReplyingTo(null);
   };
 
   const handleStartSearch = () => {
@@ -438,9 +450,11 @@ export default function ChatItNow() {
     
     if (msg.data.action === 'disconnected') {
       if (msg.data.name === username) {
-        return <span><span style={boldStyle}>You</span> disconnected.</span>;
+        // Shown when YOU call handleNext()
+        return <span><span style={boldStyle}>You</span> disconnected from the chat.</span>;
       }
-      return <span><span style={boldStyle}>{msg.data.name}</span> has disconnected.</span>;
+      // Shown when PARTNER calls disconnect
+      return <span><span style={boldStyle}>{msg.data.name}</span> disconnected from the chat.</span>;
     }
     
     return null;
@@ -505,7 +519,7 @@ export default function ChatItNow() {
               
               <div className="text-center pt-2">
                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking advices from strangers. Do your due diligence.
+                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking strangers' advice. Do your due diligence.
                  </p>
               </div>
 
@@ -542,6 +556,7 @@ export default function ChatItNow() {
   return (
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
+      {/* Wave Keyframes */}
       <style>{`
         @keyframes typing-bounce {
           0%, 100% {
@@ -570,7 +585,7 @@ export default function ChatItNow() {
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Advertisement"}</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
