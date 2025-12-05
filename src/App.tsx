@@ -4,7 +4,7 @@ import io from 'socket.io-client'; // Removed { Socket } import to avoid type co
 import AdUnit from './AdUnit';
 
 // --- CONFIGURATION ---
-const PROD_URL = "https://chatitnow-server.onrender.com"; 
+const PROD_URL = "https://chatitnow-backend.onrender.com"; 
 const ADSENSE_CLIENT_ID = "ca-pub-1806664183023369"; 
 
 // --- AD SLOTS ---
