@@ -14,7 +14,12 @@ const AD_SLOT_TOP_BANNER = "9658354392";
 const AD_SLOT_INACTIVITY = "2655630641"; 
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
-const socket: Socket = io(SERVER_URL, { autoConnect: false });
+const socket: Socket = io(SERVER_URL, { 
+  autoConnect: false,
+  reconnection: true,             
+  reconnectionAttempts: 10,       
+  reconnectionDelay: 1000,
+});
 
 interface ReplyData {
   text: string;
@@ -146,7 +151,6 @@ export default function ChatItNow() {
   const audioSentRef = useRef<HTMLAudioElement | null>(null);
   const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
 
-  // --- DARK MODE ---
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -239,21 +243,26 @@ export default function ChatItNow() {
 
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
 
-    // --- ADDED: Handle Internet Connection Drop/Restore ---
+    // --- CONNECTION HANDLERS ---
     socket.on('disconnect', () => {
-      // If we are actively chatting and lose internet (not a manual disconnect)
       if (partnerNameRef.current && isConnected) {
         setPartnerStatus('reconnecting');
       }
     });
 
     socket.on('connect', () => {
-      // If we come back online and still have a partner name, we re-establish connection state
-      // (Assuming server supports connection recovery)
       if (partnerNameRef.current) {
         setPartnerStatus('connected');
         setIsConnected(true);
       }
+    });
+
+    socket.on('partner_reconnecting_server', () => {
+      setPartnerStatus('reconnecting'); 
+    });
+
+    socket.on('partner_connected', () => {
+      setPartnerStatus('connected');
     });
     
     return () => { 
@@ -263,8 +272,10 @@ export default function ChatItNow() {
       socket.off('partner_typing'); 
       socket.off('disconnect');
       socket.off('connect');
+      socket.off('partner_reconnecting_server'); 
+      socket.off('partner_connected'); 
     };
-  }, [isMuted, isConnected]); // Added isConnected to deps to track state correctly
+  }, [isMuted, isConnected]); 
 
   useLayoutEffect(() => {
     const html = document.documentElement;
@@ -586,12 +597,12 @@ export default function ChatItNow() {
              />
           </div>
 
-          {/* UPDATED: STATUS PILLS with Reconnecting Logic */}
+          {/* UPDATED: STATUS PILLS with Name in Reconnecting */}
           <div className="text-center py-2">
              {partnerStatus === 'searching' && (<span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>)}
              {partnerStatus === 'connected' && (<span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>)}
              {partnerStatus === 'disconnected' && (<span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>)}
-             {partnerStatus === 'reconnecting' && (<span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">Reconnecting...</span>)}
+             {partnerStatus === 'reconnecting' && (<span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">{partnerNameRef.current || 'Partner'} is reconnecting...</span>)}
           </div>
 
           {messages.map((msg, idx) => {
