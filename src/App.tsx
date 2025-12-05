@@ -35,9 +35,9 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
   const [isDragging, setIsDragging] = useState(false);
   const startX = useRef(0);
   
-  // Shorter threshold for easier activation
-  const SWIPE_THRESHOLD = 35;
-  const MAX_DRAG = 80;
+  // UPDATED: Extremely short threshold for "easy" swipe
+  const SWIPE_THRESHOLD = 25; 
+  const MAX_DRAG = 70;
 
   if (isSystem) return <div>{children}</div>;
 
@@ -51,14 +51,17 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
     const currentX = e.touches[0].clientX;
     const diff = currentX - startX.current;
     
-    // Smooth 1:1 tracking (no lag) capped at MAX_DRAG
+    // UPDATED: No resistance until threshold is met for "buttery smooth" feel
     if (diff > 0) {
-      // Apply resistance only after crossing the threshold
-      const effectiveDrag = diff > SWIPE_THRESHOLD 
-        ? SWIPE_THRESHOLD + ((diff - SWIPE_THRESHOLD) * 0.5) 
-        : diff;
-        
-      setOffsetX(Math.min(effectiveDrag, MAX_DRAG));
+      let finalDrag = diff;
+      
+      // Only apply resistance AFTER the user has already swiped enough to trigger
+      if (diff > SWIPE_THRESHOLD) {
+        const extra = diff - SWIPE_THRESHOLD;
+        finalDrag = SWIPE_THRESHOLD + (extra * 0.4); // 0.4 friction
+      }
+
+      setOffsetX(Math.min(finalDrag, MAX_DRAG));
     }
   };
 
@@ -98,7 +101,7 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
 
   return (
     <div 
-      className="relative w-full select-none touch-pan-y" 
+      className="relative w-full select-none touch-pan-y"
       style={{ touchAction: 'pan-y' }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -108,12 +111,14 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Icon Background */}
+      {/* Icon Indicator */}
       <div 
         className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400"
         style={{ 
-          transform: `translateY(-50%) scale(${Math.min(offsetX / SWIPE_THRESHOLD, 1)})`,
-          opacity: Math.min(offsetX / SWIPE_THRESHOLD, 1)
+          // UPDATED: Icon fades in quicker
+          opacity: offsetX > 10 ? 1 : 0,
+          transform: `translateY(-50%) scale(${offsetX > 15 ? 1 : 0.8})`,
+          transition: 'opacity 0.1s ease, transform 0.1s ease'
         }}
       >
         <Reply size={20} />
@@ -123,7 +128,8 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
       <div 
         style={{ 
           transform: `translateX(${offsetX}px)`, 
-          transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28)' 
+          // UPDATED: Standard ease-out for smoother return
+          transition: isDragging ? 'none' : 'transform 0.3s ease-out' 
         }}
       >
         {children}
@@ -601,9 +607,13 @@ export default function ChatItNow() {
                             : `${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
                         }`}>
                           {msg.text}
-                          {/* UPDATED: Timestamp at bottom left */}
+                          {/* UPDATED: Timestamp correctly placed at bottom corners */}
                           {msg.timestamp && (
-                            <span className={`text-[10px] block text-left mt-1 select-none ${msg.type === 'you' ? 'text-white/70' : (darkMode ? 'text-gray-400' : 'text-gray-500')}`}>
+                            <span className={`text-[10px] block mt-1 select-none ${
+                              msg.type === 'you' 
+                                ? 'text-right text-white/70' 
+                                : (darkMode ? 'text-left text-gray-400' : 'text-left text-gray-500')
+                            }`}>
                               {msg.timestamp}
                             </span>
                           )}
