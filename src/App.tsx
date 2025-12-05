@@ -238,14 +238,33 @@ export default function ChatItNow() {
     });
 
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
+
+    // --- ADDED: Handle Internet Connection Drop/Restore ---
+    socket.on('disconnect', () => {
+      // If we are actively chatting and lose internet (not a manual disconnect)
+      if (partnerNameRef.current && isConnected) {
+        setPartnerStatus('reconnecting');
+      }
+    });
+
+    socket.on('connect', () => {
+      // If we come back online and still have a partner name, we re-establish connection state
+      // (Assuming server supports connection recovery)
+      if (partnerNameRef.current) {
+        setPartnerStatus('connected');
+        setIsConnected(true);
+      }
+    });
     
     return () => { 
       socket.off('matched'); 
       socket.off('receive_message'); 
       socket.off('partner_disconnected'); 
       socket.off('partner_typing'); 
+      socket.off('disconnect');
+      socket.off('connect');
     };
-  }, [isMuted]); 
+  }, [isMuted, isConnected]); // Added isConnected to deps to track state correctly
 
   useLayoutEffect(() => {
     const html = document.documentElement;
@@ -435,7 +454,7 @@ export default function ChatItNow() {
               
               <div className="text-center pt-2">
                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking a strangers advice. Always Verify.
+                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking strangers' advice.
                  </p>
               </div>
 
@@ -472,7 +491,6 @@ export default function ChatItNow() {
   return (
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
-      {/* UPDATED: Smoother & Subtler Typing Animation */}
       <style>{`
         @keyframes typing-bounce {
           0%, 100% {
@@ -480,7 +498,7 @@ export default function ChatItNow() {
             opacity: 0.5;
           }
           50% {
-            transform: translateY(-4px); /* Smaller jump for smoothness */
+            transform: translateY(-4px); 
             opacity: 1;
           }
         }
@@ -501,7 +519,7 @@ export default function ChatItNow() {
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Advertisement"}</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
@@ -568,8 +586,12 @@ export default function ChatItNow() {
              />
           </div>
 
+          {/* UPDATED: STATUS PILLS with Reconnecting Logic */}
           <div className="text-center py-2">
-             {partnerStatus === 'searching' ? (<span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>) : partnerStatus === 'disconnected' ? (<span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>) : (<span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>)}
+             {partnerStatus === 'searching' && (<span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>)}
+             {partnerStatus === 'connected' && (<span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>)}
+             {partnerStatus === 'disconnected' && (<span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>)}
+             {partnerStatus === 'reconnecting' && (<span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">Reconnecting...</span>)}
           </div>
 
           {messages.map((msg, idx) => {
@@ -617,7 +639,6 @@ export default function ChatItNow() {
             );
           })}
           
-          {/* UPDATED TYPING INDICATOR TO USE NEW ANIMATION */}
           {isTyping && (
             <div className="flex justify-start w-full">
               <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-100'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border-0 flex items-center`}>
