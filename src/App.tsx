@@ -15,6 +15,7 @@ const AD_SLOT_INACTIVITY = "2655630641";
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
+// --- SESSION MANAGEMENT ---
 const getSessionID = () => {
   if (typeof window === 'undefined') return '';
   let sessionID = localStorage.getItem("chat_session_id");
@@ -37,7 +38,7 @@ const socket: any = io(SERVER_URL, {
 
 interface ReplyData {
   text: string;
-  name: string; // Added Name field
+  name: string;
   isYou: boolean;
 }
 
@@ -195,20 +196,37 @@ export default function ChatItNow() {
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
+  // Initialize Audio
   useEffect(() => {
+    // Standardizing sounds across Desktop and Mobile
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
-    if(audioSentRef.current) audioSentRef.current.volume = 0.5;
-    if(audioReceivedRef.current) audioReceivedRef.current.volume = 0.5;
+    
+    // UPDATED: Set volume to 1.0 (Max) for mobile clarity
+    // Added preload to ensure immediate playback
+    if(audioSentRef.current) {
+        audioSentRef.current.volume = 1.0; 
+        audioSentRef.current.preload = 'auto';
+    }
+    if(audioReceivedRef.current) {
+        audioReceivedRef.current.volume = 1.0;
+        audioReceivedRef.current.preload = 'auto';
+    }
   }, []);
 
+  // --- UPDATED: MOBILE AUDIO UNLOCKER ---
+  // Unlocks BOTH sounds so "Receive" works even when app is backgrounded/idle
   const unlockAudio = () => {
-    if (audioSentRef.current) {
-        audioSentRef.current.play().then(() => {
-            audioSentRef.current?.pause();
-            audioSentRef.current!.currentTime = 0;
-        }).catch(() => {});
-    }
+    const unlock = (audio: HTMLAudioElement | null) => {
+        if (audio) {
+            audio.play().then(() => {
+                audio.pause();
+                audio.currentTime = 0;
+            }).catch(() => {});
+        }
+    };
+    unlock(audioSentRef.current);
+    unlock(audioReceivedRef.current);
   };
 
   const playSound = (type: 'sent' | 'received') => {
@@ -234,6 +252,7 @@ export default function ChatItNow() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); 
   }, [messages, isTyping, replyingTo]); 
 
+  // --- SOCKET EVENT HANDLERS ---
   useEffect(() => {
     socket.on('matched', (data: any) => {
       setShowSearching(false);
@@ -269,6 +288,7 @@ export default function ChatItNow() {
 
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
 
+    // Connection Events
     socket.on('disconnect', () => {
       if (partnerNameRef.current && isConnected) {
         setPartnerStatus('reconnecting');
@@ -362,7 +382,7 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
-      unlockAudio(); 
+      unlockAudio(); // Trigger audio unlock on both channels
       socket.connect();
       startSearch();
     } else {
@@ -403,26 +423,25 @@ export default function ChatItNow() {
 
   const handleNext = () => {
     if (!showNextConfirm) { setShowNextConfirm(true); return; }
+    
     socket.emit('disconnect_partner');
+    
     setIsConnected(false);
     setShowNextConfirm(false);
     setPartnerStatus('disconnected');
-    setMessages(prev => [...prev, { type: 'system', data: { name: username, action: 'disconnected' } }]);
     setIsTyping(false);
     setReplyingTo(null);
+    
+    setMessages(prev => [...prev, { type: 'system', data: { name: username, action: 'disconnected' } }]);
   };
 
   const handleStartSearch = () => {
     startSearch();
   };
 
-  // --- UPDATED: REPLY LOGIC (With proper name) ---
   const initiateReply = (text: any, type: string) => {
     if (!isConnected) return;
     
-    // Determine the name based on who sent the message
-    // If type is 'you', it's your name (username)
-    // If type is 'stranger', it's their name (partnerNameRef)
     const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
 
     setReplyingTo({
@@ -512,7 +531,7 @@ export default function ChatItNow() {
               
               <div className="text-center pt-2">
                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking strangers' advice. Do your due diligence.
+                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking advices from a strangers. Do your due diligence.
                  </p>
               </div>
 
@@ -578,7 +597,7 @@ export default function ChatItNow() {
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Advertisement"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
