@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { SkipForward, Moon, Sun } from 'lucide-react';
 import io, { Socket } from 'socket.io-client';
 import AdUnit from './AdUnit';
@@ -32,7 +32,7 @@ export default function ChatItNow() {
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
   
-  // DEFAULT: Light Mode (False)
+  // 1. DEFAULT: Start Light (Native)
   const [darkMode, setDarkMode] = useState(false);
 
   const [showNextConfirm, setShowNextConfirm] = useState(false);
@@ -84,45 +84,56 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- NEW: APP SHELL THEME ENGINE ---
+  // --- THEME & UI FIXER ---
   useLayoutEffect(() => {
     const html = document.documentElement;
-    
+    const body = document.body;
+
     // COLORS
-    const DARK_BG = '#111827'; 
-    const LIGHT_BG = '#ffffff';
+    const DARK_BG = '#111827'; // Gray 900
+    const LIGHT_BG = '#ffffff'; // White
+    
     const activeColor = darkMode ? DARK_BG : LIGHT_BG;
+    const statusBarStyle = darkMode ? 'black-translucent' : 'default';
 
-    // 1. UPDATE META TAGS (Browser UI)
-    const updateMeta = (name: string, content: string) => {
-      let tag = document.querySelector(`meta[name='${name}']`);
-      if (!tag) {
-        tag = document.createElement('meta');
-        tag.setAttribute('name', name);
-        document.head.appendChild(tag);
-      }
-      tag.setAttribute('content', content);
-    };
-
-    updateMeta('theme-color', activeColor);
-    updateMeta('apple-mobile-web-app-status-bar-style', darkMode ? 'black-translucent' : 'default');
-
-    // 2. TOGGLE CSS CLASS & VARIABLE
+    // 1. CLASS TOGGLING (Triggers Tailwind)
     if (darkMode) {
       html.classList.add('dark');
-      // Update the CSS variable we defined in index.css
-      html.style.setProperty('--app-bg', DARK_BG);
     } else {
       html.classList.remove('dark');
-      html.style.setProperty('--app-bg', LIGHT_BG);
     }
+
+    // 2. BODY BACKGROUND FIX (Solves Static Footer)
+    // We force the body to match the active color. 
+    // This covers the "Overscroll" area at the bottom.
+    body.style.backgroundColor = activeColor;
+    html.style.backgroundColor = activeColor;
+
+    // 3. META TAG SYNC (Solves Static Header/Status Bar)
+    // Delete old tag and recreate to force browser repaint
+    const existingThemeTag = document.querySelector('meta[name="theme-color"]');
+    if (existingThemeTag) existingThemeTag.remove();
+
+    const newThemeTag = document.createElement('meta');
+    newThemeTag.name = "theme-color";
+    newThemeTag.content = activeColor;
+    document.head.appendChild(newThemeTag);
+
+    // Update iOS status bar
+    const existingStatusTag = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (existingStatusTag) existingStatusTag.remove();
+
+    const newStatusTag = document.createElement('meta');
+    newStatusTag.name = "apple-mobile-web-app-status-bar-style";
+    newStatusTag.content = statusBarStyle;
+    document.head.appendChild(newStatusTag);
 
   }, [darkMode]);
 
   // Clean Start
   useLayoutEffect(() => {
     document.documentElement.classList.remove('dark');
-    document.documentElement.style.setProperty('--app-bg', '#ffffff');
+    document.body.style.backgroundColor = '#ffffff';
   }, []);
 
   useEffect(() => {
@@ -262,17 +273,12 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // 1. FIXED OUTER SHELL
-  // This is the only part that touches the edges. We control its background.
-  <div 
-    className={`fixed inset-0 flex flex-col items-center justify-center transition-colors duration-300 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}
-    // We add an inline style to ensure it respects the SafeArea on iPhone X+
-    style={{ height: '100dvh', width: '100vw' }}
-  >
+  // FIXED: Removed "h-screen" or "h-[100dvh]" from here to let it stretch naturally
+  // We use `fixed inset-0` combined with the body background color fix above.
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
-      {/* 2. INNER APP CONTAINER (The "Phone" View) */}
       <div className={`
-        relative w-full h-full overflow-hidden flex flex-col
+        relative w-full h-[100dvh] overflow-hidden flex flex-col
         sm:w-[420px] sm:h-[90vh] sm:rounded-2xl sm:shadow-2xl sm:border-x
         ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}
       `}>
@@ -282,7 +288,6 @@ export default function ChatItNow() {
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
               <p className="text-xs text-gray-500 mb-2">Advertisement</p>
-              {/* Ad Container ALWAYS Light so ad is visible */}
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_VERTICAL} />
               </div>
@@ -300,7 +305,7 @@ export default function ChatItNow() {
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-4`}>Looking in {field || 'All Fields'}</p>
               <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-100 border-gray-200'} border rounded-lg p-2`}>
                 <p className={`text-[10px] mb-1 opacity-50 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Advertisement</p>
-                {/* Ad Container ALWAYS Light so ad is visible */}
+                {/* Fixed White Ad Background */}
                 <div className="bg-white h-64 rounded flex items-center justify-center overflow-hidden">
                   <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_SQUARE} />
                 </div>
@@ -323,10 +328,10 @@ export default function ChatItNow() {
           <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-800 text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
         </div>
 
-        {/* CHAT AREA (Scrollable) */}
+        {/* CHAT AREA - SCROLLABLE */}
         <div className={`flex-1 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD - ALWAYS White Background */}
+          {/* TOP BANNER AD - Fixed White Background */}
           <div className="w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg bg-gray-100">
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
