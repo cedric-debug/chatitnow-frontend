@@ -25,22 +25,22 @@ interface Message {
   type: 'system' | 'you' | 'stranger' | 'warning';
   text?: React.ReactNode;
   replyTo?: ReplyData;
+  timestamp?: string;
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; };
 }
 
-// --- NEW COMPONENT: SWIPEABLE MESSAGE ---
-// Handles both Mobile Touch Swipe and Desktop Mouse Drag
+// --- UPDATED SWIPEABLE MESSAGE COMPONENT ---
 const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.ReactNode, onReply: () => void, isSystem: boolean }) => {
   const [offsetX, setOffsetX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startX = useRef(0);
-
-  // Threshold to trigger reply
-  const SWIPE_THRESHOLD = 50;
+  
+  // Shorter threshold for easier activation
+  const SWIPE_THRESHOLD = 35;
+  const MAX_DRAG = 80;
 
   if (isSystem) return <div>{children}</div>;
 
-  // --- TOUCH EVENTS (Mobile) ---
   const handleTouchStart = (e: React.TouchEvent) => {
     startX.current = e.touches[0].clientX;
     setIsDragging(true);
@@ -50,9 +50,15 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
     if (!isDragging) return;
     const currentX = e.touches[0].clientX;
     const diff = currentX - startX.current;
-    // Only allow swiping right (positive diff) and cap it at 100px
-    if (diff > 0 && diff < 100) {
-      setOffsetX(diff);
+    
+    // Smooth 1:1 tracking (no lag) capped at MAX_DRAG
+    if (diff > 0) {
+      // Apply resistance only after crossing the threshold
+      const effectiveDrag = diff > SWIPE_THRESHOLD 
+        ? SWIPE_THRESHOLD + ((diff - SWIPE_THRESHOLD) * 0.5) 
+        : diff;
+        
+      setOffsetX(Math.min(effectiveDrag, MAX_DRAG));
     }
   };
 
@@ -62,7 +68,7 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
     setOffsetX(0);
   };
 
-  // --- MOUSE EVENTS (Desktop "Click and Drag") ---
+  // Desktop Mouse Events
   const handleMouseDown = (e: React.MouseEvent) => {
     startX.current = e.clientX;
     setIsDragging(true);
@@ -72,9 +78,7 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
     if (!isDragging) return;
     const currentX = e.clientX;
     const diff = currentX - startX.current;
-    if (diff > 0 && diff < 100) {
-      setOffsetX(diff);
-    }
+    if (diff > 0) setOffsetX(Math.min(diff, MAX_DRAG));
   };
 
   const handleMouseUp = () => {
@@ -94,7 +98,8 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
 
   return (
     <div 
-      className="relative w-full select-none"
+      className="relative w-full select-none touch-pan-y" 
+      style={{ touchAction: 'pan-y' }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -103,22 +108,22 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseLeave}
     >
-      {/* Reply Icon Indicator behind the message */}
+      {/* Icon Background */}
       <div 
-        className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400 transition-opacity duration-200"
+        className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400"
         style={{ 
-          opacity: offsetX > 20 ? 1 : 0,
-          transform: `translateX(${offsetX > 20 ? 10 : 0}px) translateY(-50%)`
+          transform: `translateY(-50%) scale(${Math.min(offsetX / SWIPE_THRESHOLD, 1)})`,
+          opacity: Math.min(offsetX / SWIPE_THRESHOLD, 1)
         }}
       >
         <Reply size={20} />
       </div>
 
-      {/* The Message Bubble */}
+      {/* Message Bubble */}
       <div 
         style={{ 
           transform: `translateX(${offsetX}px)`, 
-          transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)' 
+          transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28)' 
         }}
       >
         {children}
@@ -199,6 +204,10 @@ export default function ChatItNow() {
     }
   };
 
+  const getCurrentTime = () => {
+    return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  };
+
   useEffect(() => { 
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); 
   }, [messages, isTyping, replyingTo]); 
@@ -216,7 +225,12 @@ export default function ChatItNow() {
 
     socket.on('receive_message', (data: any) => {
       const replyInfo = data.replyTo || undefined;
-      setMessages(prev => [...prev, { type: 'stranger', text: data.text, replyTo: replyInfo }]);
+      setMessages(prev => [...prev, { 
+        type: 'stranger', 
+        text: data.text, 
+        replyTo: replyInfo,
+        timestamp: getCurrentTime() 
+      }]);
       setIsTyping(false);
       playSound('received');
       resetActivity();
@@ -313,7 +327,12 @@ export default function ChatItNow() {
       const msgData: any = { text: currentMessage };
       if (replyingTo) msgData.replyTo = replyingTo;
 
-      setMessages(prev => [...prev, { type: 'you', text: currentMessage, replyTo: replyingTo || undefined }]);
+      setMessages(prev => [...prev, { 
+        type: 'you', 
+        text: currentMessage, 
+        replyTo: replyingTo || undefined,
+        timestamp: getCurrentTime() 
+      }]);
       socket.emit('send_message', msgData);
       
       setCurrentMessage('');
@@ -337,7 +356,6 @@ export default function ChatItNow() {
     startSearch();
   };
 
-  // --- REPLY HANDLER ---
   const initiateReply = (text: any, type: string) => {
     if (!isConnected) return;
     setReplyingTo({
@@ -531,7 +549,6 @@ export default function ChatItNow() {
             <span className={`font-bold text-lg ${darkMode ? 'text-purple-500' : 'text-purple-600'}`}>ChatItNow</span>
           </div>
           <div className="flex items-center gap-2">
-            {/* Mute Toggle */}
             <button onClick={() => setIsMuted(!isMuted)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
             </button>
@@ -569,11 +586,8 @@ export default function ChatItNow() {
                     <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{msg.data ? renderSystemMessage(msg) : msg.text}</span>
                   </div>
                 ) : (
-                  // --- SWIPEABLE MESSAGE WRAPPER ---
                   <SwipeableMessage onReply={() => initiateReply(msg.text, msg.type)} isSystem={false}>
-                     {/* UPDATED: Added ml-auto to sender messages to hug the right side */}
                      <div className={`flex flex-col ${msg.type === 'you' ? 'items-end ml-auto' : 'items-start'} max-w-[85%]`}>
-                        {/* Render Reply Quote if exists */}
                         {msg.replyTo && (
                           <div className={`mb-1 text-xs opacity-75 px-3 py-1.5 rounded-lg border-l-4 ${msg.type === 'you' ? 'bg-purple-700 text-purple-100 border-purple-300' : (darkMode ? 'bg-gray-800 text-gray-400 border-gray-500' : 'bg-gray-200 text-gray-600 border-gray-400')}`}>
                              <span className="font-bold block mb-0.5">{msg.replyTo.isYou ? 'You' : 'Stranger'}</span>
@@ -587,6 +601,12 @@ export default function ChatItNow() {
                             : `${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
                         }`}>
                           {msg.text}
+                          {/* UPDATED: Timestamp at bottom left */}
+                          {msg.timestamp && (
+                            <span className={`text-[10px] block text-left mt-1 select-none ${msg.type === 'you' ? 'text-white/70' : (darkMode ? 'text-gray-400' : 'text-gray-500')}`}>
+                              {msg.timestamp}
+                            </span>
+                          )}
                         </div>
                      </div>
                   </SwipeableMessage>
@@ -612,7 +632,6 @@ export default function ChatItNow() {
         {/* INPUT BAR */}
         <div className={`absolute bottom-0 left-0 right-0 p-2 border-t z-20 flex flex-col justify-end ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
           
-          {/* Reply Preview Bar */}
           {replyingTo && (
             <div className={`flex items-center justify-between px-4 py-2 mb-1 rounded-lg text-xs border-l-4 ${darkMode ? 'bg-gray-700 text-gray-300 border-purple-500' : 'bg-gray-100 text-gray-700 border-purple-500'}`}>
               <div>
