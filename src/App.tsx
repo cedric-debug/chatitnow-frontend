@@ -83,11 +83,10 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME CONTROLLER (FIXED) ---
+  // --- THEME CONTROLLER ---
   useEffect(() => {
     const html = document.documentElement;
     
-    // This controls the Browser UI color (Status Bar / Address Bar)
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
@@ -96,17 +95,12 @@ export default function ChatItNow() {
     }
 
     if (darkMode) { 
-      // Add class for CSS
       html.classList.add('dark'); 
-      
-      // --- FIX IS HERE ---
-      // Changed from #111827 (gray-900) to #1f2937 (gray-800)
-      // This matches the header color exactly, removing the line.
+      // FIXED: Changed to #1f2937 (matches tailwind gray-800 header)
       metaThemeColor.setAttribute('content', '#1f2937'); 
     } else { 
-      // Remove class for CSS
       html.classList.remove('dark'); 
-      // Update Browser UI to White
+      // White for light mode
       metaThemeColor.setAttribute('content', '#ffffff'); 
     }
   }, [darkMode]);
@@ -261,6 +255,7 @@ export default function ChatItNow() {
         ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}
       `}>
         
+        {/* Fullscreen Ad Overlay */}
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
@@ -273,6 +268,7 @@ export default function ChatItNow() {
           </div>
         )}
 
+        {/* Searching Overlay */}
         {showSearching && (
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} p-6 rounded-2xl shadow-xl w-[95%] text-center`}>
@@ -306,11 +302,14 @@ export default function ChatItNow() {
         {/* CHAT AREA */}
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-1 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
-          {/* TOP BANNER AD (Sizes preserved as requested) */}
-          <div className={`w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+          {/* TOP BANNER AD - REVERTED TO YOUR PREVIOUS CODE */}
+          <div className={`w-full h-[50px] sm:h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
              <AdUnit 
                 client={ADSENSE_CLIENT_ID} 
                 slotId={AD_SLOT_TOP_BANNER} 
+                format="horizontal" 
+                responsive="false"
+                style={{ display: 'block', maxHeight: '50px', width: '100%' }}
              />
           </div>
 
