@@ -204,12 +204,11 @@ export default function ChatItNow() {
 
   // --- MOBILE AUDIO UNLOCKER ---
   const unlockAudio = () => {
-    // Attempt to play and immediately pause to "warm up" the audio context on mobile
     if (audioSentRef.current) {
         audioSentRef.current.play().then(() => {
             audioSentRef.current?.pause();
             audioSentRef.current!.currentTime = 0;
-        }).catch(() => {}); // Ignore error if already unlocked or failed
+        }).catch(() => {});
     }
   };
 
@@ -269,14 +268,12 @@ export default function ChatItNow() {
 
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
 
-    // --- CONNECTION HANDLERS ---
     socket.on('disconnect', () => {
       if (partnerNameRef.current && isConnected) {
         setPartnerStatus('reconnecting');
       }
     });
 
-    // Handle generic connection
     socket.on('connect', () => {
       if (partnerNameRef.current) {
         setPartnerStatus('connected');
@@ -284,7 +281,6 @@ export default function ChatItNow() {
       }
     });
 
-    // Handle specific session restoration event from server
     socket.on('session_restored', () => {
       if (partnerNameRef.current) {
         setPartnerStatus('connected');
@@ -307,7 +303,7 @@ export default function ChatItNow() {
       socket.off('partner_typing'); 
       socket.off('disconnect');
       socket.off('connect');
-      socket.off('session_restored'); // New listener
+      socket.off('session_restored'); 
       socket.off('partner_reconnecting_server'); 
       socket.off('partner_connected'); 
     };
@@ -365,7 +361,7 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
-      unlockAudio(); // Unlocks audio context on mobile
+      unlockAudio(); 
       socket.connect();
       startSearch();
     } else {
@@ -542,6 +538,7 @@ export default function ChatItNow() {
   return (
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
+      {/* Wave Keyframes */}
       <style>{`
         @keyframes typing-bounce {
           0%, 100% {
@@ -592,6 +589,11 @@ export default function ChatItNow() {
         {showSearching && (
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
             <div className={`${darkMode ? 'bg-gray-900' : 'bg-white'} p-6 rounded-2xl shadow-xl w-[95%] text-center`}>
+              {/* Added: Timeout Message */}
+              <p className={`text-xs font-medium mb-4 ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>
+                If not paired within 10 seconds, please refresh.
+              </p>
+
               <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
               <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Finding Partner...</h3>
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-4`}>Looking in {field || 'All Fields'}</p>
