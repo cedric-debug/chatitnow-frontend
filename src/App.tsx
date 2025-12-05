@@ -32,7 +32,7 @@ export default function ChatItNow() {
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
   
-  // DEFAULT: Light Mode (False)
+  // DEFAULT: Light Mode
   const [darkMode, setDarkMode] = useState(false);
 
   const [showNextConfirm, setShowNextConfirm] = useState(false);
@@ -84,55 +84,58 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME ENGINE: IMMERSIVE MODE ---
+  // --- THEME ENGINE: CHATKOOL METHOD ---
   useLayoutEffect(() => {
-    // 1. DEFINE SINGLE UNIFIED COLORS
-    // This matches the ChatKOOL style: The whole app is ONE color.
-    const COLOR_DARK = '#111827'; // Tailwind Gray 900 (Matches index.css)
-    const COLOR_LIGHT = '#ffffff'; // White
+    // Define the Colors
+    // ChatKOOL uses a dark color for body background in dark mode.
+    // We will use #111827 (Gray 900) to match your app's theme.
+    const DARK_COLOR = '#111827';
+    const LIGHT_COLOR = '#ffffff';
 
-    const activeColor = darkMode ? COLOR_DARK : COLOR_LIGHT;
-    const activeStatusStyle = darkMode ? 'black-translucent' : 'default';
+    const activeColor = darkMode ? DARK_COLOR : LIGHT_COLOR;
+    const activeStatus = darkMode ? 'black-translucent' : 'default';
 
-    // 2. FORCE META TAGS REFRESH (Delete & Recreate)
-    // This forces Mobile Safari/Chrome to acknowledge the change immediately
-    const setMeta = (name: string, content: string) => {
-      // Remove old tags
-      const oldTags = document.querySelectorAll(`meta[name='${name}']`);
-      oldTags.forEach(tag => tag.remove());
-      // Add new tag
-      const meta = document.createElement('meta');
-      meta.setAttribute('name', name);
-      meta.setAttribute('content', content);
-      document.head.appendChild(meta);
+    // 1. UPDATE META TAGS (Controls Top Status Bar)
+    const updateMeta = (name: string, content: string) => {
+      let tag = document.querySelector(`meta[name='${name}']`);
+      if (!tag) {
+        tag = document.createElement('meta');
+        tag.setAttribute('name', name);
+        document.head.appendChild(tag);
+      }
+      tag.setAttribute('content', content);
     };
 
-    setMeta('theme-color', activeColor);
-    setMeta('apple-mobile-web-app-status-bar-style', activeStatusStyle);
+    updateMeta('theme-color', activeColor);
+    updateMeta('apple-mobile-web-app-status-bar-style', activeStatus);
 
-    // 3. FORCE DOM STYLES (Overrides CSS classes)
+    // 2. FORCE BODY & HTML STYLES (Controls Overscroll/Bounce Area)
+    // This replicates the ChatKOOL behavior of setting styles on the body tag
     const html = document.documentElement;
     const body = document.body;
-    const root = document.getElementById('root');
 
-    // Apply the SINGLE color to everything. 
-    // This kills the "White Header" / "Black Footer" static bars.
+    // Force "important" styles to override any CSS issues
     html.style.setProperty('background-color', activeColor, 'important');
     body.style.setProperty('background-color', activeColor, 'important');
-    if (root) root.style.setProperty('background-color', activeColor, 'important');
-
-    // 4. Toggle Tailwind Class for inner elements
+    
+    // 3. TOGGLE TAILWIND CLASS
     if (darkMode) {
       html.classList.add('dark');
+      // Optional: Add class to body too, just in case specific selectors need it
+      body.classList.add('dark');
     } else {
       html.classList.remove('dark');
+      body.classList.remove('dark');
     }
 
   }, [darkMode]);
 
-  // Initial Cleanup
+  // Clean Start
   useLayoutEffect(() => {
     document.documentElement.classList.remove('dark');
+    document.body.classList.remove('dark');
+    document.documentElement.style.backgroundColor = '#ffffff';
+    document.body.style.backgroundColor = '#ffffff';
   }, []);
 
   useEffect(() => {
@@ -272,7 +275,7 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // Unified Background: Matches the Global Theme (Gray-900)
+  // Unified Background: Matches the activeColor (Gray-900)
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
       <div className={`
