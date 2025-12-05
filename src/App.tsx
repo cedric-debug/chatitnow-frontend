@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SkipForward, Moon, Sun } from 'lucide-react';
 import io, { Socket } from 'socket.io-client';
 import AdUnit from './AdUnit';
@@ -32,8 +32,14 @@ export default function ChatItNow() {
   const [partnerStatus, setPartnerStatus] = useState('searching');
   const [showTerms, setShowTerms] = useState(false);
   
-  // DEFAULT: Light Mode
-  const [darkMode, setDarkMode] = useState(false);
+  // 1. Initialize State from LocalStorage or System Preference
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') === 'dark' || 
+             (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    }
+    return false;
+  });
 
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showSearching, setShowSearching] = useState(false);
@@ -84,59 +90,47 @@ export default function ChatItNow() {
     };
   }, []);
 
-  // --- THEME ENGINE: CHATKOOL METHOD ---
-  useLayoutEffect(() => {
-    // Define the Colors
-    // ChatKOOL uses a dark color for body background in dark mode.
-    // We will use #111827 (Gray 900) to match your app's theme.
-    const DARK_COLOR = '#111827';
-    const LIGHT_COLOR = '#ffffff';
-
-    const activeColor = darkMode ? DARK_COLOR : LIGHT_COLOR;
-    const activeStatus = darkMode ? 'black-translucent' : 'default';
-
-    // 1. UPDATE META TAGS (Controls Top Status Bar)
-    const updateMeta = (name: string, content: string) => {
-      let tag = document.querySelector(`meta[name='${name}']`);
-      if (!tag) {
-        tag = document.createElement('meta');
-        tag.setAttribute('name', name);
-        document.head.appendChild(tag);
-      }
-      tag.setAttribute('content', content);
-    };
-
-    updateMeta('theme-color', activeColor);
-    updateMeta('apple-mobile-web-app-status-bar-style', activeStatus);
-
-    // 2. FORCE BODY & HTML STYLES (Controls Overscroll/Bounce Area)
-    // This replicates the ChatKOOL behavior of setting styles on the body tag
+  // --- THEME SYNC ENGINE ---
+  useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
 
-    // Force "important" styles to override any CSS issues
-    html.style.setProperty('background-color', activeColor, 'important');
-    body.style.setProperty('background-color', activeColor, 'important');
-    
-    // 3. TOGGLE TAILWIND CLASS
+    // ChatKOOL / Native App Style Colors
+    const DARK_BG = '#111827'; // Tailwind gray-900
+    const LIGHT_BG = '#ffffff';
+
     if (darkMode) {
+      // Apply Class for Tailwind (Requires darkMode: 'class' in config)
       html.classList.add('dark');
-      // Optional: Add class to body too, just in case specific selectors need it
-      body.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+
+      // Apply Body Background (Fixes Overscroll/Bounce)
+      html.style.backgroundColor = DARK_BG;
+      body.style.backgroundColor = DARK_BG;
+
+      // Update Browser Address Bar (Chrome/Safari)
+      let metaTheme = document.querySelector("meta[name='theme-color']");
+      if (metaTheme) metaTheme.setAttribute('content', DARK_BG);
+
+      // Update iOS Status Bar Text (White Text)
+      let metaStatus = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
+      if (metaStatus) metaStatus.setAttribute('content', 'black-translucent');
+
     } else {
+      // Light Mode Revert
       html.classList.remove('dark');
-      body.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+
+      html.style.backgroundColor = LIGHT_BG;
+      body.style.backgroundColor = LIGHT_BG;
+
+      let metaTheme = document.querySelector("meta[name='theme-color']");
+      if (metaTheme) metaTheme.setAttribute('content', LIGHT_BG);
+
+      let metaStatus = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
+      if (metaStatus) metaStatus.setAttribute('content', 'default');
     }
-
   }, [darkMode]);
-
-  // Clean Start
-  useLayoutEffect(() => {
-    document.documentElement.classList.remove('dark');
-    document.body.classList.remove('dark');
-    document.documentElement.style.backgroundColor = '#ffffff';
-    document.body.style.backgroundColor = '#ffffff';
-  }, []);
 
   useEffect(() => {
     if (isConnected) {
@@ -275,8 +269,8 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // Unified Background: Matches the activeColor (Gray-900)
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+  // Unified Background: Matches the Global Theme (Gray-900)
+  <div className={`fixed inset-0 flex flex-col items-center justify-center transition-colors duration-300 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
@@ -287,7 +281,7 @@ export default function ChatItNow() {
         {/* Fullscreen Ad Overlay */}
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-            <div className={`${darkMode ? 'bg-gray-900' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
               <p className="text-xs text-gray-500 mb-2">Advertisement</p>
               {/* Ad Container ALWAYS Light so ad is visible */}
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
