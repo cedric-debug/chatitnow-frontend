@@ -119,7 +119,6 @@ export default function ChatItNow() {
 
   }, [darkMode]);
 
-  // Clean Start
   useLayoutEffect(() => {
     document.documentElement.classList.remove('dark');
     document.body.style.backgroundColor = '#ffffff';
@@ -225,7 +224,7 @@ export default function ChatItNow() {
   if (!isLoggedIn) {
     return (
       <div className="fixed inset-0 flex items-center justify-center p-4 z-50">
-        {/* Adjusted padding for login card */}
+        {/* LOGIN CARD */}
         <div className="bg-white rounded-2xl shadow-2xl px-10 py-12 max-w-[420px] w-full max-h-full overflow-y-auto">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-purple-900 mb-2">ChatItNow.com</h1>
@@ -276,11 +275,14 @@ export default function ChatItNow() {
   return (
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
       
+      {/* 
+         - Width increased from 420px to 650px on desktop (sm:w-[650px])
+         - Height increased from 90vh to 92vh on desktop (sm:h-[92vh])
+      */}
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
-        sm:w-[550px] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl 
-        border transition-colors duration-200
-        ${darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}
+        sm:w-[650px] sm:h-[92vh] sm:rounded-2xl sm:shadow-2xl sm:border-x
+        ${darkMode ? 'bg-gray-900 sm:bg-gray-800 border-gray-800' : 'bg-white border-gray-200'}
       `}>
         
         {/* Fullscreen Ad Overlay */}
