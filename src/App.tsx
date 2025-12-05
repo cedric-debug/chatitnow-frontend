@@ -53,10 +53,7 @@ export default function ChatItNow() {
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
-  // FIX: Scroll when messages update OR when partner starts typing
-  useEffect(() => { 
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); 
-  }, [messages, isTyping]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   useEffect(() => {
     socket.on('matched', (data: any) => {
@@ -97,11 +94,9 @@ export default function ChatItNow() {
     const html = document.documentElement;
     const body = document.body;
 
-    // UI COLORS
     const APP_NOTCH_DARK = '#1f2937'; 
     const APP_NOTCH_LIGHT = '#ffffff';
     
-    // FIXED: Desktop Background is now #111827 (Gray 900) to match the UI
     const DESKTOP_BG_DARK = '#111827'; 
     const DESKTOP_BG_LIGHT = '#ffffff';
 
@@ -309,14 +304,15 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  // FIXED: Background now matches UI (Gray-900) exactly
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
       
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
-        sm:w-[650px] sm:rounded-2xl sm:shadow-2xl 
-        border transition-colors duration-200
-        ${darkMode ? 'bg-gray-900 border-gray-600' : 'bg-white border-gray-200'}
+        sm:w-[650px] sm:shadow-2xl 
+        transition-colors duration-200
+        /* FIXED: Squared corners (removed rounded-2xl), full height, side borders only */
+        border-0 sm:border-x
+        ${darkMode ? 'bg-gray-900 sm:border-gray-700' : 'bg-white sm:border-gray-200'}
       `}>
         
         {/* Fullscreen Ad Overlay */}
@@ -404,7 +400,6 @@ export default function ChatItNow() {
                   </div>
                 ) : (
                   <div className={`max-w-[85%] ${msg.type === 'you' ? 'items-end' : 'items-start'}`}>
-                    {/* FIXED BUBBLE COLOR: bg-gray-700 for dark mode */}
                     <div className={`px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
                       msg.type === 'you'
                         ? 'bg-purple-600 text-white rounded-br-none' 
@@ -418,7 +413,6 @@ export default function ChatItNow() {
             );
           })}
           
-          {/* TYPING INDICATOR - VISIBLE */}
           {isTyping && (
             <div className="flex justify-start w-full">
               <div className={`${darkMode ? 'bg-gray-700' : 'bg-white'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border-0`}>
