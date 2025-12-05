@@ -53,7 +53,10 @@ export default function ChatItNow() {
 
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  // --- UPDATED: Added isTyping to dependency array so it scrolls when bubble appears ---
+  useEffect(() => { 
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); 
+  }, [messages, isTyping]);
 
   useEffect(() => {
     socket.on('matched', (data: any) => {
@@ -369,7 +372,8 @@ export default function ChatItNow() {
         </div>
 
         {/* CHAT AREA */}
-        <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 space-y-3 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+        {/* UPDATED: Added pb-4 for breathing room at bottom */}
+        <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 pb-4 space-y-3 z-10 ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
           
           {/* TOP BANNER AD */}
           <div className="w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg bg-gray-100">
