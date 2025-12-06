@@ -26,10 +26,12 @@ const getSessionID = () => {
   return sessionID;
 };
 
+// --- UTILS ---
 const generateMessageID = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
+// --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
   autoConnect: false,
   reconnection: true,             
@@ -40,6 +42,7 @@ const socket: any = io(SERVER_URL, {
   }
 });
 
+// --- TYPES ---
 interface ReplyData {
   text: string;
   name: string;
@@ -60,7 +63,7 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; };
 }
 
-// --- SWIPEABLE COMPONENT ---
+// --- SWIPEABLE MESSAGE COMPONENT ---
 const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.ReactNode, onReply: () => void, isSystem: boolean }) => {
   const [offsetX, setOffsetX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -177,7 +180,6 @@ export default function ChatItNow() {
 
   const audioSentRef = useRef<HTMLAudioElement | null>(null);
   const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
-  const audioReactRef = useRef<HTMLAudioElement | null>(null);
 
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -186,13 +188,10 @@ export default function ChatItNow() {
     return false;
   });
 
-  // --- NEW: AUTO-RECONNECT ON VISIBILITY ---
-  // This handles the "Alt-Tab" case on mobile. 
-  // When user comes back, we force a check.
+  // --- AUTO-RECONNECT ON VISIBILITY ---
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && !socket.connected && isLoggedIn) {
-        console.log("App resumed - reconnecting socket...");
         socket.connect();
       }
     };
@@ -223,34 +222,23 @@ export default function ChatItNow() {
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
   const REACTIONS = ['❤️', '😆', '😮', '😢', '😡', '👍'];
 
+  // Initialize Audio
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
-    audioReactRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3'); 
     
     if(audioSentRef.current) { audioSentRef.current.volume = 1.0; audioSentRef.current.preload = 'auto'; }
     if(audioReceivedRef.current) { audioReceivedRef.current.volume = 1.0; audioReceivedRef.current.preload = 'auto'; }
-    if(audioReactRef.current) { audioReactRef.current.volume = 1.0; audioReactRef.current.preload = 'auto'; }
   }, []);
 
-  const unlockAudio = () => {
-    const unlock = (audio: HTMLAudioElement | null) => {
-        if (audio) {
-            audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
-        }
-    };
-    unlock(audioSentRef.current);
-    unlock(audioReceivedRef.current);
-    unlock(audioReactRef.current);
-  };
+  // Removed Unlock Audio as requested
 
-  const playSound = (type: 'sent' | 'received' | 'react') => {
+  const playSound = (type: 'sent' | 'received') => {
     if (isMuted) return;
     try {
       const audioMap = {
         sent: audioSentRef.current,
-        received: audioReceivedRef.current,
-        react: audioReactRef.current
+        received: audioReceivedRef.current
       };
       const audio = audioMap[type];
       if (audio) {
@@ -264,6 +252,7 @@ export default function ChatItNow() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTyping, replyingTo]); 
 
+  // --- SOCKET HANDLERS ---
   useEffect(() => {
     socket.on('matched', (data: any) => {
       setShowSearching(false);
@@ -290,6 +279,7 @@ export default function ChatItNow() {
       resetActivity();
     });
 
+    // --- RECEIVE REACTION ---
     socket.on('receive_reaction', (data: { messageID: string, reaction: string | null }) => {
       setMessages(prev => prev.map(msg => 
         msg.id === data.messageID ? { 
@@ -297,7 +287,7 @@ export default function ChatItNow() {
             reactions: { ...msg.reactions, stranger: data.reaction } 
         } : msg
       ));
-      if (data.reaction) playSound('react'); 
+      // Removed reaction sound
     });
 
     socket.on('partner_disconnected', () => {
@@ -374,7 +364,7 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
-      unlockAudio(); 
+      // Removed Unlock Audio Call
       socket.connect();
       startSearch();
     } else {
@@ -438,6 +428,7 @@ export default function ChatItNow() {
     if(input) input.focus();
   };
 
+  // --- TOGGLE REACTION ---
   const sendReaction = (msgID: string, emoji: string) => {
     const message = messages.find(m => m.id === msgID);
     const isRemoving = message?.reactions?.you === emoji;
@@ -451,7 +442,7 @@ export default function ChatItNow() {
     ));
     
     setActiveReactionId(null);
-    if (reactionToSend) playSound('react');
+    // Removed reaction sound here
     socket.emit('send_reaction', { messageID: msgID, reaction: reactionToSend });
   };
 
@@ -822,7 +813,7 @@ export default function ChatItNow() {
           ) : (
             <form className="flex gap-2 items-center h-[60px]" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
               {/* FIX: SKIP BUTTON TEXT COLOR */}
-              <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full px-6 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-white hover:bg-gray-800' : 'border-gray-200 text-black hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
+              <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full px-4 w-16 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-white hover:bg-gray-800' : 'border-gray-200 text-black hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
               
               <input type="text" value={currentMessage} onChange={handleTyping} enterKeyHint="send" placeholder={isConnected ? (replyingTo ? `Replying to ${replyingTo.name}...` : "Say something...") : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
               <button type="submit" disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
