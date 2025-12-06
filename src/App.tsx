@@ -96,8 +96,9 @@ const SwipeableMessage = ({
     
     let finalDrag = 0;
     
-    // Direction logic
+    // Direction Logic
     if (direction === 'right') {
+       // Stranger (Left side) -> Pull Right to reply
        if (diff > 0) {
          const absDiff = Math.abs(diff);
          finalDrag = absDiff > SWIPE_THRESHOLD 
@@ -106,6 +107,7 @@ const SwipeableMessage = ({
          finalDrag = Math.min(finalDrag, MAX_DRAG);
        }
     } else {
+       // You (Right side) -> Pull Left to reply
        if (diff < 0) {
          const absDiff = Math.abs(diff);
          const resisted = absDiff > SWIPE_THRESHOLD 
@@ -232,6 +234,7 @@ export default function ChatItNow() {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [isLoggedIn]);
 
+  // --- FORCE DISCONNECT ON RELOAD ---
   useEffect(() => {
     const handleBeforeUnload = () => {
         socket.emit('disconnect_partner');
@@ -358,21 +361,17 @@ export default function ChatItNow() {
     };
   }, [isMuted, isConnected]); 
 
-  // --- THEME & COLORS (#1f2937) ---
+  // --- THEME ---
   useLayoutEffect(() => {
     const html = document.documentElement;
     const body = document.body;
     
+    // Dark Mode = #1f2937
     const DARK_BG = '#1f2937'; 
     const LIGHT_BG = '#ffffff';
 
     const currentBgColor = darkMode ? DARK_BG : LIGHT_BG;
-
-    if (darkMode) {
-      html.classList.add('dark');
-    } else {
-      html.classList.remove('dark');
-    }
+    if (darkMode) { html.classList.add('dark'); } else { html.classList.remove('dark'); }
     body.style.backgroundColor = currentBgColor;
     html.style.backgroundColor = currentBgColor;
 
@@ -391,7 +390,6 @@ export default function ChatItNow() {
         document.head.appendChild(metaStatusBarStyle);
     }
     metaStatusBarStyle.setAttribute('content', darkMode ? 'black-translucent' : 'default');
-
   }, [darkMode]);
 
   const resetActivity = () => { if (!showInactivityAd && !showTabReturnAd) setLastActivity(Date.now()); };
@@ -428,7 +426,6 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
-      // No sound
       socket.connect();
       startSearch();
     } else {
@@ -550,7 +547,7 @@ export default function ChatItNow() {
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
-             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
+            <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
                 <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
                 <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
                 <p>As a university student who knows what it feels like to crave real, genuine connection in a world thats getting more digital and more distant every year. Sometimes, even if we're surrounded by people, we still feel like no one really listens. That's why I built this platform to create a space where Filipinos can express themselves openly, share their stories, and find comfort from people who might actually understand what they're going through—even if they're total strangers.</p>
@@ -755,18 +752,17 @@ export default function ChatItNow() {
                     direction={msg.type === 'you' ? 'left' : 'right'}
                   >
                      
-                     {/* FIXED: SMILEY POSITIONING */}
-                     {/* You: Smiley Left. Stranger: Smiley Right. */}
-                     <div className={`flex items-end gap-2 w-fit ${msg.type === 'you' ? 'ml-auto flex-row' : 'flex-row'} max-w-[85%]`}>
+                     {/* FIXED: SMILEY POSITIONING & ORDER */}
+                     {/* You: Smiley Left (Row Reverse). Stranger: Smiley Right (Row). */}
+                     <div className={`flex items-end gap-2 w-fit ${msg.type === 'you' ? 'ml-auto flex-row-reverse' : 'flex-row'} max-w-[85%]`}>
                         
-                        {/* LEFT SMILEY (FOR YOU) */}
-                        {msg.type === 'you' && (
-                          <div className={`opacity-0 group-hover:opacity-100 transition-opacity`}>
+                        {/* SMILEY TRIGGER */}
+                        <div className={`opacity-0 group-hover:opacity-100 transition-opacity`}>
+                             {/* Visible on mobile (no hover) using logic if needed, but standard tap works */}
                              <button onClick={() => setActiveReactionId(activeReactionId === msg.id ? null : msg.id!)} className={`p-1 rounded-full ${darkMode ? 'text-gray-400 hover:bg-[#374151]' : 'text-gray-400 hover:bg-gray-100'}`}>
                                <Smile size={16} />
                              </button>
-                          </div>
-                        )}
+                        </div>
 
                         {/* BUBBLE CONTAINER */}
                         <div className={`flex flex-col ${msg.type === 'you' ? 'items-end' : 'items-start'} relative`}>
@@ -820,15 +816,6 @@ export default function ChatItNow() {
 
                           </div>
                         </div>
-
-                        {/* RIGHT SMILEY (FOR STRANGER) */}
-                        {msg.type !== 'you' && (
-                          <div className={`opacity-0 group-hover:opacity-100 transition-opacity`}>
-                             <button onClick={() => setActiveReactionId(activeReactionId === msg.id ? null : msg.id!)} className={`p-1 rounded-full ${darkMode ? 'text-gray-400 hover:bg-[#374151]' : 'text-gray-400 hover:bg-gray-100'}`}>
-                               <Smile size={16} />
-                             </button>
-                          </div>
-                        )}
 
                      </div>
                   </SwipeableMessage>
