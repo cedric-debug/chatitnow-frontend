@@ -96,6 +96,7 @@ const SwipeableMessage = ({
     
     let finalDrag = 0;
     
+    // Direction logic
     if (direction === 'right') {
        if (diff > 0) {
          const absDiff = Math.abs(diff);
@@ -231,7 +232,6 @@ export default function ChatItNow() {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [isLoggedIn]);
 
-  // --- FORCE DISCONNECT ON RELOAD ---
   useEffect(() => {
     const handleBeforeUnload = () => {
         socket.emit('disconnect_partner');
@@ -263,7 +263,6 @@ export default function ChatItNow() {
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
   const REACTIONS = ['❤️', '😆', '😮', '😢', '😡', '👍'];
 
-  // Initialize Audio
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
@@ -359,7 +358,7 @@ export default function ChatItNow() {
     };
   }, [isMuted, isConnected]); 
 
-  // --- THEME ---
+  // --- THEME & COLORS (#1f2937) ---
   useLayoutEffect(() => {
     const html = document.documentElement;
     const body = document.body;
@@ -368,7 +367,12 @@ export default function ChatItNow() {
     const LIGHT_BG = '#ffffff';
 
     const currentBgColor = darkMode ? DARK_BG : LIGHT_BG;
-    if (darkMode) html.classList.add('dark'); else html.classList.remove('dark');
+
+    if (darkMode) {
+      html.classList.add('dark');
+    } else {
+      html.classList.remove('dark');
+    }
     body.style.backgroundColor = currentBgColor;
     html.style.backgroundColor = currentBgColor;
 
@@ -387,6 +391,7 @@ export default function ChatItNow() {
         document.head.appendChild(metaStatusBarStyle);
     }
     metaStatusBarStyle.setAttribute('content', darkMode ? 'black-translucent' : 'default');
+
   }, [darkMode]);
 
   const resetActivity = () => { if (!showInactivityAd && !showTabReturnAd) setLastActivity(Date.now()); };
@@ -751,10 +756,10 @@ export default function ChatItNow() {
                   >
                      
                      {/* FIXED: SMILEY POSITIONING */}
-                     {/* For YOU: Smiley on LEFT. For STRANGER: Smiley on RIGHT. */}
+                     {/* You: Smiley Left. Stranger: Smiley Right. */}
                      <div className={`flex items-end gap-2 w-fit ${msg.type === 'you' ? 'ml-auto flex-row' : 'flex-row'} max-w-[85%]`}>
                         
-                        {/* LEFT SMILEY (Only for YOU) */}
+                        {/* LEFT SMILEY (FOR YOU) */}
                         {msg.type === 'you' && (
                           <div className={`opacity-0 group-hover:opacity-100 transition-opacity`}>
                              <button onClick={() => setActiveReactionId(activeReactionId === msg.id ? null : msg.id!)} className={`p-1 rounded-full ${darkMode ? 'text-gray-400 hover:bg-[#374151]' : 'text-gray-400 hover:bg-gray-100'}`}>
@@ -816,7 +821,7 @@ export default function ChatItNow() {
                           </div>
                         </div>
 
-                        {/* RIGHT SMILEY (Only for STRANGER) */}
+                        {/* RIGHT SMILEY (FOR STRANGER) */}
                         {msg.type !== 'you' && (
                           <div className={`opacity-0 group-hover:opacity-100 transition-opacity`}>
                              <button onClick={() => setActiveReactionId(activeReactionId === msg.id ? null : msg.id!)} className={`p-1 rounded-full ${darkMode ? 'text-gray-400 hover:bg-[#374151]' : 'text-gray-400 hover:bg-gray-100'}`}>
@@ -855,7 +860,7 @@ export default function ChatItNow() {
                 <span className="font-bold block text-purple-500 mb-0.5">Replying to {replyingTo.name}</span>
                 <span className="line-clamp-1 opacity-80">{replyingTo.text}</span>
               </div>
-              <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-gray-200 dark:hover:bg-[#454C59] rounded-full">
+              <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-gray-200 dark:hover:bg-[#4B5563] rounded-full">
                 <X size={14} />
               </button>
             </div>
