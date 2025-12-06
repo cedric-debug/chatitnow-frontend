@@ -180,7 +180,6 @@ export default function ChatItNow() {
 
   const audioSentRef = useRef<HTMLAudioElement | null>(null);
   const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
-  const audioReactRef = useRef<HTMLAudioElement | null>(null);
 
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -227,20 +226,27 @@ export default function ChatItNow() {
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
-    audioReactRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3'); 
     
     if(audioSentRef.current) { audioSentRef.current.volume = 1.0; audioSentRef.current.preload = 'auto'; }
     if(audioReceivedRef.current) { audioReceivedRef.current.volume = 1.0; audioReceivedRef.current.preload = 'auto'; }
-    if(audioReactRef.current) { audioReactRef.current.volume = 1.0; audioReactRef.current.preload = 'auto'; }
   }, []);
 
-  const playSound = (type: 'sent' | 'received' | 'react') => {
+  const unlockAudio = () => {
+    const unlock = (audio: HTMLAudioElement | null) => {
+        if (audio) {
+            audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
+        }
+    };
+    unlock(audioSentRef.current);
+    unlock(audioReceivedRef.current);
+  };
+
+  const playSound = (type: 'sent' | 'received') => {
     if (isMuted) return;
     try {
       const audioMap = {
         sent: audioSentRef.current,
         received: audioReceivedRef.current,
-        react: audioReactRef.current
       };
       // @ts-ignore
       const audio = audioMap[type];
@@ -289,7 +295,6 @@ export default function ChatItNow() {
             reactions: { ...msg.reactions, stranger: data.reaction } 
         } : msg
       ));
-      // No sound
     });
 
     socket.on('partner_disconnected', () => {
@@ -328,8 +333,8 @@ export default function ChatItNow() {
     const html = document.documentElement;
     const body = document.body;
     
-    // UPDATED COLORS
-    const DARK_BG = '#272C35'; // The specific blue-gray requested
+    // UPDATED DARK MODE COLOR
+    const DARK_BG = '#1f2937'; // Requested color
     const LIGHT_BG = '#ffffff';
 
     const currentBgColor = darkMode ? DARK_BG : LIGHT_BG;
@@ -395,6 +400,7 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
+      unlockAudio();
       socket.connect();
       startSearch();
     } else {
@@ -471,7 +477,6 @@ export default function ChatItNow() {
     ));
     
     setActiveReactionId(null);
-    // No reaction sound
     socket.emit('send_reaction', { messageID: msgID, reaction: reactionToSend });
   };
 
@@ -509,9 +514,8 @@ export default function ChatItNow() {
 
   if (showWelcome) {
     return (
-      // UPDATED BG
-      <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#272C35]' : 'bg-white'}`}>
-        <div className={`relative w-full h-[100dvh] sm:w-[650px] sm:shadow-2xl border-0 sm:border-x flex flex-col justify-center overflow-y-auto ${darkMode ? 'bg-[#272C35] border-[#323844]' : 'bg-white border-gray-200'}`}>
+      <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
+        <div className={`relative w-full h-[100dvh] sm:w-[650px] sm:shadow-2xl border-0 sm:border-x flex flex-col justify-center overflow-y-auto ${darkMode ? 'bg-[#1f2937] border-[#374151]' : 'bg-white border-gray-200'}`}>
           <div className="p-10 w-full max-w-[700px] mx-auto">
             <div className="text-center mb-8">
                <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
@@ -533,8 +537,8 @@ export default function ChatItNow() {
 
   if (!isLoggedIn) {
     return (
-      <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#272C35]' : 'bg-white'}`}>
-        <div className={`relative w-full h-[100dvh] sm:w-[650px] sm:shadow-2xl border-0 sm:border-x flex flex-col justify-center overflow-y-auto ${darkMode ? 'bg-[#272C35] border-[#323844]' : 'bg-white border-gray-200'}`}>
+      <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
+        <div className={`relative w-full h-[100dvh] sm:w-[650px] sm:shadow-2xl border-0 sm:border-x flex flex-col justify-center overflow-y-auto ${darkMode ? 'bg-[#1f2937] border-[#374151]' : 'bg-white border-gray-200'}`}>
           <div className="px-10 py-12 w-full max-w-[650px] mx-auto">
             <div className="text-center mb-8">
               <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>ChatItNow.com</h1>
@@ -544,17 +548,17 @@ export default function ChatItNow() {
             <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
               <div>
                   <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Choose a Username</label>
-                  <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} enterKeyHint="go" placeholder="Enter username..." className={`w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm ${darkMode ? 'bg-[#323844] border-[#454C59] text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900'}`} maxLength={20} />
+                  <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} enterKeyHint="go" placeholder="Enter username..." className={`w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm ${darkMode ? 'bg-[#111827] border-[#374151] text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900'}`} maxLength={20} />
               </div>
               <div>
                   <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Field/Profession (Optional)</label>
-                  <select value={field} onChange={(e) => setField(e.target.value)} className={`w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm ${darkMode ? 'bg-[#323844] border-[#454C59] text-white' : 'bg-white border-gray-300 text-gray-900'}`}>
+                  <select value={field} onChange={(e) => setField(e.target.value)} className={`w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm ${darkMode ? 'bg-[#111827] border-[#374151] text-white' : 'bg-white border-gray-300 text-gray-900'}`}>
                     <option value="">Select your field (or leave blank)</option>
                     {fields.slice(1).map((f) => (<option key={f} value={f}>{f}</option>))}
                   </select>
                   <p className={`text-xs mt-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>We'll try to match you with someone in the same field when possible</p>
               </div>
-              <div className={`border rounded-xl p-5 space-y-4 transition-colors duration-300 ${formError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : darkMode ? 'bg-[#323844] border-[#454C59]' : 'border-yellow-200 bg-yellow-50'}`}>
+              <div className={`border rounded-xl p-5 space-y-4 transition-colors duration-300 ${formError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : darkMode ? 'bg-[#111827] border-[#374151]' : 'border-yellow-200 bg-yellow-50'}`}>
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input type="checkbox" checked={confirmedAdult} onChange={(e) => setConfirmedAdult(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" />
                   <span className={`text-xs sm:text-sm pt-0.5 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}><strong>I confirm that I am 18 years of age or older.</strong></span>
@@ -579,8 +583,8 @@ export default function ChatItNow() {
         
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className={`rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto ${darkMode ? 'bg-[#272C35]' : 'bg-white'}`}>
-              <h2 className={`text-2xl font-bold mb-4 sticky top-0 pb-2 ${darkMode ? 'text-white bg-[#272C35]' : 'text-gray-900 bg-white'}`}>Terms & Conditions</h2>
+            <div className={`rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
+              <h2 className={`text-2xl font-bold mb-4 sticky top-0 pb-2 ${darkMode ? 'text-white bg-[#1f2937]' : 'text-gray-900 bg-white'}`}>Terms & Conditions</h2>
               <div className={`space-y-4 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 <p>Last updated: December 5, 2025</p>
                 <p><strong>Agreement to Terms</strong><br/>By accessing ChatItNow.com (the "Site"), an anonymous text-only chat platform made for Filipinos, you affirm and agree to these Terms and Conditions.</p>
@@ -589,9 +593,9 @@ export default function ChatItNow() {
                 <p><strong>Use at Your Own Risk</strong><br/>You use this Site at your own risk, fully aware of the dangers of chatting with strangers whose identities are not verified. We are not responsible for impersonation, misinformation, scams, or any harms from anonymous interactions.</p>
                 <p><strong>Disclaimer of Liability</strong><br/>The Site is provided "as is" and "as available" with no warranties of any kind, express or implied. To the fullest extent permitted by Philippine law ChatItNow.com disclaim all liability, direct or indirect, for user interactions, content, advice, disputes, harms (emotional, financial, reputational), illegal acts, or any loss arising from Site use.</p>
               </div>
-              <div className={`mt-6 flex gap-3 sticky bottom-0 pt-4 border-t ${darkMode ? 'bg-[#272C35] border-[#323844]' : 'bg-white border-gray-100'}`}>
+              <div className={`mt-6 flex gap-3 sticky bottom-0 pt-4 border-t ${darkMode ? 'bg-[#1f2937] border-[#374151]' : 'bg-white border-gray-100'}`}>
                 <button onClick={() => { setShowTerms(false); setAcceptedTerms(true); }} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg transition">Accept Terms</button>
-                <button onClick={() => setShowTerms(false)} className={`flex-1 font-bold py-3 rounded-lg transition ${darkMode ? 'bg-[#323844] hover:bg-[#454C59] text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>Close</button>
+                <button onClick={() => setShowTerms(false)} className={`flex-1 font-bold py-3 rounded-lg transition ${darkMode ? 'bg-[#374151] hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>Close</button>
               </div>
             </div>
           </div>
@@ -602,7 +606,7 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#272C35]' : 'bg-white'}`}>
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
       
       {/* Wave Keyframes */}
       <style>{`
@@ -618,13 +622,13 @@ export default function ChatItNow() {
         sm:w-[650px] sm:shadow-2xl 
         transition-colors duration-200
         border-0 sm:border-x
-        ${darkMode ? 'bg-[#272C35] sm:border-[#323844]' : 'bg-white sm:border-gray-200'}
+        ${darkMode ? 'bg-[#1f2937] sm:border-[#374151]' : 'bg-white sm:border-gray-200'}
       `}>
         
         {/* Fullscreen Ad Overlay */}
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-            <div className={`${darkMode ? 'bg-[#272C35]' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
+            <div className={`${darkMode ? 'bg-[#1f2937]' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
               <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
@@ -646,7 +650,7 @@ export default function ChatItNow() {
         {/* Searching Overlay */}
         {showSearching && (
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className={`${darkMode ? 'bg-[#272C35]' : 'bg-white'} p-6 rounded-2xl shadow-xl w-[95%] text-center`}>
+            <div className={`${darkMode ? 'bg-[#1f2937]' : 'bg-white'} p-6 rounded-2xl shadow-xl w-[95%] text-center`}>
               {/* Added: Timeout Message */}
               <p className={`text-xs font-medium mb-4 ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>
                 If not paired within 10 seconds, please refresh.
@@ -655,7 +659,7 @@ export default function ChatItNow() {
               <div className="w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
               <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Finding Partner...</h3>
               <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-4`}>Looking in {field || 'All Fields'}</p>
-              <div className={`${darkMode ? 'bg-[#323844] border-[#454C59]' : 'bg-gray-100 border-gray-200'} border rounded-lg p-2`}>
+              <div className={`${darkMode ? 'bg-[#374151] border-[#374151]' : 'bg-gray-100 border-gray-200'} border rounded-lg p-2`}>
                 <p className={`text-[10px] mb-1 opacity-50 ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Advertisement</p>
                 <div className="bg-white h-64 rounded flex items-center justify-center overflow-hidden">
                   <AdUnit client={ADSENSE_CLIENT_ID} slotId={AD_SLOT_SQUARE} />
@@ -666,7 +670,7 @@ export default function ChatItNow() {
         )}
 
         {/* HEADER */}
-        <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-[#272C35] border-b border-[#323844]' : 'bg-white border-b border-gray-100'}`}>
+        <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-[#1f2937] border-b border-[#374151]' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
               src="/logo.png" 
@@ -683,15 +687,15 @@ export default function ChatItNow() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button onClick={() => setIsMuted(!isMuted)} className={`p-2 rounded-full ${darkMode ? 'bg-[#323844] text-gray-300 hover:bg-[#454C59]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            <button onClick={() => setIsMuted(!isMuted)} className={`p-2 rounded-full ${darkMode ? 'bg-[#374151] text-gray-300 hover:bg-[#4B5563]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
             </button>
-            <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-[#323844] text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
+            <button onClick={() => setDarkMode(!darkMode)} className={`p-2 rounded-full ${darkMode ? 'bg-[#374151] text-yellow-400' : 'bg-gray-100 text-gray-600'}`}>{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
           </div>
         </div>
 
         {/* CHAT AREA */}
-        <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 pb-4 space-y-3 z-10 ${darkMode ? 'bg-[#272C35]' : 'bg-white'}`}>
+        <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 pb-4 space-y-3 z-10 ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
           
           <div className="w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg bg-gray-100">
              <AdUnit 
@@ -723,7 +727,7 @@ export default function ChatItNow() {
                         
                         {msg.type === 'you' && (
                           <div className={`opacity-0 group-hover:opacity-100 transition-opacity`}>
-                             <button onClick={() => setActiveReactionId(activeReactionId === msg.id ? null : msg.id!)} className={`p-1 rounded-full ${darkMode ? 'text-gray-400 hover:bg-[#323844]' : 'text-gray-400 hover:bg-gray-100'}`}>
+                             <button onClick={() => setActiveReactionId(activeReactionId === msg.id ? null : msg.id!)} className={`p-1 rounded-full ${darkMode ? 'text-gray-400 hover:bg-[#374151]' : 'text-gray-400 hover:bg-gray-100'}`}>
                                <Smile size={16} />
                              </button>
                           </div>
@@ -732,7 +736,7 @@ export default function ChatItNow() {
                         <div className={`flex flex-col ${msg.type === 'you' ? 'items-end' : 'items-start'} relative`}>
                           
                           {activeReactionId === msg.id && (
-                            <div className={`absolute z-30 bottom-full mb-1 flex gap-1 p-1 rounded-full shadow-xl border animate-in fade-in zoom-in duration-200 ${darkMode ? 'bg-[#323844] border-[#454C59]' : 'bg-white border-gray-200'}`} style={{ left: msg.type === 'you' ? 'auto' : 0, right: msg.type === 'you' ? 0 : 'auto' }}>
+                            <div className={`absolute z-30 bottom-full mb-1 flex gap-1 p-1 rounded-full shadow-xl border animate-in fade-in zoom-in duration-200 ${darkMode ? 'bg-[#374151] border-[#4B5563]' : 'bg-white border-gray-200'}`} style={{ left: msg.type === 'you' ? 'auto' : 0, right: msg.type === 'you' ? 0 : 'auto' }}>
                               {REACTIONS.map(emoji => (
                                 <button key={emoji} onClick={() => sendReaction(msg.id!, emoji)} className="hover:scale-125 transition text-lg p-1">{emoji}</button>
                               ))}
@@ -741,7 +745,7 @@ export default function ChatItNow() {
                           )}
 
                           {msg.replyTo && (
-                            <div className={`mb-1 text-xs opacity-75 px-3 py-1.5 rounded-lg border-l-4 ${msg.type === 'you' ? 'bg-purple-700 text-purple-100 border-purple-300' : (darkMode ? 'bg-[#3A4250] text-gray-400 border-[#4B5563]' : 'bg-gray-200 text-gray-600 border-gray-400')}`}>
+                            <div className={`mb-1 text-xs opacity-75 px-3 py-1.5 rounded-lg border-l-4 ${msg.type === 'you' ? 'bg-purple-700 text-purple-100 border-purple-300' : (darkMode ? 'bg-[#4B5563] text-gray-400 border-[#6B7280]' : 'bg-gray-200 text-gray-600 border-gray-400')}`}>
                                <span className="font-bold block mb-0.5">{msg.replyTo.name}</span>
                                <span className="line-clamp-1">{msg.replyTo.text}</span>
                             </div>
@@ -750,7 +754,7 @@ export default function ChatItNow() {
                           <div className={`relative px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
                             msg.type === 'you'
                               ? 'bg-purple-600 text-white rounded-br-none' 
-                              : `${darkMode ? 'bg-[#2A303C] text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
+                              : `${darkMode ? 'bg-[#374151] text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
                           }`}>
                             {msg.text}
                             {msg.timestamp && (
@@ -765,12 +769,12 @@ export default function ChatItNow() {
 
                             <div className={`absolute -bottom-2 ${msg.type === 'you' ? '-left-2' : '-right-2'} flex gap-[-5px]`}>
                               {msg.reactions?.you && (
-                                <div className={`text-sm bg-gray-100 dark:bg-[#323846] border dark:border-[#4B5563] border-gray-300 rounded-full w-6 h-6 flex items-center justify-center shadow-sm z-20`}>
+                                <div className={`text-sm bg-gray-100 dark:bg-[#4B5563] border dark:border-[#6B7280] border-gray-300 rounded-full w-6 h-6 flex items-center justify-center shadow-sm z-20`}>
                                   {msg.reactions.you}
                                 </div>
                               )}
                               {msg.reactions?.stranger && (
-                                <div className={`text-sm bg-gray-100 dark:bg-[#323846] border dark:border-[#4B5563] border-gray-300 rounded-full w-6 h-6 flex items-center justify-center shadow-sm z-10 -ml-2`}>
+                                <div className={`text-sm bg-gray-100 dark:bg-[#4B5563] border dark:border-[#6B7280] border-gray-300 rounded-full w-6 h-6 flex items-center justify-center shadow-sm z-10 -ml-2`}>
                                   {msg.reactions.stranger}
                                 </div>
                               )}
@@ -781,7 +785,7 @@ export default function ChatItNow() {
 
                         {msg.type !== 'you' && (
                           <div className={`opacity-0 group-hover:opacity-100 transition-opacity`}>
-                             <button onClick={() => setActiveReactionId(activeReactionId === msg.id ? null : msg.id!)} className={`p-1 rounded-full ${darkMode ? 'text-gray-400 hover:bg-[#323844]' : 'text-gray-400 hover:bg-gray-100'}`}>
+                             <button onClick={() => setActiveReactionId(activeReactionId === msg.id ? null : msg.id!)} className={`p-1 rounded-full ${darkMode ? 'text-gray-400 hover:bg-[#374151]' : 'text-gray-400 hover:bg-gray-100'}`}>
                                <Smile size={16} />
                              </button>
                           </div>
@@ -796,7 +800,7 @@ export default function ChatItNow() {
           
           {isTyping && (
             <div className="flex justify-start w-full">
-              <div className={`${darkMode ? 'bg-[#2A303C]' : 'bg-gray-100'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border-0 flex items-center`}>
+              <div className={`${darkMode ? 'bg-[#374151]' : 'bg-gray-100'} px-3 py-2 rounded-2xl rounded-bl-none shadow-sm border-0 flex items-center`}>
                 <div className="flex gap-1 h-[21px] items-center">
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-typing" style={{ animationDelay: '0ms' }}></div>
                   <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-typing" style={{ animationDelay: '160ms' }}></div>
@@ -809,15 +813,15 @@ export default function ChatItNow() {
         </div>
 
         {/* INPUT BAR */}
-        <div className={`absolute bottom-0 left-0 right-0 p-2 border-t z-20 flex flex-col justify-end ${darkMode ? 'bg-[#272C35] border-[#323844]' : 'bg-white border-gray-100'}`}>
+        <div className={`absolute bottom-0 left-0 right-0 p-2 border-t z-20 flex flex-col justify-end ${darkMode ? 'bg-[#1f2937] border-[#374151]' : 'bg-white border-gray-100'}`}>
           
           {replyingTo && (
-            <div className={`flex items-center justify-between px-4 py-2 mb-1 rounded-lg text-xs border-l-4 ${darkMode ? 'bg-[#323844] text-gray-300 border-purple-500' : 'bg-gray-100 text-gray-700 border-purple-500'}`}>
+            <div className={`flex items-center justify-between px-4 py-2 mb-1 rounded-lg text-xs border-l-4 ${darkMode ? 'bg-[#374151] text-gray-300 border-purple-500' : 'bg-gray-100 text-gray-700 border-purple-500'}`}>
               <div>
                 <span className="font-bold block text-purple-500 mb-0.5">Replying to {replyingTo.name}</span>
                 <span className="line-clamp-1 opacity-80">{replyingTo.text}</span>
               </div>
-              <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-gray-200 dark:hover:bg-[#3A4250] rounded-full">
+              <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-gray-200 dark:hover:bg-[#4B5563] rounded-full">
                 <X size={14} />
               </button>
             </div>
@@ -835,9 +839,9 @@ export default function ChatItNow() {
             </div>
           ) : (
             <form className="flex gap-2 items-center h-[60px]" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
-              <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full px-3 w-16 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-[#3A4250] text-white hover:bg-[#323844]' : 'border-gray-200 text-black hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
+              <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full px-3 w-16 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-[#374151] text-white hover:bg-[#374151]' : 'border-gray-200 text-black hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
               
-              <input type="text" value={currentMessage} onChange={handleTyping} enterKeyHint="send" placeholder={isConnected ? (replyingTo ? `Replying to ${replyingTo.name}...` : "Say something...") : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-[#323844] border-[#3A4250] text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
+              <input type="text" value={currentMessage} onChange={handleTyping} enterKeyHint="send" placeholder={isConnected ? (replyingTo ? `Replying to ${replyingTo.name}...` : "Say something...") : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-[#111827] border-[#374151] text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
               <button type="submit" disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
             </form>
           )}
