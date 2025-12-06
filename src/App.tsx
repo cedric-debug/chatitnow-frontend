@@ -63,13 +63,23 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; };
 }
 
-// --- SWIPEABLE MESSAGE COMPONENT ---
-const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.ReactNode, onReply: () => void, isSystem: boolean }) => {
+// --- SWIPEABLE MESSAGE COMPONENT (FIXED LOGIC) ---
+const SwipeableMessage = ({ 
+  children, 
+  onReply, 
+  isSystem, 
+  direction // 'left' (for you) or 'right' (for stranger)
+}: { 
+  children: React.ReactNode, 
+  onReply: () => void, 
+  isSystem: boolean,
+  direction: 'left' | 'right'
+}) => {
   const [offsetX, setOffsetX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startX = useRef(0);
   
-  const SWIPE_THRESHOLD = 30; 
+  const SWIPE_THRESHOLD = 35; 
   const MAX_DRAG = 80;
 
   if (isSystem) return <div>{children}</div>;
@@ -84,18 +94,34 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
     const currentX = e.touches[0].clientX;
     const diff = currentX - startX.current;
     
-    if (diff > 0) {
-      let finalDrag = diff;
-      if (diff > SWIPE_THRESHOLD) {
-        const extra = diff - SWIPE_THRESHOLD;
-        finalDrag = SWIPE_THRESHOLD + (Math.pow(extra, 0.8)); 
-      }
-      setOffsetX(Math.min(finalDrag, MAX_DRAG));
+    let finalDrag = 0;
+    
+    // Logic: Calculate drag based on allowed direction
+    if (direction === 'right') {
+       // Allow dragging right (positive)
+       if (diff > 0) {
+         const absDiff = Math.abs(diff);
+         finalDrag = absDiff > SWIPE_THRESHOLD 
+            ? SWIPE_THRESHOLD + Math.pow(absDiff - SWIPE_THRESHOLD, 0.8)
+            : absDiff;
+         finalDrag = Math.min(finalDrag, MAX_DRAG);
+       }
+    } else {
+       // Allow dragging left (negative)
+       if (diff < 0) {
+         const absDiff = Math.abs(diff);
+         const resisted = absDiff > SWIPE_THRESHOLD 
+            ? SWIPE_THRESHOLD + Math.pow(absDiff - SWIPE_THRESHOLD, 0.8)
+            : absDiff;
+         finalDrag = -Math.min(resisted, MAX_DRAG);
+       }
     }
+
+    if (finalDrag !== 0) setOffsetX(finalDrag);
   };
 
   const handleTouchEnd = () => {
-    if (offsetX > SWIPE_THRESHOLD) onReply();
+    if (Math.abs(offsetX) > SWIPE_THRESHOLD) onReply();
     setIsDragging(false);
     setOffsetX(0);
   };
@@ -109,12 +135,20 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
     if (!isDragging) return;
     const currentX = e.clientX;
     const diff = currentX - startX.current;
-    if (diff > 0) setOffsetX(Math.min(diff, MAX_DRAG));
+
+    let finalDrag = 0;
+    if (direction === 'right' && diff > 0) {
+        finalDrag = Math.min(diff, MAX_DRAG);
+    } else if (direction === 'left' && diff < 0) {
+        finalDrag = Math.max(diff, -MAX_DRAG);
+    }
+
+    if (finalDrag !== 0) setOffsetX(finalDrag);
   };
 
   const handleMouseUp = () => {
     if (isDragging) {
-      if (offsetX > SWIPE_THRESHOLD) onReply();
+      if (Math.abs(offsetX) > SWIPE_THRESHOLD) onReply();
       setIsDragging(false);
       setOffsetX(0);
     }
@@ -138,17 +172,19 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseLeave}
+      onDoubleClick={onReply}
     >
+      {/* Reply Icon - Positioned based on direction */}
       <div 
-        className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400"
+        className={`absolute top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400 transition-opacity duration-200 ${direction === 'right' ? 'left-2' : 'right-2'}`}
         style={{ 
-          opacity: offsetX > 10 ? 1 : 0,
-          transform: `translateY(-50%) scale(${offsetX > 20 ? 1 : 0.8})`,
-          transition: 'opacity 0.1s ease, transform 0.1s ease'
+          opacity: Math.abs(offsetX) > 15 ? 1 : 0,
+          transform: `translateY(-50%) scale(${Math.min(Math.abs(offsetX) / SWIPE_THRESHOLD, 1)})`
         }}
       >
-        <Reply size={20} />
+        <Reply size={20} className={direction === 'left' ? "scale-x-[-1]" : ""} /> 
       </div>
+
       <div 
         style={{ 
           transform: `translateX(${offsetX}px)`, 
@@ -199,6 +235,15 @@ export default function ChatItNow() {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [isLoggedIn]);
 
+  // --- FORCE DISCONNECT ON RELOAD ---
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+        socket.emit('disconnect_partner');
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => setDarkMode(e.matches);
@@ -230,6 +275,16 @@ export default function ChatItNow() {
     if(audioSentRef.current) { audioSentRef.current.volume = 1.0; audioSentRef.current.preload = 'auto'; }
     if(audioReceivedRef.current) { audioReceivedRef.current.volume = 1.0; audioReceivedRef.current.preload = 'auto'; }
   }, []);
+
+  const unlockAudio = () => {
+    const unlock = (audio: HTMLAudioElement | null) => {
+        if (audio) {
+            audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
+        }
+    };
+    unlock(audioSentRef.current);
+    unlock(audioReceivedRef.current);
+  };
 
   const playSound = (type: 'sent' | 'received') => {
     if (isMuted) return;
@@ -318,12 +373,11 @@ export default function ChatItNow() {
     };
   }, [isMuted, isConnected]); 
 
-  // --- UPDATED: THEME & ADDRESS BAR COLOR ---
+  // --- THEME & ADDRESS BAR COLOR ---
   useLayoutEffect(() => {
     const html = document.documentElement;
     const body = document.body;
     
-    // DARK BG FIXED TO #1f2937
     const DARK_BG = '#1f2937'; 
     const LIGHT_BG = '#ffffff';
 
@@ -389,6 +443,7 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
+      unlockAudio();
       socket.connect();
       startSearch();
     } else {
@@ -709,9 +764,12 @@ export default function ChatItNow() {
                     <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{msg.data ? renderSystemMessage(msg) : msg.text}</span>
                   </div>
                 ) : (
-                  <SwipeableMessage onReply={() => initiateReply(msg.text, msg.type)} isSystem={false}>
+                  <SwipeableMessage 
+                    onReply={() => initiateReply(msg.text, msg.type)} 
+                    isSystem={false} 
+                    direction={msg.type === 'you' ? 'left' : 'right'}
+                  >
                      
-                     {/* FLEX CONTAINER - Keeps emoji attached to bubble */}
                      <div className={`flex items-end gap-2 w-fit ${msg.type === 'you' ? 'ml-auto flex-row-reverse' : 'flex-row'} max-w-[85%]`}>
                         
                         {/* LEFT SMILEY (FOR YOU) */}
@@ -723,7 +781,7 @@ export default function ChatItNow() {
                           </div>
                         )}
 
-                        {/* BUBBLE WRAPPER */}
+                        {/* BUBBLE CONTAINER */}
                         <div className={`flex flex-col ${msg.type === 'you' ? 'items-end' : 'items-start'} relative`}>
                           
                           {/* --- REACTION SELECTOR BAR --- */}
@@ -759,6 +817,7 @@ export default function ChatItNow() {
                               </span>
                             )}
 
+                            {/* --- REACTION BADGES --- */}
                             <div className={`absolute -bottom-2 ${msg.type === 'you' ? '-left-2' : '-right-2'} flex gap-[-5px]`}>
                               {msg.reactions?.you && (
                                 <div className={`text-sm bg-gray-100 dark:bg-[#4B5563] border dark:border-[#6B7280] border-gray-300 rounded-full w-6 h-6 flex items-center justify-center shadow-sm z-20`}>
