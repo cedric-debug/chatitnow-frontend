@@ -15,27 +15,21 @@ const AD_SLOT_INACTIVITY = "2655630641";
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
-// --- SESSION MANAGEMENT (UPDATED) ---
+// --- SESSION MANAGEMENT ---
 const getSessionID = () => {
   if (typeof window === 'undefined') return '';
-  
-  // CHANGED: sessionStorage is cleared when the tab/browser is closed.
-  // This ensures users don't reconnect to old chats if they closed the app,
-  // but DOES allow reconnects if they just alt-tabbed or lost internet.
-  let sessionID = sessionStorage.getItem("chat_session_id");
+  let sessionID = localStorage.getItem("chat_session_id");
   if (!sessionID) {
     sessionID = Math.random().toString(36).substring(2) + Date.now().toString(36);
-    sessionStorage.setItem("chat_session_id", sessionID);
+    localStorage.setItem("chat_session_id", sessionID);
   }
   return sessionID;
 };
 
-// --- UTILS ---
 const generateMessageID = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
-// --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
   autoConnect: false,
   reconnection: true,             
@@ -46,7 +40,6 @@ const socket: any = io(SERVER_URL, {
   }
 });
 
-// --- TYPES ---
 interface ReplyData {
   text: string;
   name: string;
@@ -67,7 +60,7 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; };
 }
 
-// --- SWIPEABLE MESSAGE COMPONENT ---
+// --- SWIPEABLE COMPONENT ---
 const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.ReactNode, onReply: () => void, isSystem: boolean }) => {
   const [offsetX, setOffsetX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -156,7 +149,6 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
       <div 
         style={{ 
           transform: `translateX(${offsetX}px)`, 
-          // Cubic-bezier for smooth snap
           transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28)' 
         }}
       >
@@ -185,7 +177,7 @@ export default function ChatItNow() {
 
   const audioSentRef = useRef<HTMLAudioElement | null>(null);
   const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
-  // Removed Reaction Audio Ref
+  const audioReactRef = useRef<HTMLAudioElement | null>(null);
 
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -193,6 +185,20 @@ export default function ChatItNow() {
     }
     return false;
   });
+
+  // --- NEW: AUTO-RECONNECT ON VISIBILITY ---
+  // This handles the "Alt-Tab" case on mobile. 
+  // When user comes back, we force a check.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !socket.connected && isLoggedIn) {
+        console.log("App resumed - reconnecting socket...");
+        socket.connect();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [isLoggedIn]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -217,13 +223,14 @@ export default function ChatItNow() {
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
   const REACTIONS = ['❤️', '😆', '😮', '😢', '😡', '👍'];
 
-  // Initialize Audio (Removed reaction sound)
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
+    audioReactRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3'); 
     
     if(audioSentRef.current) { audioSentRef.current.volume = 1.0; audioSentRef.current.preload = 'auto'; }
     if(audioReceivedRef.current) { audioReceivedRef.current.volume = 1.0; audioReceivedRef.current.preload = 'auto'; }
+    if(audioReactRef.current) { audioReactRef.current.volume = 1.0; audioReactRef.current.preload = 'auto'; }
   }, []);
 
   const unlockAudio = () => {
@@ -234,17 +241,21 @@ export default function ChatItNow() {
     };
     unlock(audioSentRef.current);
     unlock(audioReceivedRef.current);
+    unlock(audioReactRef.current);
   };
 
-  const playSound = (type: 'sent' | 'received') => {
+  const playSound = (type: 'sent' | 'received' | 'react') => {
     if (isMuted) return;
     try {
-      if (type === 'sent' && audioSentRef.current) {
-        audioSentRef.current.currentTime = 0;
-        audioSentRef.current.play().catch(() => {});
-      } else if (type === 'received' && audioReceivedRef.current) {
-        audioReceivedRef.current.currentTime = 0;
-        audioReceivedRef.current.play().catch(() => {});
+      const audioMap = {
+        sent: audioSentRef.current,
+        received: audioReceivedRef.current,
+        react: audioReactRef.current
+      };
+      const audio = audioMap[type];
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
       }
     } catch (e) { console.error("Audio play failed", e); }
   };
@@ -253,7 +264,6 @@ export default function ChatItNow() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTyping, replyingTo]); 
 
-  // --- SOCKET HANDLERS ---
   useEffect(() => {
     socket.on('matched', (data: any) => {
       setShowSearching(false);
@@ -280,7 +290,6 @@ export default function ChatItNow() {
       resetActivity();
     });
 
-    // --- RECEIVE REACTION ---
     socket.on('receive_reaction', (data: { messageID: string, reaction: string | null }) => {
       setMessages(prev => prev.map(msg => 
         msg.id === data.messageID ? { 
@@ -288,7 +297,7 @@ export default function ChatItNow() {
             reactions: { ...msg.reactions, stranger: data.reaction } 
         } : msg
       ));
-      // Removed reaction sound here
+      if (data.reaction) playSound('react'); 
     });
 
     socket.on('partner_disconnected', () => {
@@ -429,7 +438,6 @@ export default function ChatItNow() {
     if(input) input.focus();
   };
 
-  // --- TOGGLE REACTION ---
   const sendReaction = (msgID: string, emoji: string) => {
     const message = messages.find(m => m.id === msgID);
     const isRemoving = message?.reactions?.you === emoji;
@@ -443,7 +451,7 @@ export default function ChatItNow() {
     ));
     
     setActiveReactionId(null);
-    // Removed reaction sound here
+    if (reactionToSend) playSound('react');
     socket.emit('send_reaction', { messageID: msgID, reaction: reactionToSend });
   };
 
@@ -489,11 +497,11 @@ export default function ChatItNow() {
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
-             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
-                <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
-                <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
-                <p>As a university student who knows what it feels like to crave real, genuine connection in a world thats getting more digital and more distant every year. Sometimes, even if we're surrounded by people, we still feel like no one really listens. That's why I built this platform to create a space where Filipinos can express themselves openly, share their stories, and find comfort from people who might actually understand what they're going through—even if they're total strangers.</p>
-                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is completely free to use and always will be. It's meant to be simple, accessible, and welcoming to everyone. Just hop in, start a conversation, and see where it goes. One chat might not change your whole life, but it might change your day—and sometimes, that's already more than enough.</p>
+            <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p>
+                <p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p>
+                <p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p>
+                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is completely free and anonymous. Connect with fellow Filipinos, one conversation at a time.</p>
             </div>
             <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
           </div>
@@ -538,7 +546,7 @@ export default function ChatItNow() {
               
               <div className="text-center pt-2">
                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking advices from strangers. Do your due diligence.
+                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking strangers' advice. Do your due diligence.
                  </p>
               </div>
 
@@ -596,7 +604,7 @@ export default function ChatItNow() {
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Advertisement"}</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
@@ -786,7 +794,8 @@ export default function ChatItNow() {
         </div>
 
         {/* INPUT BAR */}
-        <div className={`absolute bottom-0 left-0 right-0 p-2 border-t z-20 flex flex-col justify-end ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
+        {/* FIX: CHANGED BG-GRAY-800 -> BG-GRAY-900 */}
+        <div className={`absolute bottom-0 left-0 right-0 p-2 border-t z-20 flex flex-col justify-end ${darkMode ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-100'}`}>
           
           {replyingTo && (
             <div className={`flex items-center justify-between px-4 py-2 mb-1 rounded-lg text-xs border-l-4 ${darkMode ? 'bg-gray-700 text-gray-300 border-purple-500' : 'bg-gray-100 text-gray-700 border-purple-500'}`}>
@@ -812,8 +821,9 @@ export default function ChatItNow() {
             </div>
           ) : (
             <form className="flex gap-2 items-center h-[60px]" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
-              {/* UPDATED SKIP BUTTON STYLE */}
-              <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full px-6 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
+              {/* FIX: SKIP BUTTON TEXT COLOR */}
+              <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full px-6 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-white hover:bg-gray-800' : 'border-gray-200 text-black hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
+              
               <input type="text" value={currentMessage} onChange={handleTyping} enterKeyHint="send" placeholder={isConnected ? (replyingTo ? `Replying to ${replyingTo.name}...` : "Say something...") : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
               <button type="submit" disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
             </form>
