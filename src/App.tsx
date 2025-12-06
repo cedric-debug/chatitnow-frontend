@@ -63,23 +63,13 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; };
 }
 
-// --- SWIPEABLE MESSAGE COMPONENT (FIXED DIRECTION) ---
-const SwipeableMessage = ({ 
-  children, 
-  onReply, 
-  isSystem, 
-  direction // 'left' (for you) or 'right' (for stranger)
-}: { 
-  children: React.ReactNode, 
-  onReply: () => void, 
-  isSystem: boolean,
-  direction: 'left' | 'right'
-}) => {
+// --- SWIPEABLE MESSAGE COMPONENT ---
+const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.ReactNode, onReply: () => void, isSystem: boolean }) => {
   const [offsetX, setOffsetX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startX = useRef(0);
   
-  const SWIPE_THRESHOLD = 35; 
+  const SWIPE_THRESHOLD = 30; 
   const MAX_DRAG = 80;
 
   if (isSystem) return <div>{children}</div>;
@@ -94,32 +84,18 @@ const SwipeableMessage = ({
     const currentX = e.touches[0].clientX;
     const diff = currentX - startX.current;
     
-    // LOGIC: Only allow swipe in the intended direction
-    let isValidSwipe = false;
-    
-    if (direction === 'right' && diff > 0) isValidSwipe = true; // Pulling Right (Stranger)
-    if (direction === 'left' && diff < 0) isValidSwipe = true;  // Pulling Left (You)
-
-    if (isValidSwipe) {
-      let absDiff = Math.abs(diff);
-      let finalDrag = absDiff;
-
-      // Resistance
-      if (absDiff > SWIPE_THRESHOLD) {
-        const extra = absDiff - SWIPE_THRESHOLD;
+    if (diff > 0) {
+      let finalDrag = diff;
+      if (diff > SWIPE_THRESHOLD) {
+        const extra = diff - SWIPE_THRESHOLD;
         finalDrag = SWIPE_THRESHOLD + (Math.pow(extra, 0.8)); 
       }
-      
-      // Cap Max Drag
-      finalDrag = Math.min(finalDrag, MAX_DRAG);
-
-      // Apply direction
-      setOffsetX(direction === 'right' ? finalDrag : -finalDrag);
+      setOffsetX(Math.min(finalDrag, MAX_DRAG));
     }
   };
 
   const handleTouchEnd = () => {
-    if (Math.abs(offsetX) > SWIPE_THRESHOLD) onReply();
+    if (offsetX > SWIPE_THRESHOLD) onReply();
     setIsDragging(false);
     setOffsetX(0);
   };
@@ -133,20 +109,12 @@ const SwipeableMessage = ({
     if (!isDragging) return;
     const currentX = e.clientX;
     const diff = currentX - startX.current;
-
-    // Same direction logic for mouse
-    let isValidSwipe = false;
-    if (direction === 'right' && diff > 0) isValidSwipe = true;
-    if (direction === 'left' && diff < 0) isValidSwipe = true;
-
-    if (isValidSwipe) {
-       if (Math.abs(diff) < MAX_DRAG) setOffsetX(diff);
-    }
+    if (diff > 0) setOffsetX(Math.min(diff, MAX_DRAG));
   };
 
   const handleMouseUp = () => {
     if (isDragging) {
-      if (Math.abs(offsetX) > SWIPE_THRESHOLD) onReply();
+      if (offsetX > SWIPE_THRESHOLD) onReply();
       setIsDragging(false);
       setOffsetX(0);
     }
@@ -170,19 +138,17 @@ const SwipeableMessage = ({
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseLeave}
-      onDoubleClick={onReply} // Keep double click for desktop convenience
     >
-      {/* Reply Icon - Positioned based on direction */}
       <div 
-        className={`absolute top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400 transition-opacity duration-200 ${direction === 'right' ? 'left-2' : 'right-2'}`}
+        className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400"
         style={{ 
-          opacity: Math.abs(offsetX) > 15 ? 1 : 0,
-          transform: `translateY(-50%) scale(${Math.min(Math.abs(offsetX) / SWIPE_THRESHOLD, 1)})`
+          opacity: offsetX > 10 ? 1 : 0,
+          transform: `translateY(-50%) scale(${offsetX > 20 ? 1 : 0.8})`,
+          transition: 'opacity 0.1s ease, transform 0.1s ease'
         }}
       >
-        <Reply size={20} className={direction === 'left' ? "scale-x-[-1]" : ""} /> 
+        <Reply size={20} />
       </div>
-
       <div 
         style={{ 
           transform: `translateX(${offsetX}px)`, 
@@ -270,7 +236,7 @@ export default function ChatItNow() {
     try {
       const audioMap = {
         sent: audioSentRef.current,
-        received: audioReceivedRef.current
+        received: audioReceivedRef.current,
       };
       // @ts-ignore
       const audio = audioMap[type];
@@ -423,7 +389,6 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
-      // No sound
       socket.connect();
       startSearch();
     } else {
@@ -744,12 +709,9 @@ export default function ChatItNow() {
                     <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{msg.data ? renderSystemMessage(msg) : msg.text}</span>
                   </div>
                 ) : (
-                  <SwipeableMessage 
-                    onReply={() => initiateReply(msg.text, msg.type)} 
-                    isSystem={false} 
-                    direction={msg.type === 'you' ? 'left' : 'right'}
-                  >
+                  <SwipeableMessage onReply={() => initiateReply(msg.text, msg.type)} isSystem={false}>
                      
+                     {/* FLEX CONTAINER - Keeps emoji attached to bubble */}
                      <div className={`flex items-end gap-2 w-fit ${msg.type === 'you' ? 'ml-auto flex-row-reverse' : 'flex-row'} max-w-[85%]`}>
                         
                         {/* LEFT SMILEY (FOR YOU) */}
@@ -761,7 +723,7 @@ export default function ChatItNow() {
                           </div>
                         )}
 
-                        {/* BUBBLE CONTAINER */}
+                        {/* BUBBLE WRAPPER */}
                         <div className={`flex flex-col ${msg.type === 'you' ? 'items-end' : 'items-start'} relative`}>
                           
                           {/* --- REACTION SELECTOR BAR --- */}
@@ -797,7 +759,6 @@ export default function ChatItNow() {
                               </span>
                             )}
 
-                            {/* --- REACTION BADGES --- */}
                             <div className={`absolute -bottom-2 ${msg.type === 'you' ? '-left-2' : '-right-2'} flex gap-[-5px]`}>
                               {msg.reactions?.you && (
                                 <div className={`text-sm bg-gray-100 dark:bg-[#4B5563] border dark:border-[#6B7280] border-gray-300 rounded-full w-6 h-6 flex items-center justify-center shadow-sm z-20`}>
@@ -871,7 +832,6 @@ export default function ChatItNow() {
             </div>
           ) : (
             <form className="flex gap-2 items-center h-[60px]" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
-              {/* FIX: SKIP BUTTON TEXT COLOR */}
               <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full px-3 w-16 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-[#374151] text-white hover:bg-[#374151]' : 'border-gray-200 text-black hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
               
               <input type="text" value={currentMessage} onChange={handleTyping} enterKeyHint="send" placeholder={isConnected ? (replyingTo ? `Replying to ${replyingTo.name}...` : "Say something...") : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-[#111827] border-[#374151] text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
