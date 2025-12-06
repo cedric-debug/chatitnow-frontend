@@ -55,10 +55,9 @@ interface Message {
   text?: React.ReactNode;
   replyTo?: ReplyData;
   timestamp?: string;
-  reaction?: string; 
   reactions?: {
-    you?: string;
-    stranger?: string;
+    you?: string | null;
+    stranger?: string | null;
   };
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; };
 }
@@ -273,8 +272,7 @@ export default function ChatItNow() {
       resetActivity();
     });
 
-    // --- HANDLE RECEIVING REACTION ---
-    socket.on('receive_reaction', (data: { messageID: string, reaction: string }) => {
+    socket.on('receive_reaction', (data: { messageID: string, reaction: string | null }) => {
       setMessages(prev => prev.map(msg => 
         msg.id === data.messageID ? { 
             ...msg, 
@@ -294,11 +292,29 @@ export default function ChatItNow() {
 
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
 
-    socket.on('disconnect', () => { if (partnerNameRef.current && isConnected) setPartnerStatus('reconnecting'); });
-    socket.on('connect', () => { if (partnerNameRef.current) { setPartnerStatus('connected'); setIsConnected(true); } });
-    socket.on('session_restored', () => { if (partnerNameRef.current) { setPartnerStatus('connected'); setIsConnected(true); } });
-    socket.on('partner_reconnecting_server', () => setPartnerStatus('reconnecting'));
-    socket.on('partner_connected', () => setPartnerStatus('connected'));
+    // --- UPDATED CONNECTION STATES ---
+    socket.on('disconnect', () => { 
+        if (partnerNameRef.current && isConnected) setPartnerStatus('reconnecting_me'); 
+    });
+    
+    socket.on('partner_reconnecting_server', () => {
+        setPartnerStatus('reconnecting_partner'); 
+    });
+
+    socket.on('connect', () => { 
+        // Generic reconnect, specific logic handled by session_restored
+    });
+
+    socket.on('session_restored', () => { 
+        if (partnerNameRef.current) { 
+            setPartnerStatus('restored_me'); 
+            setIsConnected(true); 
+        } 
+    });
+
+    socket.on('partner_connected', () => {
+        setPartnerStatus('restored_partner');
+    });
     
     return () => { 
       socket.off('matched'); 
@@ -421,16 +437,25 @@ export default function ChatItNow() {
     if(input) input.focus();
   };
 
+  // --- UPDATED: TOGGLE REACTION ---
   const sendReaction = (msgID: string, emoji: string) => {
-    // Update Local "You" Reaction
+    // Find the current message to check if we already reacted
+    const message = messages.find(m => m.id === msgID);
+    const isRemoving = message?.reactions?.you === emoji;
+    
+    // If clicking same emoji, remove it (null). Else set new emoji.
+    const reactionToSend = isRemoving ? null : emoji;
+
+    // Optimistic Update
     setMessages(prev => prev.map(msg => 
         msg.id === msgID ? { 
             ...msg, 
-            reactions: { ...msg.reactions, you: emoji } 
+            reactions: { ...msg.reactions, you: reactionToSend } 
         } : msg
     ));
+    
     setActiveReactionId(null);
-    socket.emit('send_reaction', { messageID: msgID, reaction: emoji });
+    socket.emit('send_reaction', { messageID: msgID, reaction: reactionToSend });
   };
 
   const renderSystemMessage = (msg: Message) => {
@@ -444,6 +469,33 @@ export default function ChatItNow() {
     return null;
   };
 
+  // --- HELPER: RENDER STATUS PILL ---
+  const renderStatusPill = () => {
+      switch(partnerStatus) {
+          case 'searching':
+              return <span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>;
+          case 'connected':
+          case 'restored_me': // Fallback if user stays in restored state
+          case 'restored_partner':
+              return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>;
+          case 'disconnected':
+              return <span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>;
+          
+          // --- NEW STATES ---
+          case 'reconnecting_me':
+              return <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">Trying to reconnect you back...</span>;
+          case 'reconnecting_partner':
+              return <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">{partnerNameRef.current} is trying to reconnect...</span>;
+          
+          // Temporary success states (if you want distinct text before going back to 'Connected')
+          // Using logic inside the switch to catch them.
+          default:
+              if (partnerStatus === 'restored_me') return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">You reconnected</span>;
+              if (partnerStatus === 'restored_partner') return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">{partnerNameRef.current} has reconnected</span>;
+              return null;
+      }
+  };
+
   if (showWelcome) {
     return (
       <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
@@ -453,7 +505,7 @@ export default function ChatItNow() {
                <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
-            </div>
+             </div>
             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
                 <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
@@ -561,7 +613,7 @@ export default function ChatItNow() {
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Advertisement"}</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
@@ -634,10 +686,7 @@ export default function ChatItNow() {
           </div>
 
           <div className="text-center py-2">
-             {partnerStatus === 'searching' && (<span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>)}
-             {partnerStatus === 'connected' && (<span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>)}
-             {partnerStatus === 'disconnected' && (<span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>)}
-             {partnerStatus === 'reconnecting' && (<span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">Reconnecting</span>)}
+             {renderStatusPill()}
           </div>
 
           {messages.map((msg, idx) => {
