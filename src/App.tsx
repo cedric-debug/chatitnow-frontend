@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { SkipForward, Moon, Sun, Volume2, VolumeX, X, Reply, Smile } from 'lucide-react';
+import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 
@@ -15,13 +15,17 @@ const AD_SLOT_INACTIVITY = "2655630641";
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
-// --- SESSION MANAGEMENT ---
+// --- SESSION MANAGEMENT (UPDATED) ---
 const getSessionID = () => {
   if (typeof window === 'undefined') return '';
-  let sessionID = localStorage.getItem("chat_session_id");
+  
+  // CHANGED: sessionStorage is cleared when the tab/browser is closed.
+  // This ensures users don't reconnect to old chats if they closed the app,
+  // but DOES allow reconnects if they just alt-tabbed or lost internet.
+  let sessionID = sessionStorage.getItem("chat_session_id");
   if (!sessionID) {
     sessionID = Math.random().toString(36).substring(2) + Date.now().toString(36);
-    localStorage.setItem("chat_session_id", sessionID);
+    sessionStorage.setItem("chat_session_id", sessionID);
   }
   return sessionID;
 };
@@ -152,6 +156,7 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
       <div 
         style={{ 
           transform: `translateX(${offsetX}px)`, 
+          // Cubic-bezier for smooth snap
           transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28)' 
         }}
       >
@@ -180,7 +185,7 @@ export default function ChatItNow() {
 
   const audioSentRef = useRef<HTMLAudioElement | null>(null);
   const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
-  const audioReactRef = useRef<HTMLAudioElement | null>(null); 
+  // Removed Reaction Audio Ref
 
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -212,23 +217,13 @@ export default function ChatItNow() {
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
   const REACTIONS = ['❤️', '😆', '😮', '😢', '😡', '👍'];
 
-  // Initialize Audio
+  // Initialize Audio (Removed reaction sound)
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
     
-    // UPDATED SOUND: Simple Boop/Pop
-    audioReactRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3'); 
-
-    const setupAudio = (audio: HTMLAudioElement | null) => {
-      if(audio) {
-        audio.volume = 1.0;
-        audio.preload = 'auto';
-      }
-    };
-    setupAudio(audioSentRef.current);
-    setupAudio(audioReceivedRef.current);
-    setupAudio(audioReactRef.current);
+    if(audioSentRef.current) { audioSentRef.current.volume = 1.0; audioSentRef.current.preload = 'auto'; }
+    if(audioReceivedRef.current) { audioReceivedRef.current.volume = 1.0; audioReceivedRef.current.preload = 'auto'; }
   }, []);
 
   const unlockAudio = () => {
@@ -239,21 +234,17 @@ export default function ChatItNow() {
     };
     unlock(audioSentRef.current);
     unlock(audioReceivedRef.current);
-    unlock(audioReactRef.current);
   };
 
-  const playSound = (type: 'sent' | 'received' | 'react') => {
+  const playSound = (type: 'sent' | 'received') => {
     if (isMuted) return;
     try {
-      const audioMap = {
-        sent: audioSentRef.current,
-        received: audioReceivedRef.current,
-        react: audioReactRef.current
-      };
-      const audio = audioMap[type];
-      if (audio) {
-        audio.currentTime = 0;
-        audio.play().catch(() => {});
+      if (type === 'sent' && audioSentRef.current) {
+        audioSentRef.current.currentTime = 0;
+        audioSentRef.current.play().catch(() => {});
+      } else if (type === 'received' && audioReceivedRef.current) {
+        audioReceivedRef.current.currentTime = 0;
+        audioReceivedRef.current.play().catch(() => {});
       }
     } catch (e) { console.error("Audio play failed", e); }
   };
@@ -297,7 +288,7 @@ export default function ChatItNow() {
             reactions: { ...msg.reactions, stranger: data.reaction } 
         } : msg
       ));
-      playSound('react'); 
+      // Removed reaction sound here
     });
 
     socket.on('partner_disconnected', () => {
@@ -311,27 +302,11 @@ export default function ChatItNow() {
 
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
 
-    // --- UPDATED CONNECTION STATES ---
-    socket.on('disconnect', () => { 
-        if (partnerNameRef.current && isConnected) setPartnerStatus('reconnecting_me'); 
-    });
-    
-    socket.on('partner_reconnecting_server', () => {
-        setPartnerStatus('reconnecting_partner'); 
-    });
-
+    socket.on('disconnect', () => { if (partnerNameRef.current && isConnected) setPartnerStatus('reconnecting_me'); });
+    socket.on('partner_reconnecting_server', () => setPartnerStatus('reconnecting_partner'));
     socket.on('connect', () => { });
-
-    socket.on('session_restored', () => { 
-        if (partnerNameRef.current) { 
-            setPartnerStatus('restored_me'); 
-            setIsConnected(true); 
-        } 
-    });
-
-    socket.on('partner_connected', () => {
-        setPartnerStatus('restored_partner');
-    });
+    socket.on('session_restored', () => { if (partnerNameRef.current) { setPartnerStatus('restored_me'); setIsConnected(true); } });
+    socket.on('partner_connected', () => setPartnerStatus('restored_partner'));
     
     return () => { 
       socket.off('matched'); 
@@ -468,7 +443,7 @@ export default function ChatItNow() {
     ));
     
     setActiveReactionId(null);
-    playSound('react'); 
+    // Removed reaction sound here
     socket.emit('send_reaction', { messageID: msgID, reaction: reactionToSend });
   };
 
@@ -483,7 +458,6 @@ export default function ChatItNow() {
     return null;
   };
 
-  // --- HELPER: RENDER STATUS PILL (MOVED TO HEADER) ---
   const renderStatusPill = () => {
       switch(partnerStatus) {
           case 'searching':
@@ -515,9 +489,7 @@ export default function ChatItNow() {
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
-            
-            {/* UPDATED: Fixed Welcome Page Layout Visibility */}
-            <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
+             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
                 <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
                 <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
                 <p>As a university student who knows what it feels like to crave real, genuine connection in a world thats getting more digital and more distant every year. Sometimes, even if we're surrounded by people, we still feel like no one really listens. That's why I built this platform to create a space where Filipinos can express themselves openly, share their stories, and find comfort from people who might actually understand what they're going through—even if they're total strangers.</p>
@@ -676,7 +648,7 @@ export default function ChatItNow() {
             <span className={`font-bold text-lg ${darkMode ? 'text-purple-500' : 'text-purple-600'}`}>ChatItNow</span>
           </div>
           
-          {/* UPDATED: STATUS PILL MOVED HERE (CENTERED) */}
+          {/* CENTERED STATUS PILL */}
           <div className="absolute left-1/2 -translate-x-1/2">
              {renderStatusPill()}
           </div>
@@ -840,7 +812,8 @@ export default function ChatItNow() {
             </div>
           ) : (
             <form className="flex gap-2 items-center h-[60px]" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
-              <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full aspect-square rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'} disabled:opacity-50`}><SkipForward size={18} /></button>
+              {/* UPDATED SKIP BUTTON STYLE */}
+              <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full px-6 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-500 hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
               <input type="text" value={currentMessage} onChange={handleTyping} enterKeyHint="send" placeholder={isConnected ? (replyingTo ? `Replying to ${replyingTo.name}...` : "Say something...") : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
               <button type="submit" disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
             </form>
