@@ -15,7 +15,6 @@ const AD_SLOT_INACTIVITY = "2655630641";
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
-// --- SESSION MANAGEMENT ---
 const getSessionID = () => {
   if (typeof window === 'undefined') return '';
   let sessionID = localStorage.getItem("chat_session_id");
@@ -26,12 +25,10 @@ const getSessionID = () => {
   return sessionID;
 };
 
-// --- UTILS ---
 const generateMessageID = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
-// --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
   autoConnect: false,
   reconnection: true,             
@@ -42,7 +39,6 @@ const socket: any = io(SERVER_URL, {
   }
 });
 
-// --- TYPES ---
 interface ReplyData {
   text: string;
   name: string;
@@ -67,7 +63,6 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
   const [offsetX, setOffsetX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startX = useRef(0);
-  
   const SWIPE_THRESHOLD = 25; 
   const MAX_DRAG = 70;
 
@@ -179,6 +174,7 @@ export default function ChatItNow() {
 
   const audioSentRef = useRef<HTMLAudioElement | null>(null);
   const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
+  const audioReactionRef = useRef<HTMLAudioElement | null>(null); // NEW: Reaction Sound
 
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -214,8 +210,11 @@ export default function ChatItNow() {
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
+    audioReactionRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3'); // Pop sound for reaction
+    
     if(audioSentRef.current) { audioSentRef.current.volume = 1.0; audioSentRef.current.preload = 'auto'; }
     if(audioReceivedRef.current) { audioReceivedRef.current.volume = 1.0; audioReceivedRef.current.preload = 'auto'; }
+    if(audioReactionRef.current) { audioReactionRef.current.volume = 1.0; audioReactionRef.current.preload = 'auto'; }
   }, []);
 
   const unlockAudio = () => {
@@ -226,17 +225,20 @@ export default function ChatItNow() {
     };
     unlock(audioSentRef.current);
     unlock(audioReceivedRef.current);
+    unlock(audioReactionRef.current);
   };
 
-  const playSound = (type: 'sent' | 'received') => {
+  const playSound = (type: 'sent' | 'received' | 'reaction') => {
     if (isMuted) return;
     try {
-      if (type === 'sent' && audioSentRef.current) {
-        audioSentRef.current.currentTime = 0;
-        audioSentRef.current.play().catch(() => {});
-      } else if (type === 'received' && audioReceivedRef.current) {
-        audioReceivedRef.current.currentTime = 0;
-        audioReceivedRef.current.play().catch(() => {});
+      let audio: HTMLAudioElement | null = null;
+      if (type === 'sent') audio = audioSentRef.current;
+      else if (type === 'received') audio = audioReceivedRef.current;
+      else if (type === 'reaction') audio = audioReactionRef.current;
+
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
       }
     } catch (e) { console.error("Audio play failed", e); }
   };
@@ -279,6 +281,7 @@ export default function ChatItNow() {
             reactions: { ...msg.reactions, stranger: data.reaction } 
         } : msg
       ));
+      playSound('reaction');
     });
 
     socket.on('partner_disconnected', () => {
@@ -292,7 +295,6 @@ export default function ChatItNow() {
 
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
 
-    // --- UPDATED CONNECTION STATES ---
     socket.on('disconnect', () => { 
         if (partnerNameRef.current && isConnected) setPartnerStatus('reconnecting_me'); 
     });
@@ -302,18 +304,22 @@ export default function ChatItNow() {
     });
 
     socket.on('connect', () => { 
-        // Generic reconnect, specific logic handled by session_restored
+        // Connected handled by specific events
     });
 
     socket.on('session_restored', () => { 
         if (partnerNameRef.current) { 
             setPartnerStatus('restored_me'); 
             setIsConnected(true); 
+            // Return to normal "Connected" pill after 3 seconds
+            setTimeout(() => setPartnerStatus('connected'), 3000);
         } 
     });
 
     socket.on('partner_connected', () => {
         setPartnerStatus('restored_partner');
+        // Return to normal "Connected" pill after 3 seconds
+        setTimeout(() => setPartnerStatus('connected'), 3000);
     });
     
     return () => { 
@@ -437,16 +443,13 @@ export default function ChatItNow() {
     if(input) input.focus();
   };
 
-  // --- UPDATED: TOGGLE REACTION ---
   const sendReaction = (msgID: string, emoji: string) => {
-    // Find the current message to check if we already reacted
+    // Find current state to toggle
     const message = messages.find(m => m.id === msgID);
     const isRemoving = message?.reactions?.you === emoji;
-    
-    // If clicking same emoji, remove it (null). Else set new emoji.
     const reactionToSend = isRemoving ? null : emoji;
 
-    // Optimistic Update
+    // Update Local
     setMessages(prev => prev.map(msg => 
         msg.id === msgID ? { 
             ...msg, 
@@ -455,6 +458,7 @@ export default function ChatItNow() {
     ));
     
     setActiveReactionId(null);
+    playSound('reaction');
     socket.emit('send_reaction', { messageID: msgID, reaction: reactionToSend });
   };
 
@@ -469,30 +473,23 @@ export default function ChatItNow() {
     return null;
   };
 
-  // --- HELPER: RENDER STATUS PILL ---
   const renderStatusPill = () => {
       switch(partnerStatus) {
-          case 'searching':
-              return <span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>;
-          case 'connected':
-          case 'restored_me': // Fallback if user stays in restored state
-          case 'restored_partner':
-              return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>;
-          case 'disconnected':
-              return <span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>;
+          case 'searching': return <span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>;
+          case 'connected': return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>;
+          case 'disconnected': return <span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>;
           
-          // --- NEW STATES ---
+          // GRANULAR STATES
           case 'reconnecting_me':
               return <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">Trying to reconnect you back...</span>;
           case 'reconnecting_partner':
               return <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">{partnerNameRef.current} is trying to reconnect...</span>;
           
-          // Temporary success states (if you want distinct text before going back to 'Connected')
-          // Using logic inside the switch to catch them.
-          default:
-              if (partnerStatus === 'restored_me') return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">You reconnected</span>;
-              if (partnerStatus === 'restored_partner') return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">{partnerNameRef.current} has reconnected</span>;
-              return null;
+          case 'restored_me':
+              return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">You reconnected</span>;
+          case 'restored_partner':
+              return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">{partnerNameRef.current} has reconnected</span>;
+          default: return null;
       }
   };
 
@@ -505,12 +502,12 @@ export default function ChatItNow() {
                <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
-             </div>
+            </div>
             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
-                <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
-                <p>As a university student who knows what it feels like to crave real, genuine connection in a world thats getting more digital and more distant every year. Sometimes, even if we're surrounded by people, we still feel like no one really listens. That's why I built this platform to create a space where Filipinos can express themselves openly, share their stories, and find comfort from people who might actually understand what they're going through—even if they're total strangers.</p>
-                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow iis completely free to use and always will be. It's meant to be simple, accessible, and welcoming to everyone. Just hop in, start a conversation, and see where it goes. One chat might not change your whole life, but it might change your day—and sometimes, that's already more than enough.</p>
+                <p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p>
+                <p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p>
+                <p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p>
+                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is completely free and anonymous. Connect with fellow Filipinos, one conversation at a time.</p>
             </div>
             <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
           </div>
@@ -555,7 +552,7 @@ export default function ChatItNow() {
               
               <div className="text-center pt-2">
                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking advices from a strangers. Do your due diligence.
+                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking strangers' advice. Do your due diligence.
                  </p>
               </div>
 
@@ -613,7 +610,7 @@ export default function ChatItNow() {
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
-              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Welcome Back"}</p>
+              <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Inactive for 7 minutes" : "Welcome Back"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
               </div>
@@ -693,9 +690,6 @@ export default function ChatItNow() {
             let justifyClass = 'justify-center'; if (msg.type === 'you') justifyClass = 'justify-end'; if (msg.type === 'stranger') justifyClass = 'justify-start';
             return (
               <div key={idx} className={`flex w-full ${justifyClass} group relative`}>
-                
-                {/* --- REACTION SELECTOR --- */}
-                {/* FIXED: INSIDE BUBBLE CONTAINER */}
                 
                 {msg.type === 'warning' ? (
                   <div className="w-[90%] text-center my-2">
