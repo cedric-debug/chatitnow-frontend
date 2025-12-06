@@ -15,7 +15,6 @@ const AD_SLOT_INACTIVITY = "2655630641";
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
-// --- SESSION MANAGEMENT ---
 const getSessionID = () => {
   if (typeof window === 'undefined') return '';
   let sessionID = localStorage.getItem("chat_session_id");
@@ -26,12 +25,10 @@ const getSessionID = () => {
   return sessionID;
 };
 
-// --- UTILS ---
 const generateMessageID = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
-// --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
   autoConnect: false,
   reconnection: true,             
@@ -42,7 +39,6 @@ const socket: any = io(SERVER_URL, {
   }
 });
 
-// --- TYPES ---
 interface ReplyData {
   text: string;
   name: string;
@@ -55,7 +51,11 @@ interface Message {
   text?: React.ReactNode;
   replyTo?: ReplyData;
   timestamp?: string;
-  reaction?: string; 
+  // UPDATED: Supports dual reactions
+  reactions: {
+    you?: string;
+    stranger?: string;
+  };
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; };
 }
 
@@ -207,7 +207,6 @@ export default function ChatItNow() {
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
   const REACTIONS = ['❤️', '😆', '😮', '😢', '😡', '👍'];
 
-  // Initialize Audio
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
@@ -242,7 +241,6 @@ export default function ChatItNow() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTyping, replyingTo]); 
 
-  // --- SOCKET HANDLERS ---
   useEffect(() => {
     socket.on('matched', (data: any) => {
       setShowSearching(false);
@@ -250,7 +248,7 @@ export default function ChatItNow() {
       setIsConnected(true);
       setShowNextConfirm(false);
       partnerNameRef.current = data.name; 
-      setMessages([{ id: 'sys-start', type: 'system', data: { name: data.name, field: data.field, action: 'connected' } }]);
+      setMessages([{ id: 'sys-start', type: 'system', data: { name: data.name, field: data.field, action: 'connected' }, reactions: {} }]);
       resetActivity();
     });
 
@@ -261,16 +259,21 @@ export default function ChatItNow() {
         type: 'stranger', 
         text: data.text, 
         replyTo: data.replyTo,
-        timestamp: data.timestamp || getCurrentTime()
+        timestamp: data.timestamp || getCurrentTime(),
+        reactions: {}
       }]);
       setIsTyping(false);
       playSound('received');
       resetActivity();
     });
 
+    // --- UPDATED: Handle receiving partner's reaction ---
     socket.on('receive_reaction', (data: { messageID: string, reaction: string }) => {
       setMessages(prev => prev.map(msg => 
-        msg.id === data.messageID ? { ...msg, reaction: data.reaction } : msg
+        msg.id === data.messageID ? { 
+            ...msg, 
+            reactions: { ...msg.reactions, stranger: data.reaction } 
+        } : msg
       ));
     });
 
@@ -280,7 +283,7 @@ export default function ChatItNow() {
       setIsTyping(false); 
       setReplyingTo(null); 
       const nameToShow = partnerNameRef.current || 'Partner';
-      setMessages(prev => [...prev, { id: 'sys-end', type: 'system', data: { name: nameToShow, action: 'disconnected' } }]);
+      setMessages(prev => [...prev, { id: 'sys-end', type: 'system', data: { name: nameToShow, action: 'disconnected' }, reactions: {} }]);
     });
 
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
@@ -379,7 +382,8 @@ export default function ChatItNow() {
         type: 'you', 
         text: currentMessage, 
         replyTo: replyingTo || undefined,
-        timestamp: msgData.timestamp
+        timestamp: msgData.timestamp,
+        reactions: {}
       }]);
       socket.emit('send_message', msgData);
       
@@ -398,7 +402,7 @@ export default function ChatItNow() {
     setPartnerStatus('disconnected');
     setIsTyping(false);
     setReplyingTo(null);
-    setMessages(prev => [...prev, { id: 'sys-end-me', type: 'system', data: { name: username, action: 'disconnected' } }]);
+    setMessages(prev => [...prev, { id: 'sys-end-me', type: 'system', data: { name: username, action: 'disconnected' }, reactions: {} }]);
   };
 
   const handleStartSearch = () => { startSearch(); };
@@ -411,8 +415,15 @@ export default function ChatItNow() {
     if(input) input.focus();
   };
 
+  // --- UPDATED: REACTION SENDING ---
   const sendReaction = (msgID: string, emoji: string) => {
-    setMessages(prev => prev.map(msg => msg.id === msgID ? { ...msg, reaction: emoji } : msg));
+    // Update Local "You" Reaction
+    setMessages(prev => prev.map(msg => 
+        msg.id === msgID ? { 
+            ...msg, 
+            reactions: { ...msg.reactions, you: emoji } 
+        } : msg
+    ));
     setActiveReactionId(null);
     socket.emit('send_reaction', { messageID: msgID, reaction: emoji });
   };
@@ -439,10 +450,10 @@ export default function ChatItNow() {
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                <p><strong>ChatItNow</strong> was created to give Filipinos a simple and safe place to connect with others from anywhere in the country. Whether you're a student, a professional, or just someone looking to talk, this platform is for anyone who wants to meet new people or share their experiences with others.</p>
-                <p>Sometimes, it's hard to find someone to talk to—whether its about life, school, work, or anything you're going through. That's why ChatItNow exists. Here, you can have real conversations, make new friends, or just chill and chat with someone who might understand what you're feeling. Everything is anonymous, so you can open up without worrying about being judged.</p>
-                <p>This platform was built by a university student who knows how important it is to have a space where people can feel heard. In a world that's becoming more digital and less personal, ChatItNow aims to give Filipinos a chance to express themselves freely, find support, and connect with others who get what they're going through.</p>
-                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is free and completely anonymous. Enjoy meeting new people and starting meaningful conversations—one chat at a time.</p>
+                <p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p>
+                <p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p>
+                <p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p>
+                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is completely free and anonymous. Connect with fellow Filipinos, one conversation at a time.</p>
             </div>
             <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
           </div>
@@ -487,7 +498,7 @@ export default function ChatItNow() {
               
               <div className="text-center pt-2">
                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking advices from strangers. Do your due diligence.
+                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking strangers' advice. Do your due diligence.
                  </p>
               </div>
 
@@ -630,7 +641,7 @@ export default function ChatItNow() {
               <div key={idx} className={`flex w-full ${justifyClass} group relative`}>
                 
                 {/* --- REACTION SELECTOR --- */}
-                {/* FIXED: Moved inside bubble container for correct positioning */}
+                {/* FIXED: Inside bubble container */}
                 
                 {msg.type === 'warning' ? (
                   <div className="w-[90%] text-center my-2">
@@ -642,62 +653,64 @@ export default function ChatItNow() {
                   </div>
                 ) : (
                   <SwipeableMessage onReply={() => initiateReply(msg.text, msg.type)} isSystem={false}>
-                     {/* WRAPPED in Flex Row to keep Smiley Next to Bubble */}
-                     <div className={`max-w-[85%] relative flex items-center gap-2 ${msg.type === 'you' ? 'flex-row-reverse ml-auto' : 'flex-row'}`}>
+                     <div className={`flex flex-col ${msg.type === 'you' ? 'items-end ml-auto' : 'items-start'} max-w-[85%] relative`}>
                         
+                        {/* --- REACTION SELECTOR BAR --- */}
+                        {activeReactionId === msg.id && (
+                          <div className={`absolute z-30 bottom-full mb-1 flex gap-1 p-1 rounded-full shadow-xl border animate-in fade-in zoom-in duration-200 ${darkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`} style={{ left: msg.type === 'you' ? 'auto' : 0, right: msg.type === 'you' ? 0 : 'auto' }}>
+                            {REACTIONS.map(emoji => (
+                               <button key={emoji} onClick={() => sendReaction(msg.id!, emoji)} className="hover:scale-125 transition text-lg p-1">{emoji}</button>
+                            ))}
+                            <button onClick={() => setActiveReactionId(null)} className="text-gray-400 hover:text-red-500 p-1"><X size={14} /></button>
+                          </div>
+                        )}
+
                         {/* --- SMILEY TRIGGER --- */}
-                        <div className={`opacity-0 group-hover:opacity-100 transition-opacity`}>
+                        <div className={`absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity ${msg.type === 'you' ? '-left-8' : '-right-8'}`}>
                            <button onClick={() => setActiveReactionId(activeReactionId === msg.id ? null : msg.id!)} className={`p-1 rounded-full ${darkMode ? 'text-gray-400 hover:bg-gray-700' : 'text-gray-400 hover:bg-gray-100'}`}>
                              <Smile size={16} />
                            </button>
                         </div>
-                        
-                        {/* --- BUBBLE CONTAINER --- */}
-                        <div className={`flex flex-col ${msg.type === 'you' ? 'items-end' : 'items-start'} relative`}>
-                          
-                          {/* REACTION SELECTOR BAR */}
-                          {activeReactionId === msg.id && (
-                            <div className={`absolute z-30 bottom-full mb-1 flex gap-1 p-1 rounded-full shadow-xl border animate-in fade-in zoom-in duration-200 ${darkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`} style={{ left: msg.type === 'you' ? 'auto' : 0, right: msg.type === 'you' ? 0 : 'auto' }}>
-                              {REACTIONS.map(emoji => (
-                                <button key={emoji} onClick={() => sendReaction(msg.id!, emoji)} className="hover:scale-125 transition text-lg p-1">{emoji}</button>
-                              ))}
-                              <button onClick={() => setActiveReactionId(null)} className="text-gray-400 hover:text-red-500 p-1"><X size={14} /></button>
-                            </div>
+
+                        {msg.replyTo && (
+                          <div className={`mb-1 text-xs opacity-75 px-3 py-1.5 rounded-lg border-l-4 ${msg.type === 'you' ? 'bg-purple-700 text-purple-100 border-purple-300' : (darkMode ? 'bg-gray-800 text-gray-400 border-gray-500' : 'bg-gray-200 text-gray-600 border-gray-400')}`}>
+                             <span className="font-bold block mb-0.5">{msg.replyTo.name}</span>
+                             <span className="line-clamp-1">{msg.replyTo.text}</span>
+                          </div>
+                        )}
+
+                        {/* --- BUBBLE --- */}
+                        <div className={`relative px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
+                          msg.type === 'you'
+                            ? 'bg-purple-600 text-white rounded-br-none' 
+                            : `${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
+                        }`}>
+                          {msg.text}
+                          {msg.timestamp && (
+                            <span className={`text-[10px] block mt-1 select-none ${
+                              msg.type === 'you' 
+                                ? 'text-right text-white/70' 
+                                : (darkMode ? 'text-left text-gray-400' : 'text-left text-gray-500')
+                            }`}>
+                              {msg.timestamp}
+                            </span>
                           )}
 
-                          {msg.replyTo && (
-                            <div className={`mb-1 text-xs opacity-75 px-3 py-1.5 rounded-lg border-l-4 ${msg.type === 'you' ? 'bg-purple-700 text-purple-100 border-purple-300' : (darkMode ? 'bg-gray-800 text-gray-400 border-gray-500' : 'bg-gray-200 text-gray-600 border-gray-400')}`}>
-                               <span className="font-bold block mb-0.5">{msg.replyTo.name}</span>
-                               <span className="line-clamp-1">{msg.replyTo.text}</span>
-                            </div>
-                          )}
-
-                          <div className={`relative px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
-                            msg.type === 'you'
-                              ? 'bg-purple-600 text-white rounded-br-none' 
-                              : `${darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
-                          }`}>
-                            {msg.text}
-                            {msg.timestamp && (
-                              <span className={`text-[10px] block mt-1 select-none ${
-                                msg.type === 'you' 
-                                  ? 'text-right text-white/70' 
-                                  : (darkMode ? 'text-left text-gray-400' : 'text-left text-gray-500')
-                              }`}>
-                                {msg.timestamp}
-                              </span>
-                            )}
-
-                            {/* --- REACTION BADGE --- */}
-                            {msg.reaction && (
-                              <div className={`absolute -bottom-2 ${msg.type === 'you' ? '-left-2' : '-right-2'} text-sm bg-gray-100 dark:bg-gray-800 border dark:border-gray-600 border-gray-300 rounded-full w-6 h-6 flex items-center justify-center shadow-sm`}>
-                                {msg.reaction}
+                          {/* --- UPDATED REACTION BADGES (SIDE-BY-SIDE) --- */}
+                          <div className={`absolute -bottom-2 ${msg.type === 'you' ? '-left-2' : '-right-2'} flex gap-[-5px]`}>
+                            {msg.reactions?.you && (
+                              <div className={`text-sm bg-gray-100 dark:bg-gray-800 border dark:border-gray-600 border-gray-300 rounded-full w-6 h-6 flex items-center justify-center shadow-sm z-20`}>
+                                {msg.reactions.you}
                               </div>
                             )}
-
+                            {msg.reactions?.stranger && (
+                              <div className={`text-sm bg-gray-100 dark:bg-gray-800 border dark:border-gray-600 border-gray-300 rounded-full w-6 h-6 flex items-center justify-center shadow-sm z-10 -ml-2`}>
+                                {msg.reactions.stranger}
+                              </div>
+                            )}
                           </div>
+                          
                         </div>
-
                      </div>
                   </SwipeableMessage>
                 )}
