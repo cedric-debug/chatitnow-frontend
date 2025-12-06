@@ -63,12 +63,12 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; };
 }
 
-// --- SWIPEABLE MESSAGE COMPONENT (FIXED LOGIC) ---
+// --- SWIPEABLE MESSAGE COMPONENT ---
 const SwipeableMessage = ({ 
   children, 
   onReply, 
   isSystem, 
-  direction // 'left' (for you) or 'right' (for stranger)
+  direction 
 }: { 
   children: React.ReactNode, 
   onReply: () => void, 
@@ -96,9 +96,7 @@ const SwipeableMessage = ({
     
     let finalDrag = 0;
     
-    // Logic: Calculate drag based on allowed direction
     if (direction === 'right') {
-       // Allow dragging right (positive)
        if (diff > 0) {
          const absDiff = Math.abs(diff);
          finalDrag = absDiff > SWIPE_THRESHOLD 
@@ -107,7 +105,6 @@ const SwipeableMessage = ({
          finalDrag = Math.min(finalDrag, MAX_DRAG);
        }
     } else {
-       // Allow dragging left (negative)
        if (diff < 0) {
          const absDiff = Math.abs(diff);
          const resisted = absDiff > SWIPE_THRESHOLD 
@@ -174,7 +171,6 @@ const SwipeableMessage = ({
       onMouseLeave={handleMouseLeave}
       onDoubleClick={onReply}
     >
-      {/* Reply Icon - Positioned based on direction */}
       <div 
         className={`absolute top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400 transition-opacity duration-200 ${direction === 'right' ? 'left-2' : 'right-2'}`}
         style={{ 
@@ -224,7 +220,7 @@ export default function ChatItNow() {
     return false;
   });
 
-  // --- AUTO-RECONNECT ON VISIBILITY ---
+  // --- AUTO-RECONNECT ---
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && !socket.connected && isLoggedIn) {
@@ -275,16 +271,6 @@ export default function ChatItNow() {
     if(audioSentRef.current) { audioSentRef.current.volume = 1.0; audioSentRef.current.preload = 'auto'; }
     if(audioReceivedRef.current) { audioReceivedRef.current.volume = 1.0; audioReceivedRef.current.preload = 'auto'; }
   }, []);
-
-  const unlockAudio = () => {
-    const unlock = (audio: HTMLAudioElement | null) => {
-        if (audio) {
-            audio.play().then(() => { audio.pause(); audio.currentTime = 0; }).catch(() => {});
-        }
-    };
-    unlock(audioSentRef.current);
-    unlock(audioReceivedRef.current);
-  };
 
   const playSound = (type: 'sent' | 'received') => {
     if (isMuted) return;
@@ -373,7 +359,7 @@ export default function ChatItNow() {
     };
   }, [isMuted, isConnected]); 
 
-  // --- THEME & ADDRESS BAR COLOR ---
+  // --- THEME ---
   useLayoutEffect(() => {
     const html = document.documentElement;
     const body = document.body;
@@ -382,12 +368,7 @@ export default function ChatItNow() {
     const LIGHT_BG = '#ffffff';
 
     const currentBgColor = darkMode ? DARK_BG : LIGHT_BG;
-
-    if (darkMode) {
-      html.classList.add('dark');
-    } else {
-      html.classList.remove('dark');
-    }
+    if (darkMode) html.classList.add('dark'); else html.classList.remove('dark');
     body.style.backgroundColor = currentBgColor;
     html.style.backgroundColor = currentBgColor;
 
@@ -406,7 +387,6 @@ export default function ChatItNow() {
         document.head.appendChild(metaStatusBarStyle);
     }
     metaStatusBarStyle.setAttribute('content', darkMode ? 'black-translucent' : 'default');
-
   }, [darkMode]);
 
   const resetActivity = () => { if (!showInactivityAd && !showTabReturnAd) setLastActivity(Date.now()); };
@@ -443,7 +423,7 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
-      unlockAudio();
+      // No sound
       socket.connect();
       startSearch();
     } else {
@@ -629,7 +609,7 @@ export default function ChatItNow() {
             <div className={`rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
               <h2 className={`text-2xl font-bold mb-4 sticky top-0 pb-2 ${darkMode ? 'text-white bg-[#1f2937]' : 'text-gray-900 bg-white'}`}>Terms & Conditions</h2>
               <div className={`space-y-4 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                <p>Last updated: December 5, 2025</p>
+                <p>Last updated: December 6, 2025</p>
                 <p><strong>Agreement to Terms</strong><br/>By accessing ChatItNow.com (the "Site"), an anonymous text-only chat platform made for Filipinos, you affirm and agree to these Terms and Conditions.</p>
                 <p><strong>You Are 18+</strong><br/>You affirm you are at least 18 years old.</p>
                 <p><strong>Prohibited Conduct</strong><br/>Do not make threats, promote negativity, hate speech, harassment, discrimination, scams, or illegal content.</p>
@@ -770,9 +750,11 @@ export default function ChatItNow() {
                     direction={msg.type === 'you' ? 'left' : 'right'}
                   >
                      
-                     <div className={`flex items-end gap-2 w-fit ${msg.type === 'you' ? 'ml-auto flex-row-reverse' : 'flex-row'} max-w-[85%]`}>
+                     {/* FIXED: SMILEY POSITIONING */}
+                     {/* For YOU: Smiley on LEFT. For STRANGER: Smiley on RIGHT. */}
+                     <div className={`flex items-end gap-2 w-fit ${msg.type === 'you' ? 'ml-auto flex-row' : 'flex-row'} max-w-[85%]`}>
                         
-                        {/* LEFT SMILEY (FOR YOU) */}
+                        {/* LEFT SMILEY (Only for YOU) */}
                         {msg.type === 'you' && (
                           <div className={`opacity-0 group-hover:opacity-100 transition-opacity`}>
                              <button onClick={() => setActiveReactionId(activeReactionId === msg.id ? null : msg.id!)} className={`p-1 rounded-full ${darkMode ? 'text-gray-400 hover:bg-[#374151]' : 'text-gray-400 hover:bg-gray-100'}`}>
@@ -834,7 +816,7 @@ export default function ChatItNow() {
                           </div>
                         </div>
 
-                        {/* RIGHT SMILEY (FOR STRANGER) */}
+                        {/* RIGHT SMILEY (Only for STRANGER) */}
                         {msg.type !== 'you' && (
                           <div className={`opacity-0 group-hover:opacity-100 transition-opacity`}>
                              <button onClick={() => setActiveReactionId(activeReactionId === msg.id ? null : msg.id!)} className={`p-1 rounded-full ${darkMode ? 'text-gray-400 hover:bg-[#374151]' : 'text-gray-400 hover:bg-gray-100'}`}>
@@ -873,7 +855,7 @@ export default function ChatItNow() {
                 <span className="font-bold block text-purple-500 mb-0.5">Replying to {replyingTo.name}</span>
                 <span className="line-clamp-1 opacity-80">{replyingTo.text}</span>
               </div>
-              <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-gray-200 dark:hover:bg-[#4B5563] rounded-full">
+              <button onClick={() => setReplyingTo(null)} className="p-1 hover:bg-gray-200 dark:hover:bg-[#454C59] rounded-full">
                 <X size={14} />
               </button>
             </div>
