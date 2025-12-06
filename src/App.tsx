@@ -234,8 +234,6 @@ export default function ChatItNow() {
     if(audioReactRef.current) { audioReactRef.current.volume = 1.0; audioReactRef.current.preload = 'auto'; }
   }, []);
 
-  // Removed Unlock Audio
-
   const playSound = (type: 'sent' | 'received' | 'react') => {
     if (isMuted) return;
     try {
@@ -290,7 +288,7 @@ export default function ChatItNow() {
             reactions: { ...msg.reactions, stranger: data.reaction } 
         } : msg
       ));
-      // No sound for reaction receipt
+      // No reaction sound as requested
     });
 
     socket.on('partner_disconnected', () => {
@@ -330,13 +328,20 @@ export default function ChatItNow() {
     const body = document.body;
     
     // Tailwind gray-900 = #111827
-    const currentBgColor = darkMode ? '#111827' : '#ffffff'; 
+    const DARK_BG = '#111827';
+    const LIGHT_BG = '#ffffff';
 
-    if (darkMode) html.classList.add('dark'); else html.classList.remove('dark');
+    const currentBgColor = darkMode ? DARK_BG : LIGHT_BG;
+
+    if (darkMode) {
+      html.classList.add('dark');
+    } else {
+      html.classList.remove('dark');
+    }
     body.style.backgroundColor = currentBgColor;
     html.style.backgroundColor = currentBgColor;
 
-    // --- META TAG UPDATE FOR MOBILE ADDRESS BAR ---
+    // Force Update Meta Theme Color (Android Chrome / iOS Safari 15+)
     let metaThemeColor = document.querySelector("meta[name='theme-color']");
     if (!metaThemeColor) {
       metaThemeColor = document.createElement('meta');
@@ -344,6 +349,15 @@ export default function ChatItNow() {
       document.head.appendChild(metaThemeColor);
     }
     metaThemeColor.setAttribute('content', currentBgColor);
+
+    // iOS Status Bar Specific
+    let metaStatusBarStyle = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
+    if (!metaStatusBarStyle) {
+        metaStatusBarStyle = document.createElement('meta');
+        metaStatusBarStyle.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
+        document.head.appendChild(metaStatusBarStyle);
+    }
+    metaStatusBarStyle.setAttribute('content', darkMode ? 'black-translucent' : 'default');
 
   }, [darkMode]);
 
@@ -381,7 +395,6 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
-      // No unlock audio call
       socket.connect();
       startSearch();
     } else {
@@ -445,7 +458,6 @@ export default function ChatItNow() {
     if(input) input.focus();
   };
 
-  // --- TOGGLE REACTION ---
   const sendReaction = (msgID: string, emoji: string) => {
     const message = messages.find(m => m.id === msgID);
     const isRemoving = message?.reactions?.you === emoji;
@@ -459,7 +471,7 @@ export default function ChatItNow() {
     ));
     
     setActiveReactionId(null);
-    // Removed reaction sound
+    // Removed reaction sound call
     socket.emit('send_reaction', { messageID: msgID, reaction: reactionToSend });
   };
 
