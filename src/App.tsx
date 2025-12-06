@@ -55,6 +55,7 @@ interface Message {
   text?: React.ReactNode;
   replyTo?: ReplyData;
   timestamp?: string;
+  reaction?: string; 
   reactions?: {
     you?: string | null;
     stranger?: string | null;
@@ -62,13 +63,13 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; };
 }
 
-// --- SWIPEABLE MESSAGE COMPONENT (UPDATED ANIMATION) ---
+// --- SWIPEABLE MESSAGE COMPONENT ---
 const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.ReactNode, onReply: () => void, isSystem: boolean }) => {
   const [offsetX, setOffsetX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startX = useRef(0);
   
-  const SWIPE_THRESHOLD = 30; // Slightly increased to prevent accidental swipes
+  const SWIPE_THRESHOLD = 30; 
   const MAX_DRAG = 80;
 
   if (isSystem) return <div>{children}</div>;
@@ -84,11 +85,10 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
     const diff = currentX - startX.current;
     
     if (diff > 0) {
-      // Linear pull until threshold, then exponential resistance
       let finalDrag = diff;
       if (diff > SWIPE_THRESHOLD) {
         const extra = diff - SWIPE_THRESHOLD;
-        finalDrag = SWIPE_THRESHOLD + (Math.pow(extra, 0.8)); // Smoother resistance curve
+        finalDrag = SWIPE_THRESHOLD + (Math.pow(extra, 0.8)); 
       }
       setOffsetX(Math.min(finalDrag, MAX_DRAG));
     }
@@ -152,7 +152,6 @@ const SwipeableMessage = ({ children, onReply, isSystem }: { children: React.Rea
       <div 
         style={{ 
           transform: `translateX(${offsetX}px)`, 
-          // UPDATED: Cubic-bezier for native-like snap back
           transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28)' 
         }}
       >
@@ -181,7 +180,7 @@ export default function ChatItNow() {
 
   const audioSentRef = useRef<HTMLAudioElement | null>(null);
   const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
-  const audioReactRef = useRef<HTMLAudioElement | null>(null); // New React Sound
+  const audioReactRef = useRef<HTMLAudioElement | null>(null); 
 
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -217,7 +216,9 @@ export default function ChatItNow() {
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
-    audioReactRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3'); // Pop sound
+    
+    // UPDATED SOUND: Simple Boop/Pop
+    audioReactRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3'); 
 
     const setupAudio = (audio: HTMLAudioElement | null) => {
       if(audio) {
@@ -296,7 +297,7 @@ export default function ChatItNow() {
             reactions: { ...msg.reactions, stranger: data.reaction } 
         } : msg
       ));
-      playSound('react'); // Play sound when partner reacts
+      playSound('react'); 
     });
 
     socket.on('partner_disconnected', () => {
@@ -310,7 +311,7 @@ export default function ChatItNow() {
 
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
 
-    // --- UPDATED CONNECTION STATES (Specific strings) ---
+    // --- UPDATED CONNECTION STATES ---
     socket.on('disconnect', () => { 
         if (partnerNameRef.current && isConnected) setPartnerStatus('reconnecting_me'); 
     });
@@ -319,9 +320,7 @@ export default function ChatItNow() {
         setPartnerStatus('reconnecting_partner'); 
     });
 
-    socket.on('connect', () => { 
-        // Logic handled by session_restored
-    });
+    socket.on('connect', () => { });
 
     socket.on('session_restored', () => { 
         if (partnerNameRef.current) { 
@@ -455,13 +454,12 @@ export default function ChatItNow() {
     if(input) input.focus();
   };
 
-  // --- SEND REACTION (Toggle Logic) ---
+  // --- TOGGLE REACTION ---
   const sendReaction = (msgID: string, emoji: string) => {
     const message = messages.find(m => m.id === msgID);
     const isRemoving = message?.reactions?.you === emoji;
     const reactionToSend = isRemoving ? null : emoji;
 
-    // Optimistic Update
     setMessages(prev => prev.map(msg => 
         msg.id === msgID ? { 
             ...msg, 
@@ -470,7 +468,7 @@ export default function ChatItNow() {
     ));
     
     setActiveReactionId(null);
-    playSound('react'); // Play sound
+    playSound('react'); 
     socket.emit('send_reaction', { messageID: msgID, reaction: reactionToSend });
   };
 
@@ -485,27 +483,24 @@ export default function ChatItNow() {
     return null;
   };
 
-  // --- UPDATED PILL RENDER ---
+  // --- HELPER: RENDER STATUS PILL (MOVED TO HEADER) ---
   const renderStatusPill = () => {
       switch(partnerStatus) {
           case 'searching':
               return <span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>;
           case 'connected':
+          case 'restored_me': 
+          case 'restored_partner':
               return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>;
           case 'disconnected':
               return <span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>;
-          
           case 'reconnecting_me':
               return <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">Trying to reconnect you back...</span>;
           case 'reconnecting_partner':
               return <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">{partnerNameRef.current} is trying to reconnect...</span>;
-          
-          case 'restored_me':
-              return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">You reconnected.</span>;
-          case 'restored_partner':
-              return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">{partnerNameRef.current} has reconnected.</span>;
-          
           default:
+              if (partnerStatus === 'restored_me') return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">You reconnected.</span>;
+              if (partnerStatus === 'restored_partner') return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">{partnerNameRef.current} has reconnected.</span>;
               return null;
       }
   };
@@ -519,8 +514,10 @@ export default function ChatItNow() {
                <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
-             </div>
-            <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+            </div>
+            
+            {/* UPDATED: Fixed Welcome Page Layout Visibility */}
+            <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
                 <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
                 <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
                 <p>As a university student who knows what it feels like to crave real, genuine connection in a world thats getting more digital and more distant every year. Sometimes, even if we're surrounded by people, we still feel like no one really listens. That's why I built this platform to create a space where Filipinos can express themselves openly, share their stories, and find comfort from people who might actually understand what they're going through—even if they're total strangers.</p>
@@ -678,6 +675,12 @@ export default function ChatItNow() {
             />
             <span className={`font-bold text-lg ${darkMode ? 'text-purple-500' : 'text-purple-600'}`}>ChatItNow</span>
           </div>
+          
+          {/* UPDATED: STATUS PILL MOVED HERE (CENTERED) */}
+          <div className="absolute left-1/2 -translate-x-1/2">
+             {renderStatusPill()}
+          </div>
+
           <div className="flex items-center gap-2">
             <button onClick={() => setIsMuted(!isMuted)} className={`p-2 rounded-full ${darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
@@ -699,17 +702,10 @@ export default function ChatItNow() {
              />
           </div>
 
-          <div className="text-center py-2">
-             {renderStatusPill()}
-          </div>
-
           {messages.map((msg, idx) => {
             let justifyClass = 'justify-center'; if (msg.type === 'you') justifyClass = 'justify-end'; if (msg.type === 'stranger') justifyClass = 'justify-start';
             return (
               <div key={idx} className={`flex w-full ${justifyClass} group relative`}>
-                
-                {/* --- REACTION SELECTOR --- */}
-                {/* FIXED: INSIDE BUBBLE CONTAINER */}
                 
                 {msg.type === 'warning' ? (
                   <div className="w-[90%] text-center my-2">
@@ -722,7 +718,7 @@ export default function ChatItNow() {
                 ) : (
                   <SwipeableMessage onReply={() => initiateReply(msg.text, msg.type)} isSystem={false}>
                      
-                     {/* WRAPPED IN FLEX ROW to keep Smiley TIGHTLY coupled */}
+                     {/* WRAPPED IN FLEX ROW - items-end ensures emoji stays at bottom */}
                      <div className={`flex items-end gap-2 w-fit ${msg.type === 'you' ? 'ml-auto' : ''} max-w-[85%]`}>
                         
                         {/* LEFT SMILEY (FOR YOU) */}
