@@ -16,8 +16,15 @@ const AD_SLOT_INACTIVITY = "2655630641";
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
 // --- SESSION MANAGEMENT ---
-// Defined outside component to reset on page reload (Hard Disconnect)
-const SESSION_ID = Math.random().toString(36).substring(2) + Date.now().toString(36);
+const getSessionID = () => {
+  if (typeof window === 'undefined') return '';
+  let sessionID = localStorage.getItem("chat_session_id");
+  if (!sessionID) {
+    sessionID = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    localStorage.setItem("chat_session_id", sessionID);
+  }
+  return sessionID;
+};
 
 // --- UTILS ---
 const generateMessageID = () => {
@@ -31,7 +38,7 @@ const socket: any = io(SERVER_URL, {
   reconnectionAttempts: 20,       
   reconnectionDelay: 1000,
   auth: {
-    sessionID: SESSION_ID
+    sessionID: getSessionID()
   }
 });
 
@@ -213,7 +220,7 @@ export default function ChatItNow() {
     return false;
   });
 
-  // --- AUTO-RECONNECT ---
+  // --- AUTO-RECONNECT ON VISIBILITY ---
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && !socket.connected && isLoggedIn) {
@@ -256,9 +263,11 @@ export default function ChatItNow() {
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
   const REACTIONS = ['❤️', '😆', '😮', '😢', '😡', '👍'];
 
+  // Initialize Audio
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
+    
     if(audioSentRef.current) { audioSentRef.current.volume = 1.0; audioSentRef.current.preload = 'auto'; }
     if(audioReceivedRef.current) { audioReceivedRef.current.volume = 1.0; audioReceivedRef.current.preload = 'auto'; }
   }, []);
@@ -268,7 +277,7 @@ export default function ChatItNow() {
     try {
       const audioMap = {
         sent: audioSentRef.current,
-        received: audioReceivedRef.current
+        received: audioReceivedRef.current,
       };
       // @ts-ignore
       const audio = audioMap[type];
@@ -297,6 +306,7 @@ export default function ChatItNow() {
 
     socket.on('receive_message', (data: any) => {
       const msgId = data.id || generateMessageID();
+      
       setMessages(prev => [...prev, { 
         id: msgId,
         type: 'stranger', 
@@ -305,9 +315,19 @@ export default function ChatItNow() {
         timestamp: data.timestamp || getCurrentTime(),
         reactions: {}
       }]);
+      
       setIsTyping(false);
       playSound('received');
       resetActivity();
+
+      // --- NEW: SYSTEM NOTIFICATION ---
+      // Only notify if user is tabbed out AND we have permission
+      if (document.hidden && Notification.permission === "granted") {
+          new Notification(`New message from ${partnerNameRef.current || 'Partner'}`, {
+              body: data.text || "Sent a message",
+              icon: "/favicon.ico" // Make sure you have a favicon in public folder
+          });
+      }
     });
 
     socket.on('receive_reaction', (data: { messageID: string, reaction: string | null }) => {
@@ -350,12 +370,12 @@ export default function ChatItNow() {
     };
   }, [isMuted, isConnected]); 
 
-  // --- THEME ---
+  // --- THEME & ADDRESS BAR COLOR ---
   useLayoutEffect(() => {
     const html = document.documentElement;
     const body = document.body;
     
-    const DARK_BG = '#1E232D'; // Fixed Dark Color
+    const DARK_BG = '#1f2937'; 
     const LIGHT_BG = '#ffffff';
 
     const currentBgColor = darkMode ? DARK_BG : LIGHT_BG;
@@ -383,6 +403,7 @@ export default function ChatItNow() {
         document.head.appendChild(metaStatusBarStyle);
     }
     metaStatusBarStyle.setAttribute('content', darkMode ? 'black-translucent' : 'default');
+
   }, [darkMode]);
 
   const resetActivity = () => { if (!showInactivityAd && !showTabReturnAd) setLastActivity(Date.now()); };
@@ -419,6 +440,10 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
+      // Request Notification Permission on Login
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        Notification.requestPermission();
+      }
       socket.connect();
       startSearch();
     } else {
@@ -532,19 +557,19 @@ export default function ChatItNow() {
 
   if (showWelcome) {
     return (
-      <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#1E232D]' : 'bg-white'}`}>
-        <div className={`relative w-full h-[100dvh] sm:w-[650px] sm:shadow-2xl border-0 sm:border-x flex flex-col justify-center overflow-y-auto ${darkMode ? 'bg-[#262B36] border-[#323846]' : 'bg-white border-gray-200'}`}>
+      <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
+        <div className={`relative w-full h-[100dvh] sm:w-[650px] sm:shadow-2xl border-0 sm:border-x flex flex-col justify-center overflow-y-auto ${darkMode ? 'bg-[#1f2937] border-[#374151]' : 'bg-white border-gray-200'}`}>
           <div className="p-10 w-full max-w-[700px] mx-auto">
             <div className="text-center mb-8">
                <img src="/logo.png" alt="" className="w-20 h-20 mx-auto mb-4 rounded-full object-cover shadow-md" onError={(e) => e.currentTarget.style.display='none'} />
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
- <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
-                <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
-                <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
-                <p>As a university student who knows what it feels like to crave real, genuine connection in a world thats getting more digital and more distant every year. Sometimes, even if we're surrounded by people, we still feel like no one really listens. That's why I built this platform to create a space where Filipinos can express themselves openly, share their stories, and find comfort from people who might actually understand what they're going through—even if they're total strangers.</p>
-                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is completely free to use and always will be. It's meant to be simple, accessible, and welcoming to everyone. Just hop in, start a conversation, and see where it goes. One chat might not change your whole life, but it might change your day—and sometimes, that's already more than enough.</p>
+            <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p>
+                <p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p>
+                <p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p>
+                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is completely free and anonymous. Connect with fellow Filipinos, one conversation at a time.</p>
             </div>
             <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
           </div>
@@ -555,8 +580,8 @@ export default function ChatItNow() {
 
   if (!isLoggedIn) {
     return (
-      <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#1E232D]' : 'bg-white'}`}>
-        <div className={`relative w-full h-[100dvh] sm:w-[650px] sm:shadow-2xl border-0 sm:border-x flex flex-col justify-center overflow-y-auto ${darkMode ? 'bg-[#262B36] border-[#323846]' : 'bg-white border-gray-200'}`}>
+      <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
+        <div className={`relative w-full h-[100dvh] sm:w-[650px] sm:shadow-2xl border-0 sm:border-x flex flex-col justify-center overflow-y-auto ${darkMode ? 'bg-[#1f2937] border-[#374151]' : 'bg-white border-gray-200'}`}>
           <div className="px-10 py-12 w-full max-w-[650px] mx-auto">
             <div className="text-center mb-8">
               <h1 className={`text-3xl font-bold mb-2 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>ChatItNow.com</h1>
@@ -566,17 +591,17 @@ export default function ChatItNow() {
             <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
               <div>
                   <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Choose a Username</label>
-                  <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} enterKeyHint="go" placeholder="Enter username..." className={`w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm ${darkMode ? 'bg-[#2F3642] border-[#3A4250] text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900'}`} maxLength={20} />
+                  <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} enterKeyHint="go" placeholder="Enter username..." className={`w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm ${darkMode ? 'bg-[#111827] border-[#374151] text-white placeholder-gray-400' : 'bg-white border-gray-300 text-gray-900'}`} maxLength={20} />
               </div>
               <div>
                   <label className={`block text-sm font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Field/Profession (Optional)</label>
-                  <select value={field} onChange={(e) => setField(e.target.value)} className={`w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm ${darkMode ? 'bg-[#2F3642] border-[#3A4250] text-white' : 'bg-white border-gray-300 text-gray-900'}`}>
+                  <select value={field} onChange={(e) => setField(e.target.value)} className={`w-full px-4 py-3.5 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base shadow-sm ${darkMode ? 'bg-[#111827] border-[#374151] text-white' : 'bg-white border-gray-300 text-gray-900'}`}>
                     <option value="">Select your field (or leave blank)</option>
                     {fields.slice(1).map((f) => (<option key={f} value={f}>{f}</option>))}
                   </select>
                   <p className={`text-xs mt-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>We'll try to match you with someone in the same field when possible</p>
               </div>
-              <div className={`border rounded-xl p-5 space-y-4 transition-colors duration-300 ${formError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : darkMode ? 'bg-[#2F3642] border-[#3A4250]' : 'border-yellow-200 bg-yellow-50'}`}>
+              <div className={`border rounded-xl p-5 space-y-4 transition-colors duration-300 ${formError ? 'border-red-500 bg-red-50 ring-2 ring-red-200' : darkMode ? 'bg-[#111827] border-[#374151]' : 'border-yellow-200 bg-yellow-50'}`}>
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input type="checkbox" checked={confirmedAdult} onChange={(e) => setConfirmedAdult(e.target.checked)} className="mt-1 w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" />
                   <span className={`text-xs sm:text-sm pt-0.5 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}><strong>I confirm that I am 18 years of age or older.</strong></span>
@@ -589,7 +614,7 @@ export default function ChatItNow() {
               
               <div className="text-center pt-2">
                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking advices from a strangers. Do your due diligence.
+                   <span className={`font-bold ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>CAUTION:</span> Be careful about taking advices from strangers. Do your due diligence.
                  </p>
               </div>
 
@@ -601,8 +626,8 @@ export default function ChatItNow() {
         
         {showTerms && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className={`rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto ${darkMode ? 'bg-[#262B36]' : 'bg-white'}`}>
-              <h2 className={`text-2xl font-bold mb-4 sticky top-0 pb-2 ${darkMode ? 'text-white bg-[#262B36]' : 'text-gray-900 bg-white'}`}>Terms & Conditions</h2>
+            <div className={`rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
+              <h2 className={`text-2xl font-bold mb-4 sticky top-0 pb-2 ${darkMode ? 'text-white bg-[#1f2937]' : 'text-gray-900 bg-white'}`}>Terms & Conditions</h2>
               <div className={`space-y-4 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 <p>Last updated: December 6, 2025</p>
                 <p><strong>Agreement to Terms</strong><br/>By accessing ChatItNow.com (the "Site"), an anonymous text-only chat platform made for Filipinos, you affirm and agree to these Terms and Conditions.</p>
@@ -611,7 +636,7 @@ export default function ChatItNow() {
                 <p><strong>Use at Your Own Risk</strong><br/>You use this Site at your own risk, fully aware of the dangers of chatting with strangers whose identities are not verified. We are not responsible for impersonation, misinformation, scams, or any harms from anonymous interactions.</p>
                 <p><strong>Disclaimer of Liability</strong><br/>The Site is provided "as is" and "as available" with no warranties of any kind, express or implied. To the fullest extent permitted by Philippine law ChatItNow.com disclaim all liability, direct or indirect, for user interactions, content, advice, disputes, harms (emotional, financial, reputational), illegal acts, or any loss arising from Site use.</p>
               </div>
-              <div className={`mt-6 flex gap-3 sticky bottom-0 pt-4 border-t ${darkMode ? 'bg-[#262B36] border-[#323846]' : 'bg-white border-gray-100'}`}>
+              <div className={`mt-6 flex gap-3 sticky bottom-0 pt-4 border-t ${darkMode ? 'bg-[#1f2937] border-[#374151]' : 'bg-white border-gray-100'}`}>
                 <button onClick={() => { setShowTerms(false); setAcceptedTerms(true); }} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg transition">Accept Terms</button>
                 <button onClick={() => setShowTerms(false)} className={`flex-1 font-bold py-3 rounded-lg transition ${darkMode ? 'bg-[#374151] hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>Close</button>
               </div>
@@ -624,7 +649,7 @@ export default function ChatItNow() {
 
   // --- MAIN CHAT INTERFACE ---
   return (
-  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#1E232D]' : 'bg-white'}`}>
+  <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
       
       {/* Wave Keyframes */}
       <style>{`
@@ -640,13 +665,13 @@ export default function ChatItNow() {
         sm:w-[650px] sm:shadow-2xl 
         transition-colors duration-200
         border-0 sm:border-x
-        ${darkMode ? 'bg-[#1E232D] sm:border-[#2F3642]' : 'bg-white sm:border-gray-200'}
+        ${darkMode ? 'bg-[#1f2937] sm:border-[#374151]' : 'bg-white sm:border-gray-200'}
       `}>
         
         {/* Fullscreen Ad Overlay */}
         {(showInactivityAd || showTabReturnAd) && (
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-            <div className={`${darkMode ? 'bg-[#262B36]' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
+            <div className={`${darkMode ? 'bg-[#1f2937]' : 'bg-white'} rounded-xl p-6 w-full text-center shadow-2xl`}>
               <p className="text-xs text-gray-500 mb-2">{showInactivityAd ? "Advertisement" : "Advertisement"}</p>
               <div className="bg-gray-200 h-96 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
                 <AdUnit client={ADSENSE_CLIENT_ID} slotId={showInactivityAd ? AD_SLOT_INACTIVITY : AD_SLOT_VERTICAL} />
@@ -668,7 +693,7 @@ export default function ChatItNow() {
         {/* Searching Overlay */}
         {showSearching && (
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className={`${darkMode ? 'bg-[#1E232D]' : 'bg-white'} p-6 rounded-2xl shadow-xl w-[95%] text-center`}>
+            <div className={`${darkMode ? 'bg-[#1f2937]' : 'bg-white'} p-6 rounded-2xl shadow-xl w-[95%] text-center`}>
               {/* Added: Timeout Message */}
               <p className={`text-xs font-medium mb-4 ${darkMode ? 'text-yellow-400' : 'text-amber-600'}`}>
                 If not paired within 10 seconds, please refresh.
@@ -688,7 +713,7 @@ export default function ChatItNow() {
         )}
 
         {/* HEADER */}
-        <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-[#1E232D] border-b border-[#2F3642]' : 'bg-white border-b border-gray-100'}`}>
+        <div className={`absolute top-0 left-0 right-0 h-[60px] px-4 flex justify-between items-center shadow-sm z-20 ${darkMode ? 'bg-[#1f2937] border-b border-[#374151]' : 'bg-white border-b border-gray-100'}`}>
           <div className="flex items-center gap-2">
             <img 
               src="/logo.png" 
@@ -713,7 +738,7 @@ export default function ChatItNow() {
         </div>
 
         {/* CHAT AREA */}
-        <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 pb-4 space-y-3 z-10 ${darkMode ? 'bg-[#1E232D]' : 'bg-white'}`}>
+        <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 pb-4 space-y-3 z-10 ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
           
           <div className="w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg bg-gray-100">
              <AdUnit 
@@ -747,7 +772,7 @@ export default function ChatItNow() {
                      
                      {/* FIXED: SMILEY POSITIONING */}
                      {/* You: Smiley Left. Stranger: Smiley Right. */}
-                     <div className={`flex items-end gap-2 w-fit ${msg.type === 'you' ? 'ml-auto' : 'flex-row'} max-w-[85%]`}>
+                     <div className={`flex items-end gap-2 w-fit ${msg.type === 'you' ? 'ml-auto flex-row-reverse' : 'flex-row'} max-w-[85%]`}>
                         
                         {/* LEFT SMILEY (FOR YOU) */}
                         {msg.type === 'you' && (
