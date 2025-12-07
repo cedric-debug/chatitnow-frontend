@@ -58,7 +58,7 @@ interface ReplyData {
   text: string;
   name: string;
   isYou: boolean;
-  id: string; // ADDED: Store ID for scrolling
+  id: string; 
 }
 
 interface Message {
@@ -328,7 +328,8 @@ export default function ChatItNow() {
   const recordingTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null); 
   
-  const [filePreview, setFilePreview] = useState<{ base64: string, type: 'image' | 'video' } | null>(null);
+  // FIX: Updated Type to include previewUrl
+  const [filePreview, setFilePreview] = useState<{ base64: string, type: 'image' | 'video', previewUrl: string } | null>(null);
   const [isNSFWMarked, setIsNSFWMarked] = useState(false);
   const [aiDetectedNSFW, setAiDetectedNSFW] = useState(false); 
   const [isAnalyzing, setIsAnalyzing] = useState(false); 
@@ -633,7 +634,10 @@ export default function ChatItNow() {
 
     try {
         const base64 = await blobToBase64(file);
-        setFilePreview({ base64, type: isImage ? 'image' : 'video' });
+        // FIX: Use Object URL for video preview to ensure playback works
+        const previewUrl = isVideo ? URL.createObjectURL(file) : base64;
+        
+        setFilePreview({ base64, type: isImage ? 'image' : 'video', previewUrl });
         
         let detectedNSFW = false;
         if(nsfwModel) {
@@ -691,12 +695,25 @@ export default function ChatItNow() {
 
     socket.emit('send_message', msgData);
     
+    // Cleanup Object URL if it was a video
+    if (filePreview.type === 'video' && filePreview.previewUrl !== filePreview.base64) {
+        URL.revokeObjectURL(filePreview.previewUrl);
+    }
+
     setReplyingTo(null);
     playSound('sent');
     resetActivity();
     setFilePreview(null); 
     setIsNSFWMarked(false);
     setAiDetectedNSFW(false);
+  };
+
+  // Helper to cleanup on cancel
+  const handleCancelPreview = () => {
+      if (filePreview?.type === 'video' && filePreview.previewUrl !== filePreview.base64) {
+          URL.revokeObjectURL(filePreview.previewUrl);
+      }
+      setFilePreview(null);
   };
 
   const handleSendAudio = (base64Audio: string) => {
@@ -980,22 +997,18 @@ export default function ChatItNow() {
 
   const handleStartSearch = () => { startSearch(); };
 
-  // --- CHANGED: Added ID to initiateReply ---
   const initiateReply = (text: any, type: string, id: string) => {
     if (!isConnected) return;
     const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
-    // Store ID for scrolling later
     setReplyingTo({ text: typeof text === 'string' ? text : 'Content', name: senderName, isYou: type === 'you', id: id });
     const input = document.querySelector('input[type="text"]') as HTMLInputElement;
     if(input) input.focus();
   };
 
-  // --- ADDED: Scroll Function ---
   const scrollToMessage = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        // Optional: Add a temporary highlight class
         element.classList.add('animate-pulse-red');
         setTimeout(() => element.classList.remove('animate-pulse-red'), 1000);
     }
@@ -1192,7 +1205,12 @@ export default function ChatItNow() {
                  ) : filePreview.type === 'image' ? (
                     <img src={filePreview.base64} alt="Preview" className="max-h-full rounded object-contain" />
                  ) : (
-                    <video src={filePreview.base64} controls className="max-h-full rounded" />
+                    <video 
+                        src={filePreview.previewUrl} 
+                        controls 
+                        autoPlay 
+                        className="max-h-full rounded" 
+                    />
                  )}
               </div>
 
@@ -1232,7 +1250,7 @@ export default function ChatItNow() {
               )}
 
               <div className="flex gap-3">
-                 <button onClick={() => setFilePreview(null)} className="flex-1 py-3 rounded-lg font-bold bg-gray-200 hover:bg-gray-300 text-gray-800 transition">Cancel</button>
+                 <button onClick={handleCancelPreview} className="flex-1 py-3 rounded-lg font-bold bg-gray-200 hover:bg-gray-300 text-gray-800 transition">Cancel</button>
                  <button 
                    onClick={handleConfirmSendFile} 
                    disabled={isAnalyzing}
@@ -1353,7 +1371,6 @@ export default function ChatItNow() {
           {messages.map((msg, idx) => {
             let justifyClass = 'justify-center'; if (msg.type === 'you') justifyClass = 'justify-end'; if (msg.type === 'stranger') justifyClass = 'justify-start';
             return (
-              // CHANGED: Added id={msg.id} for scroll targeting
               <div id={msg.id} key={idx} className={`flex w-full ${justifyClass} group relative`}>
                 
                 {msg.type === 'warning' ? (
@@ -1365,7 +1382,6 @@ export default function ChatItNow() {
                     <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{msg.data ? renderSystemMessage(msg) : msg.text}</span>
                   </div>
                 ) : (
-                  // CHANGED: Pass ID to initiateReply
                   <SwipeableMessage 
                     onReply={() => initiateReply(msg.text, msg.type, msg.id)} 
                     isSystem={false} 
@@ -1398,7 +1414,6 @@ export default function ChatItNow() {
                             </div>
                           )}
 
-                          {/* CHANGED: ADDED onClick to Reply Box */}
                           {msg.replyTo && (
                             <div 
                                 onClick={() => scrollToMessage(msg.replyTo!.id)}
