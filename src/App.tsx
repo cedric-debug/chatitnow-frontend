@@ -105,14 +105,11 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; isYou?: boolean; };
 }
 
-// --- MEDIA MESSAGE COMPONENT (STRICT LOADING STATE) ---
+// --- MEDIA MESSAGE COMPONENT ---
 const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) => {
   const shouldBlur = msg.type !== 'you' && (msg.isNSFW || safeMode);
   const [isRevealed, setIsRevealed] = useState(!shouldBlur);
   const videoRef = useRef<HTMLVideoElement>(null);
-  
-  // Initialize as null to force a "Loading" state for Receiver
-  // Only initialize immediately if it's already a Blob URL (Sender)
   const [stableVideoUrl, setStableVideoUrl] = useState<string | null>(
     msg.video && msg.video.startsWith('blob:') ? msg.video : null
   );
@@ -122,7 +119,6 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
     let isMounted = true;
 
     if (msg.video && !stableVideoUrl) {
-        // It is Base64 (Receiver), convert it safely
         fetch(msg.video)
             .then(res => res.blob())
             .then(blob => {
@@ -139,7 +135,7 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
             URL.revokeObjectURL(activeUrl);
         }
     };
-  }, [msg.video]); // Only run if source changes
+  }, [msg.video]);
 
   useEffect(() => {
     if (msg.type === 'you') {
@@ -201,7 +197,6 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
         )}
         
         {msg.video && (
-            // FIX: If URL isn't ready yet, show Spinner instead of broken player
             stableVideoUrl ? (
               <video 
                 ref={videoRef}
@@ -1461,7 +1456,10 @@ export default function ChatItNow() {
         </div>
 
         {/* CHAT AREA */}
-        <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 overflow-y-auto p-2 pb-4 space-y-3 z-10 ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
+        <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 p-2 pb-4 space-y-3 z-10 
+            ${darkMode ? 'bg-[#1f2937]' : 'bg-white'} 
+            ${partnerStatus === 'disconnected' ? 'overflow-hidden' : 'overflow-y-auto'} 
+        `}>
           
           <div className="w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg bg-gray-100">
              <AdUnit 
@@ -1624,6 +1622,12 @@ export default function ChatItNow() {
             </div>
           )}
           <div ref={messagesEndRef} />
+          
+          {/* LOCK OVERLAY */}
+          {partnerStatus === 'disconnected' && (
+            <div className="absolute inset-0 z-50 bg-gray-500/10 backdrop-blur-[1px]" />
+          )}
+
         </div>
 
         {/* INPUT BAR */}
