@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines } from 'lucide-react';
+import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 
@@ -72,6 +72,93 @@ interface Message {
   };
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; isYou?: boolean; };
 }
+
+// --- CUSTOM AUDIO PLAYER COMPONENT ---
+const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isOwnMessage: boolean, isDarkMode: boolean }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent triggering parent swipe/click events
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const onLoadedMetadata = () => {
+        if(audio.duration !== Infinity && !isNaN(audio.duration)) {
+            setDuration(audio.duration);
+        }
+    };
+    const onEnded = () => {
+        setIsPlaying(false);
+        setCurrentTime(0);
+    };
+
+    audio.addEventListener('timeupdate', onTimeUpdate);
+    audio.addEventListener('loadedmetadata', onLoadedMetadata);
+    audio.addEventListener('ended', onEnded);
+
+    return () => {
+      audio.removeEventListener('timeupdate', onTimeUpdate);
+      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+      audio.removeEventListener('ended', onEnded);
+    };
+  }, []);
+
+  const formatTime = (t: number) => {
+    if(!t || isNaN(t)) return "0:00";
+    const m = Math.floor(t / 60);
+    const s = Math.floor(t % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  // Colors based on context
+  // You (Purple) -> White icons/text, White Bar
+  // Stranger (Dark) -> Light Gray icons/text, Purple Bar
+  // Stranger (Light) -> Dark Gray icons/text, Purple Bar
+  
+  const btnColor = isOwnMessage ? "text-white" : (isDarkMode ? "text-gray-200" : "text-gray-700");
+  const trackBg = isOwnMessage ? "bg-purple-400/50" : (isDarkMode ? "bg-gray-600" : "bg-gray-300");
+  const trackFill = isOwnMessage ? "bg-white" : (isDarkMode ? "bg-purple-400" : "bg-purple-600");
+  const timeColor = isOwnMessage ? "text-purple-100" : (isDarkMode ? "text-gray-400" : "text-gray-500");
+
+  return (
+    <div className="flex items-center gap-3 min-w-[180px] py-1 select-none">
+      <audio ref={audioRef} src={src} preload="metadata" />
+      
+      <button onClick={togglePlay} className={`p-1 rounded-full transition hover:opacity-80 focus:outline-none ${btnColor}`}>
+        {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
+      </button>
+
+      <div className="flex-1 flex flex-col justify-center h-full pt-1">
+         <div className={`h-1 w-full rounded-full ${trackBg} overflow-hidden`}>
+            <div 
+              className={`h-full ${trackFill} transition-all duration-100 ease-linear`} 
+              style={{ width: `${progressPercent}%` }}
+            />
+         </div>
+      </div>
+
+      <span className={`text-[10px] font-mono w-[30px] text-right ${timeColor} pt-0.5`}>
+        {formatTime(isPlaying ? currentTime : duration)}
+      </span>
+    </div>
+  );
+};
 
 // --- SWIPEABLE MESSAGE COMPONENT ---
 const SwipeableMessage = ({ 
@@ -284,11 +371,22 @@ export default function ChatItNow() {
 
   // Initialize Audio
   useEffect(() => {
+    // Setup Audio
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
     
-    if(audioSentRef.current) { audioSentRef.current.volume = 1.0; audioSentRef.current.preload = 'auto'; }
-    if(audioReceivedRef.current) { audioReceivedRef.current.volume = 1.0; audioReceivedRef.current.preload = 'auto'; }
+    // Configure for mobile support
+    if(audioSentRef.current) { 
+      audioSentRef.current.volume = 1.0; 
+      audioSentRef.current.preload = 'auto';
+      // Some browsers require muted autoplay first
+      audioSentRef.current.muted = false; 
+    }
+    if(audioReceivedRef.current) { 
+      audioReceivedRef.current.volume = 1.0; 
+      audioReceivedRef.current.preload = 'auto'; 
+      audioReceivedRef.current.muted = false;
+    }
   }, []);
 
   const playSound = (type: 'sent' | 'received') => {
@@ -302,7 +400,12 @@ export default function ChatItNow() {
       const audio = audioMap[type];
       if (audio) {
         audio.currentTime = 0;
-        audio.play().catch(() => {});
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((error: any) => {
+             console.log("Audio play failed (interaction likely needed):", error);
+          });
+        }
       }
     } catch (e) { console.error("Audio play failed", e); }
   };
@@ -433,11 +536,29 @@ export default function ChatItNow() {
       resetActivity();
 
       // --- SYSTEM NOTIFICATION CHECK ---
-      if (!isNotifyMuted && document.hidden && Notification.permission === "granted") {
-          new Notification(`New message from ${partnerNameRef.current || 'Partner'}`, {
-              body: data.audio ? "Sent a voice message" : (data.text || "Sent a message"),
-              icon: "/favicon.ico" 
-          });
+      if (!isNotifyMuted && document.hidden) {
+          if (Notification.permission === "granted") {
+              try {
+                  const notifTitle = `New message from ${partnerNameRef.current || 'Partner'}`;
+                  const notifBody = data.audio ? "Sent a voice message" : (data.text || "Sent a message");
+                  
+                  if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+                     navigator.serviceWorker.ready.then(registration => {
+                        registration.showNotification(notifTitle, {
+                           body: notifBody,
+                           icon: "/favicon.ico"
+                        });
+                     });
+                  } else {
+                     new Notification(notifTitle, {
+                        body: notifBody,
+                        icon: "/favicon.ico" 
+                     });
+                  }
+              } catch (e) {
+                  console.error("Notification failed", e);
+              }
+          }
       }
     });
 
@@ -553,10 +674,26 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
-      // Request Notification Permission on Login
-      if ('Notification' in window && Notification.permission !== 'granted') {
-        Notification.requestPermission();
+
+      // --- MOBILE AUDIO UNLOCK ---
+      if (audioReceivedRef.current) {
+        audioReceivedRef.current.play().then(() => {
+           audioReceivedRef.current?.pause();
+           if(audioReceivedRef.current) audioReceivedRef.current.currentTime = 0;
+        }).catch(e => console.log("Audio unlock failed", e));
       }
+
+      // --- PERMISSION REQUEST FIX ---
+      if ('Notification' in window) {
+        Notification.requestPermission().then((permission) => {
+          if (permission === 'granted') {
+             console.log("Notification permission granted.");
+          } else {
+             console.log("Notification permission denied/default.");
+          }
+        });
+      }
+
       socket.connect();
       startSearch();
     } else {
@@ -932,9 +1069,9 @@ export default function ChatItNow() {
                               : `${darkMode ? 'bg-[#374151] text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
                           }`}>
                             
-                            {/* --- RENDER TEXT OR AUDIO --- */}
+                            {/* --- RENDER TEXT OR CUSTOM AUDIO --- */}
                             {msg.audio ? (
-                                <audio controls src={msg.audio} className="h-8 max-w-[200px]" />
+                                <CustomAudioPlayer src={msg.audio} isOwnMessage={msg.type === 'you'} isDarkMode={darkMode} />
                             ) : (
                                 msg.text
                             )}
