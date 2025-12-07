@@ -43,7 +43,7 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
 
 // --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
-  transports: ['websocket'], // <--- CONFIRMED: Forced WebSocket for large files
+  transports: ['websocket'], 
   autoConnect: false,
   reconnection: true,             
   reconnectionAttempts: 50,       
@@ -79,12 +79,12 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; isYou?: boolean; };
 }
 
-// --- MEDIA MESSAGE COMPONENT ---
+// --- MEDIA MESSAGE COMPONENT (OPTIMIZED VIDEO) ---
 const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) => {
   const shouldBlur = msg.type !== 'you' && (msg.isNSFW || safeMode);
   const [isRevealed, setIsRevealed] = useState(!shouldBlur);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Reactive Safe Mode
   useEffect(() => {
     if (msg.type === 'you') {
         setIsRevealed(true);
@@ -99,7 +99,15 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
 
   const toggleReveal = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsRevealed(!isRevealed);
+    const willReveal = !isRevealed;
+    setIsRevealed(willReveal);
+    
+    // Auto-play video when revealed for smoother UX
+    if (willReveal && videoRef.current) {
+        videoRef.current.play().catch(err => console.log("Auto-play blocked:", err));
+    } else if (!willReveal && videoRef.current) {
+        videoRef.current.pause();
+    }
   };
 
   return (
@@ -131,6 +139,7 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
         </div>
       )}
 
+      {/* MEDIA CONTENT */}
       <div className={`${!isRevealed ? 'filter blur-xl opacity-0' : 'opacity-100'} transition-all duration-300`}>
         {msg.image && (
           <img 
@@ -142,14 +151,15 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
         )}
         
         {msg.video && (
-          // <--- CONFIRMED: Restored Video Compatibility Attributes
           <video 
+            ref={videoRef}
             key={msg.id} 
             src={msg.video} 
-            controls={isRevealed}
-            playsInline // Critical for iOS
-            preload="auto" // Helps load content
+            controls
+            playsInline 
+            preload="metadata" 
             className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1 bg-black" 
+            onError={(e) => console.error("Video Error:", e)}
           />
         )}
       </div>
@@ -340,13 +350,15 @@ export default function ChatItNow() {
     return false;
   });
 
-  // --- LOAD NSFW MODEL (OPTIMIZED: MobileNetV2Mid) ---
+  // --- CHANGED: FASTER MODEL LOADING ---
+  // Calling nsfwjs.load() without arguments loads the "Lite" MobileNetV2 model
+  // This is ~2MB compared to the Mid model (~15MB), drastically reducing load/scan time.
   useEffect(() => {
     const loadModel = async () => {
         try {
-            const _model = await nsfwjs.load('MobileNetV2Mid');
+            const _model = await nsfwjs.load(); 
             setNsfwModel(_model);
-            console.log("NSFW Model Loaded");
+            console.log("NSFW Model Loaded (Lite Version)");
         } catch (e) {
             console.error("Failed to load NSFW model", e);
         }
@@ -530,7 +542,7 @@ export default function ChatItNow() {
     });
   };
 
-  // --- FAST VIDEO SCANNER (3 SCANS @ 224x224 + 5% Threshold) ---
+  // --- CHANGED: OPTIMIZED VIDEO SCANNER (Reuses Canvas) ---
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
@@ -539,6 +551,12 @@ export default function ChatItNow() {
       video.src = URL.createObjectURL(file);
       video.muted = true;
       video.playsInline = true;
+
+      // Optimization: Create canvas ONCE outside the loop
+      const canvas = document.createElement('canvas');
+      canvas.width = 224;
+      canvas.height = 224;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
       const scanQueue: number[] = []; 
 
@@ -555,6 +573,7 @@ export default function ChatItNow() {
       video.onloadeddata = () => {
          const dur = video.duration;
          if(dur && dur > 1) {
+            // Check Start, Middle, End
             scanQueue.push(dur * 0.1); 
             scanQueue.push(dur * 0.5); 
             scanQueue.push(dur * 0.9); 
@@ -566,11 +585,6 @@ export default function ChatItNow() {
 
       video.onseeked = async () => {
          try {
-             const canvas = document.createElement('canvas');
-             canvas.width = 224;
-             canvas.height = 224;
-             const ctx = canvas.getContext('2d', { willReadFrequently: true });
-             
              if(ctx) {
                  ctx.drawImage(video, 0, 0, 224, 224);
                  const predictions = await nsfwModel!.classify(canvas);
@@ -614,6 +628,13 @@ export default function ChatItNow() {
     if (!isImage && !isVideo) {
       alert("Only images and videos are supported.");
       return;
+    }
+
+    // --- CHANGED: STRICT FORMAT CHECK FOR FLAWLESS PLAYBACK ---
+    if (isVideo && !['video/mp4', 'video/webm', 'video/ogg'].includes(file.type)) {
+       alert("Video format not supported. Please use standard MP4, WebM, or OGG.");
+       if (fileInputRef.current) fileInputRef.current.value = '';
+       return;
     }
 
     setIsAnalyzing(true);
@@ -1529,7 +1550,7 @@ export default function ChatItNow() {
                   type="file" 
                   ref={fileInputRef} 
                   className="hidden" 
-                  accept="image/*,video/*" 
+                  accept="image/*,video/mp4,video/webm,video/ogg" 
                   onChange={handleFileSelect} 
                 />
 
