@@ -1146,7 +1146,7 @@ export default function ChatItNow() {
           </div>
         </div>
       </div>
-    );
+    )
   }
 
   if (!isLoggedIn) {
