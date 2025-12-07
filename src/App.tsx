@@ -81,18 +81,22 @@ interface Message {
 
 // --- MEDIA MESSAGE COMPONENT ---
 const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) => {
+  // Logic: Blur if it's NOT you, AND (SafeMode is ON -OR- Content is NSFW)
   const shouldBlur = msg.type !== 'you' && (msg.isNSFW || safeMode);
   const [isRevealed, setIsRevealed] = useState(!shouldBlur);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Reactive Logic for Toggle Switch
   useEffect(() => {
     if (msg.type === 'you') {
         setIsRevealed(true);
         return;
     }
     if (safeMode) {
+        // If Safe Shield is ON -> Force Blur (Hide) everything
         setIsRevealed(false); 
     } else {
+        // If Safe Shield is OFF -> Only Blur if tagged NSFW
         setIsRevealed(!msg.isNSFW); 
     }
   }, [safeMode, msg.isNSFW, msg.type]);
@@ -102,7 +106,7 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
     const willReveal = !isRevealed;
     setIsRevealed(willReveal);
     
-    // UPDATED: Only pause if re-hiding. Never auto-play.
+    // Only pause video if hiding. Do NOT auto-play on reveal.
     if (!willReveal && videoRef.current) {
         videoRef.current.pause();
     }
@@ -121,19 +125,21 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
           onClick={toggleReveal}
         >
            {msg.isNSFW ? (
+             // RED WARNING: If AI tagged as NSFW or Manual Gore Flag
              <>
                <AlertTriangle className="text-red-500 mb-2" size={32} />
                <span className="text-red-500 font-bold text-sm uppercase tracking-wider mb-1">Sensitive Content</span>
                <span className="text-gray-400 text-xs">(NSFW / Gore)</span>
              </>
            ) : (
+             // BLUE WARNING: If Safe Shield is ON (and image is SFW)
              <>
                <Shield className="text-blue-400 mb-2" size={32} />
                <span className="text-blue-400 font-bold text-sm uppercase tracking-wider mb-1">Hidden Media</span>
                <span className="text-gray-400 text-xs">Safe Mode Active</span>
              </>
            )}
-           <span className="text-gray-300 text-[10px] mt-4 border border-gray-600 px-3 py-1 rounded-full">Click to view</span>
+           <span className="text-gray-300 text-[10px] mt-4 border border-gray-600 px-3 py-1 rounded-full">Tap to view</span>
         </div>
       )}
 
