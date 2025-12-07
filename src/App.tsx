@@ -81,12 +81,12 @@ const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isO
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const togglePlay = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering parent swipe/click events
+    e.stopPropagation(); 
     if (!audioRef.current) return;
     if (isPlaying) {
       audioRef.current.pause();
     } else {
-      audioRef.current.play();
+      audioRef.current.play().catch(e => console.error("Play failed", e));
     }
     setIsPlaying(!isPlaying);
   };
@@ -126,11 +126,6 @@ const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isO
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  // Colors based on context
-  // You (Purple) -> White icons/text, White Bar
-  // Stranger (Dark) -> Light Gray icons/text, Purple Bar
-  // Stranger (Light) -> Dark Gray icons/text, Purple Bar
-  
   const btnColor = isOwnMessage ? "text-white" : (isDarkMode ? "text-gray-200" : "text-gray-700");
   const trackBg = isOwnMessage ? "bg-purple-400/50" : (isDarkMode ? "bg-gray-600" : "bg-gray-300");
   const trackFill = isOwnMessage ? "bg-white" : (isDarkMode ? "bg-purple-400" : "bg-purple-600");
@@ -371,22 +366,50 @@ export default function ChatItNow() {
 
   // Initialize Audio
   useEffect(() => {
-    // Setup Audio
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
     
-    // Configure for mobile support
-    if(audioSentRef.current) { 
-      audioSentRef.current.volume = 1.0; 
-      audioSentRef.current.preload = 'auto';
-      // Some browsers require muted autoplay first
-      audioSentRef.current.muted = false; 
-    }
-    if(audioReceivedRef.current) { 
-      audioReceivedRef.current.volume = 1.0; 
-      audioReceivedRef.current.preload = 'auto'; 
-      audioReceivedRef.current.muted = false;
-    }
+    // ANDROID FIX: Preload and set volume
+    [audioSentRef.current, audioReceivedRef.current].forEach(audio => {
+        if(audio) {
+            audio.volume = 1.0;
+            audio.preload = 'auto';
+        }
+    });
+  }, []);
+
+  // --- GLOBAL AUDIO UNLOCKER FOR ANDROID ---
+  useEffect(() => {
+    const unlockAudio = () => {
+        const audioElements = [audioSentRef.current, audioReceivedRef.current];
+        audioElements.forEach(audio => {
+            if (audio) {
+                // Hack for Android: Play muted, then pause immediately
+                const originalVolume = audio.volume;
+                audio.muted = true;
+                audio.play().then(() => {
+                    audio.pause();
+                    audio.currentTime = 0;
+                    audio.muted = false; // Unmute for future use
+                    audio.volume = originalVolume;
+                }).catch(() => {});
+            }
+        });
+        // Remove listeners once unlocked
+        document.removeEventListener('click', unlockAudio);
+        document.removeEventListener('touchstart', unlockAudio);
+        document.removeEventListener('keydown', unlockAudio);
+    };
+
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('touchstart', unlockAudio);
+    document.addEventListener('keydown', unlockAudio);
+
+    return () => {
+        document.removeEventListener('click', unlockAudio);
+        document.removeEventListener('touchstart', unlockAudio);
+        document.removeEventListener('keydown', unlockAudio);
+    };
   }, []);
 
   const playSound = (type: 'sent' | 'received') => {
@@ -535,14 +558,15 @@ export default function ChatItNow() {
       playSound('received');
       resetActivity();
 
-      // --- SYSTEM NOTIFICATION CHECK ---
+      // --- SYSTEM NOTIFICATION CHECK (ANDROID OPTIMIZED) ---
       if (!isNotifyMuted && document.hidden) {
           if (Notification.permission === "granted") {
+              const notifTitle = `New message from ${partnerNameRef.current || 'Partner'}`;
+              const notifBody = data.audio ? "Sent a voice message" : (data.text || "Sent a message");
+              
               try {
-                  const notifTitle = `New message from ${partnerNameRef.current || 'Partner'}`;
-                  const notifBody = data.audio ? "Sent a voice message" : (data.text || "Sent a message");
-                  
-                  if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
+                  // Android Chrome often REQUIRES Service Worker for notifications
+                  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
                      navigator.serviceWorker.ready.then(registration => {
                         registration.showNotification(notifTitle, {
                            body: notifBody,
@@ -550,6 +574,7 @@ export default function ChatItNow() {
                         });
                      });
                   } else {
+                     // Fallback for Desktop / non-SW environments
                      new Notification(notifTitle, {
                         body: notifBody,
                         icon: "/favicon.ico" 
@@ -674,14 +699,6 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
-
-      // --- MOBILE AUDIO UNLOCK ---
-      if (audioReceivedRef.current) {
-        audioReceivedRef.current.play().then(() => {
-           audioReceivedRef.current?.pause();
-           if(audioReceivedRef.current) audioReceivedRef.current.currentTime = 0;
-        }).catch(e => console.log("Audio unlock failed", e));
-      }
 
       // --- PERMISSION REQUEST FIX ---
       if ('Notification' in window) {
@@ -815,11 +832,11 @@ export default function ChatItNow() {
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
-             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
-                <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
-                <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
-                <p>As a university student who knows what it feels like to crave real, genuine connection in a world thats getting more digital and more distant every year. Sometimes, even if we're surrounded by people, we still feel like no one really listens. That's why I built this platform to create a space where Filipinos can express themselves openly, share their stories, and find comfort from people who might actually understand what they're going through—even if they're total strangers.</p>
-                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is completely free to use and always will be. It's meant to be simple, accessible, and welcoming to everyone. Just hop in, start a conversation, and see where it goes. One chat might not change your whole life, but it might change your day—and sometimes, that's already more than enough.</p>
+            <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p>
+                <p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p>
+                <p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p>
+                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is completely free and anonymous. Connect with fellow Filipinos, one conversation at a time.</p>
             </div>
             <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
           </div>
