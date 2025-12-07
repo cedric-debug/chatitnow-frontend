@@ -601,7 +601,7 @@ export default function ChatItNow() {
     }
   };
 
-  // --- AI SCANNERS (STRICTER FILTER) ---
+  // --- AI SCANNERS ---
   const checkImageContent = async (base64Data: string): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
@@ -612,7 +612,6 @@ export default function ChatItNow() {
             try {
                 const predictions = await nsfwModel.classify(img);
                 console.log("NSFW Analysis (Image):", predictions);
-                
                 const isNsfw = predictions.some(p => 
                     (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
                     && p.probability > 0.25
@@ -626,22 +625,17 @@ export default function ChatItNow() {
 
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
-    
     return new Promise((resolve) => {
       const video = document.createElement('video');
       video.preload = 'metadata';
       video.src = URL.createObjectURL(file);
       video.muted = true;
       video.playsInline = true;
-
       video.onloadeddata = () => {
          let seekTime = 1;
-         if(video.duration && video.duration > 2) {
-             seekTime = video.duration * 0.2; 
-         }
+         if(video.duration && video.duration > 2) seekTime = video.duration * 0.2; 
          video.currentTime = seekTime;
       };
-
       video.onseeked = async () => {
          try {
              const canvas = document.createElement('canvas');
@@ -652,7 +646,6 @@ export default function ChatItNow() {
                  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                  const predictions = await nsfwModel.classify(canvas);
                  console.log("NSFW Analysis (Video):", predictions);
-                 
                  const isNsfw = predictions.some(p => 
                      (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
                      && p.probability > 0.25
@@ -662,7 +655,6 @@ export default function ChatItNow() {
              } else { resolve(false); }
          } catch(e) { resolve(false); }
       };
-
       video.onerror = () => resolve(false);
     });
   };
@@ -685,8 +677,12 @@ export default function ChatItNow() {
       return;
     }
 
-    setIsAnalyzing(true);
+    // 1. Show preview immediately
     const base64 = await blobToBase64(file);
+    setFilePreview({ base64, type: isImage ? 'image' : 'video' });
+    
+    // 2. Start Analyzing
+    setIsAnalyzing(true);
     let detectedNSFW = false;
     
     if (nsfwModel) {
@@ -697,8 +693,8 @@ export default function ChatItNow() {
         }
     }
 
+    // 3. Update result
     setIsAnalyzing(false);
-    setFilePreview({ base64, type: isImage ? 'image' : 'video' });
     setIsNSFWMarked(detectedNSFW); 
     
     if (fileInputRef.current) fileInputRef.current.value = '';
