@@ -63,8 +63,8 @@ interface Message {
   type: 'system' | 'you' | 'stranger' | 'warning';
   text?: React.ReactNode;
   audio?: string;
-  image?: string; // UPDATED
-  video?: string; // UPDATED
+  image?: string;
+  video?: string;
   replyTo?: ReplyData;
   timestamp?: string;
   status?: 'sent' | 'read';
@@ -316,7 +316,7 @@ export default function ChatItNow() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null); // UPDATED: File Input Ref
+  const fileInputRef = useRef<HTMLInputElement>(null); 
 
   const audioSentRef = useRef<HTMLAudioElement | null>(null);
   const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
@@ -519,12 +519,12 @@ export default function ChatItNow() {
     }
   };
 
-  // --- FILE SELECT LOGIC (UPDATED) ---
+  // --- FILE SELECT LOGIC ---
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) { // 10MB
+    if (file.size > 10 * 1024 * 1024) { 
       alert("File is too large. Max size is 10MB.");
       return;
     }
@@ -621,8 +621,8 @@ export default function ChatItNow() {
         type: 'stranger', 
         text: data.text,
         audio: data.audio,
-        image: data.image, // UPDATED
-        video: data.video, // UPDATED
+        image: data.image,
+        video: data.video,
         replyTo: data.replyTo,
         timestamp: data.timestamp || getCurrentTime(),
         reactions: {}
@@ -931,7 +931,7 @@ export default function ChatItNow() {
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
-             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
+            <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
                 <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
                 <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
                 <p>As a university student who knows what it feels like to crave real, genuine connection in a world thats getting more digital and more distant every year. Sometimes, even if we're surrounded by people, we still feel like no one really listens. That's why I built this platform to create a space where Filipinos can express themselves openly, share their stories, and find comfort from people who might actually understand what they're going through—even if they're total strangers.</p>
@@ -1335,25 +1335,27 @@ export default function ChatItNow() {
                   onChange={handleFileSelect} 
                 />
 
-                <button 
-                  type="button" 
-                  onClick={() => fileInputRef.current?.click()} 
-                  className={`h-full px-3 w-12 rounded-xl flex items-center justify-center transition ${darkMode ? 'text-gray-400 hover:bg-[#374151]' : 'text-gray-500 hover:bg-gray-100'}`}
-                >
-                  <Paperclip size={20} />
-                </button>
-
                 <div className="relative flex-1 h-full flex items-center">
+                  
+                  {/* PAPERCLIP INSIDE (LEFT) */}
+                  <button 
+                    type="button" 
+                    onClick={() => fileInputRef.current?.click()} 
+                    className={`absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition z-10 ${darkMode ? 'text-gray-400 hover:bg-[#374151]' : 'text-gray-500 hover:bg-gray-100'}`}
+                  >
+                    <Paperclip size={20} />
+                  </button>
+
                   <input 
                     type="text" 
                     value={currentMessage} 
                     onChange={handleTyping} 
                     enterKeyHint="send" 
                     placeholder={isConnected ? (replyingTo ? `Replying to ${replyingTo.name}...` : "Say something...") : "Waiting..."} 
-                    className={`w-full h-full px-4 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-[#111827] border-[#374151] text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'} ${!currentMessage.trim() ? 'pr-12' : ''}`} 
+                    className={`w-full h-full pl-12 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-[#111827] border-[#374151] text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'} ${!currentMessage.trim() ? 'pr-12' : 'pr-4'}`} 
                   />
                   
-                  {/* MIC ICON INSIDE INPUT */}
+                  {/* MIC ICON INSIDE INPUT (RIGHT) */}
                   {!currentMessage.trim() && (
                     <button 
                       type="button" 
