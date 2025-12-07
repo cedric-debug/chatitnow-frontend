@@ -44,7 +44,6 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
 // --- HELPER: DETECT LINKS & FORMAT TEXT ---
 const formatMessageText = (text: string) => {
   if (!text) return null;
-  // Regex to detect URLs (http/https)
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const parts = text.split(urlRegex);
 
@@ -57,7 +56,7 @@ const formatMessageText = (text: string) => {
           target="_blank"
           rel="noopener noreferrer"
           className="text-blue-300 underline break-all hover:text-blue-200"
-          onClick={(e) => e.stopPropagation()} // Prevent triggering message clicks
+          onClick={(e) => e.stopPropagation()}
         >
           {part}
         </a>
@@ -560,37 +559,67 @@ export default function ChatItNow() {
     });
   };
 
-  // --- ROBUST VIDEO SCANNER (Reuses Canvas) ---
-  // Re-introduced Canvas Bridge for maximum device compatibility
+  // --- FIXED: MOBILE-OPTIMIZED VIDEO SCANNER (Canvas Bridge + Force Play) ---
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
+      // 1. Create hidden video element
       const video = document.createElement('video');
-      video.preload = 'auto'; // Force load for mobile
-      video.src = URL.createObjectURL(file);
+      video.preload = 'auto';
       video.muted = true;
-      video.playsInline = true;
+      video.playsInline = true; 
+      
+      // CRITICAL FOR MOBILE: Must be in DOM to trigger loading/seeking
+      video.style.position = 'fixed';
+      video.style.top = '-10000px';
+      video.style.left = '-10000px';
+      video.style.opacity = '0';
+      document.body.appendChild(video);
 
-      // Create a canvas for reading frames (Bridge method)
+      // 2. Setup Canvas
       const canvas = document.createElement('canvas');
       canvas.width = 224;
       canvas.height = 224;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
       const scanQueue: number[] = []; 
+      let isResolved = false;
+
+      // Helper to clean up DOM and resolve
+      const cleanup = (result: boolean) => {
+         if (isResolved) return;
+         isResolved = true;
+         if (video.parentNode) {
+             document.body.removeChild(video);
+         }
+         URL.revokeObjectURL(video.src);
+         resolve(result);
+      };
 
       const scanNext = async () => {
          if(scanQueue.length === 0) {
-             URL.revokeObjectURL(video.src);
-             resolve(false);
+             cleanup(false); // Finished scanning, no NSFW found
              return;
          }
          const nextTime = scanQueue.shift();
-         video.currentTime = nextTime!;
+         
+         try {
+             video.currentTime = nextTime!;
+         } catch (e) {
+             console.warn("Seek error, skipping frame", e);
+             scanNext();
+         }
       };
 
-      // Changed from onloadeddata to onloadedmetadata for better mobile support
-      video.onloadedmetadata = () => {
+      video.onloadedmetadata = async () => {
+         // --- MOBILE FIX: Force play to buffer data ---
+         try {
+             await video.play();
+             video.pause(); // Pause immediately once activated
+         } catch(e) {
+             console.log("Play kicked failed (might be desktop)", e);
+         }
+
          const dur = video.duration;
          if(dur && dur > 1) {
             scanQueue.push(dur * 0.1); 
@@ -605,9 +634,7 @@ export default function ChatItNow() {
       video.onseeked = async () => {
          try {
              if(ctx) {
-                 // Draw to canvas first
                  ctx.drawImage(video, 0, 0, 224, 224);
-                 // Scan the CANVAS pixels
                  const predictions = await nsfwModel!.classify(canvas);
                  console.log("Video Scan:", predictions);
                  
@@ -617,13 +644,11 @@ export default function ChatItNow() {
                  );
 
                  if (isNsfw) {
-                     URL.revokeObjectURL(video.src);
-                     resolve(true);
+                     cleanup(true);
                      return;
                  }
              }
              scanNext();
-
          } catch(e) { 
              console.error("Frame scan failed", e);
              scanNext(); 
@@ -632,8 +657,12 @@ export default function ChatItNow() {
 
       video.onerror = () => {
           console.error("Video load error");
-          resolve(false);
+          cleanup(false); // Fail safe
       };
+
+      // 3. Start Loading
+      video.src = URL.createObjectURL(file);
+      video.load();
     });
   };
 
@@ -1461,7 +1490,7 @@ export default function ChatItNow() {
                             </div>
                           )}
 
-                          <div className={`relative px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug ${
+                          <div className={`relative px-3 py-2 rounded-2xl text-[15px] shadow-sm leading-snug select-text ${
                             msg.type === 'you'
                               ? 'bg-purple-600 text-white rounded-br-none' 
                               : `${darkMode ? 'bg-[#374151] text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
