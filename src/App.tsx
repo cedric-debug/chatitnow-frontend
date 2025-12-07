@@ -43,7 +43,7 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
 
 // --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
-  transports: ['websocket'], 
+  transports: ['websocket'], // <--- CONFIRMED: Forced WebSocket for large files
   autoConnect: false,
   reconnection: true,             
   reconnectionAttempts: 50,       
@@ -84,6 +84,7 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
   const shouldBlur = msg.type !== 'you' && (msg.isNSFW || safeMode);
   const [isRevealed, setIsRevealed] = useState(!shouldBlur);
 
+  // Reactive Safe Mode
   useEffect(() => {
     if (msg.type === 'you') {
         setIsRevealed(true);
@@ -103,6 +104,8 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
 
   return (
     <div className="relative group">
+      
+      {/* BLUR OVERLAY */}
       {!isRevealed && (
         <div 
           className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-lg cursor-pointer transition-colors backdrop-blur-xl"
@@ -137,18 +140,21 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
             onClick={() => isRevealed && window.open(msg.image)} 
           />
         )}
+        
         {msg.video && (
+          // <--- CONFIRMED: Restored Video Compatibility Attributes
           <video 
-            key={msg.id}
+            key={msg.id} 
             src={msg.video} 
             controls={isRevealed}
-            playsInline
-            preload="auto"
+            playsInline // Critical for iOS
+            preload="auto" // Helps load content
             className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1 bg-black" 
           />
         )}
       </div>
 
+      {/* RE-HIDE BUTTON */}
       {isRevealed && (msg.isNSFW || safeMode) && (
         <button 
           onClick={toggleReveal}
@@ -340,7 +346,7 @@ export default function ChatItNow() {
         try {
             const _model = await nsfwjs.load('MobileNetV2Mid');
             setNsfwModel(_model);
-            console.log("NSFW Model Loaded (Fast)");
+            console.log("NSFW Model Loaded");
         } catch (e) {
             console.error("Failed to load NSFW model", e);
         }
@@ -610,14 +616,14 @@ export default function ChatItNow() {
       return;
     }
 
-    const base64 = await blobToBase64(file);
-    setFilePreview({ base64, type: isImage ? 'image' : 'video' });
-    
     setIsAnalyzing(true);
     setIsNSFWMarked(false); 
     setAiDetectedNSFW(false); 
 
     try {
+        const base64 = await blobToBase64(file);
+        setFilePreview({ base64, type: isImage ? 'image' : 'video' });
+        
         let detectedNSFW = false;
         if(nsfwModel) {
              if(isImage) {
@@ -1029,7 +1035,7 @@ export default function ChatItNow() {
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
-             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
+            <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
                 <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
                 <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
                 <p>As a university student who knows what it feels like to crave real, genuine connection in a world thats getting more digital and more distant every year. Sometimes, even if we're surrounded by people, we still feel like no one really listens. That's why I built this platform to create a space where Filipinos can express themselves openly, share their stories, and find comfort from people who might actually understand what they're going through—even if they're total strangers.</p>
