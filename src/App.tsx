@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-// REMOVED 'Eye' from imports to fix the error
 import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip, AlertTriangle, EyeOff, Loader2, Info } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
@@ -377,6 +376,7 @@ export default function ChatItNow() {
   // --- FILE PREVIEW & NSFW ---
   const [filePreview, setFilePreview] = useState<{ base64: string, type: 'image' | 'video' } | null>(null);
   const [isNSFWMarked, setIsNSFWMarked] = useState(false);
+  const [aiDetectedNSFW, setAiDetectedNSFW] = useState(false); 
   const [isAnalyzing, setIsAnalyzing] = useState(false); 
   const [nsfwModel, setNsfwModel] = useState<nsfwjs.NSFWJS | null>(null); 
 
@@ -625,8 +625,10 @@ export default function ChatItNow() {
     });
   };
 
+  // --- VIDEO SCANNER (STRICT + NO TIMEOUT) ---
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
+    
     return new Promise((resolve) => {
       const video = document.createElement('video');
       video.preload = 'metadata';
@@ -689,17 +691,19 @@ export default function ChatItNow() {
          }
       };
 
+      // Ensure no indefinite hang if video fails to load
       video.onerror = () => resolve(false);
     });
   };
 
-  // --- FILE SELECT LOGIC (AUTO SCAN) ---
+  // --- FILE SELECT LOGIC (UPDATED: 20MB LIMIT) ---
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 50 * 1024 * 1024) { 
-      alert("File is too large. Max size is 50MB.");
+    // UPDATED: 20MB Limit
+    if (file.size > 20 * 1024 * 1024) { 
+      alert("File is too large. Max size is 20MB.");
       return;
     }
 
@@ -711,22 +715,34 @@ export default function ChatItNow() {
       return;
     }
 
-    setIsAnalyzing(true);
+    // 1. Show Preview Immediately
     const base64 = await blobToBase64(file);
-    let detectedNSFW = false;
+    setFilePreview({ base64, type: isImage ? 'image' : 'video' });
     
-    if (nsfwModel) {
-        if (isImage) {
-            detectedNSFW = await checkImageContent(base64);
-        } else if (isVideo) {
-            detectedNSFW = await checkVideoContent(file);
+    // 2. Start Scanning (Background)
+    setIsAnalyzing(true);
+    setIsNSFWMarked(false); // Reset manual check
+    setAiDetectedNSFW(false); // Reset AI check
+
+    try {
+        let detectedNSFW = false;
+        if (nsfwModel) {
+            if (isImage) {
+                detectedNSFW = await checkImageContent(base64);
+            } else if (isVideo) {
+                detectedNSFW = await checkVideoContent(file);
+            }
         }
+        
+        if (detectedNSFW) {
+            setAiDetectedNSFW(true); // Flag AI detected
+        }
+    } catch (e) {
+        console.error("Scan error", e);
+    } finally {
+        setIsAnalyzing(false); // Stop spinner
     }
 
-    setIsAnalyzing(false);
-    setFilePreview({ base64, type: isImage ? 'image' : 'video' });
-    setIsNSFWMarked(detectedNSFW); 
-    
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -736,13 +752,16 @@ export default function ChatItNow() {
     const msgID = generateMessageID();
     const timestamp = getCurrentTime();
     
+    // LOGIC: AI or Manual triggers NSFW
+    const finalIsNSFW = aiDetectedNSFW || isNSFWMarked;
+
     const msgData: any = {
       id: msgID,
       text: null,
       timestamp: timestamp,
       image: filePreview.type === 'image' ? filePreview.base64 : null,
       video: filePreview.type === 'video' ? filePreview.base64 : null,
-      isNSFW: isNSFWMarked
+      isNSFW: finalIsNSFW
     };
 
     if (replyingTo) msgData.replyTo = replyingTo;
@@ -753,7 +772,7 @@ export default function ChatItNow() {
       text: null,
       image: filePreview.type === 'image' ? filePreview.base64 : undefined,
       video: filePreview.type === 'video' ? filePreview.base64 : undefined,
-      isNSFW: isNSFWMarked,
+      isNSFW: finalIsNSFW,
       replyTo: replyingTo || undefined,
       timestamp: timestamp,
       status: 'sent',
@@ -766,6 +785,8 @@ export default function ChatItNow() {
     playSound('sent');
     resetActivity();
     setFilePreview(null); 
+    setIsNSFWMarked(false);
+    setAiDetectedNSFW(false);
   };
 
   const handleSendAudio = (base64Audio: string) => {
@@ -1024,6 +1045,7 @@ export default function ChatItNow() {
         text: currentMessage, 
         replyTo: replyingTo || undefined,
         timestamp: msgData.timestamp,
+        status: 'sent',
         reactions: {}
       }]);
       socket.emit('send_message', msgData);
@@ -1251,26 +1273,40 @@ export default function ChatItNow() {
                  )}
               </div>
 
-              {/* MANUAL NSFW CHECKBOX (RESTORED) */}
-              <label className={`flex items-center gap-3 mb-2 cursor-pointer p-3 rounded-lg border transition ${isNSFWMarked ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : 'hover:bg-gray-50 dark:hover:bg-[#374151]'}`}>
-                 <input 
-                   type="checkbox" 
-                   checked={isNSFWMarked} 
-                   onChange={(e) => setIsNSFWMarked(e.target.checked)}
-                   className="w-5 h-5 text-red-600 rounded focus:ring-red-500" 
-                 />
-                 <div className="flex flex-col">
-                    <span className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>Mark as Sensitive (NSFW / Gore)</span>
-                    <span className="text-xs text-gray-500">Blur content for receiver</span>
-                 </div>
-              </label>
-              
-              <div className="flex items-start gap-2 mb-6 px-1">
-                 <Info size={14} className="text-gray-400 mt-0.5 shrink-0" />
-                 <p className="text-[10px] text-gray-400">
-                    AI automatically flags nudity. Please manually check this box for violence or gore.
-                 </p>
-              </div>
+              {/* AUTOMATIC NSFW LABEL (IF AI DETECTED) */}
+              {aiDetectedNSFW ? (
+                  <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3">
+                      <AlertTriangle className="text-red-600 dark:text-red-400" size={20} />
+                      <div className="flex flex-col">
+                          <span className="font-bold text-sm text-red-700 dark:text-red-400">Content Flagged by AI</span>
+                          <span className="text-xs text-red-600/80 dark:text-red-400/80">Will be blurred for receiver</span>
+                      </div>
+                  </div>
+              ) : (
+                  // MANUAL NSFW CHECKBOX (RESTORED - Only shows if AI didn't catch it)
+                  <label className={`flex items-center gap-3 mb-2 cursor-pointer p-3 rounded-lg border transition ${isNSFWMarked ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : 'hover:bg-gray-50 dark:hover:bg-[#374151]'}`}>
+                     <input 
+                       type="checkbox" 
+                       checked={isNSFWMarked} 
+                       onChange={(e) => setIsNSFWMarked(e.target.checked)}
+                       className="w-5 h-5 text-red-600 rounded focus:ring-red-500" 
+                     />
+                     <div className="flex flex-col">
+                        <span className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>Mark as Sensitive (NSFW / Gore)</span>
+                        <span className="text-xs text-gray-500">Blur content for receiver</span>
+                     </div>
+                  </label>
+              )}
+
+              {/* DISCLAIMER (Only show if manual check is available) */}
+              {!aiDetectedNSFW && (
+                  <div className="flex items-start gap-2 mb-6 px-1">
+                     <Info size={14} className="text-gray-400 mt-0.5 shrink-0" />
+                     <p className="text-[10px] text-gray-400">
+                        AI scans for nudity automatically. Please manually check this box for violence or gore.
+                     </p>
+                  </div>
+              )}
 
               <div className="flex gap-3">
                  <button onClick={() => setFilePreview(null)} className="flex-1 py-3 rounded-lg font-bold bg-gray-200 hover:bg-gray-300 text-gray-800 transition">Cancel</button>
