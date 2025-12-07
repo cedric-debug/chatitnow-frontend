@@ -60,7 +60,8 @@ interface Message {
     you?: string | null;
     stranger?: string | null;
   };
-  data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; };
+  // UPDATED: Added isYou to data interface
+  data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; isYou?: boolean; };
 }
 
 // --- SWIPEABLE MESSAGE COMPONENT ---
@@ -323,7 +324,6 @@ export default function ChatItNow() {
       resetActivity();
 
       // --- SYSTEM NOTIFICATION CHECK ---
-      // Added check for isNotifyMuted
       if (!isNotifyMuted && document.hidden && Notification.permission === "granted") {
           new Notification(`New message from ${partnerNameRef.current || 'Partner'}`, {
               body: data.text || "Sent a message",
@@ -347,7 +347,8 @@ export default function ChatItNow() {
       setIsTyping(false); 
       setReplyingTo(null); 
       const nameToShow = partnerNameRef.current || 'Partner';
-      setMessages(prev => [...prev, { id: 'sys-end', type: 'system', data: { name: nameToShow, action: 'disconnected' }, reactions: {} }]);
+      // UPDATED: Added isYou: false
+      setMessages(prev => [...prev, { id: 'sys-end', type: 'system', data: { name: nameToShow, action: 'disconnected', isYou: false }, reactions: {} }]);
     });
 
     socket.on('partner_typing', (typing: boolean) => setIsTyping(typing));
@@ -496,7 +497,8 @@ export default function ChatItNow() {
     setPartnerStatus('disconnected');
     setIsTyping(false);
     setReplyingTo(null);
-    setMessages(prev => [...prev, { id: 'sys-end-me', type: 'system', data: { name: username, action: 'disconnected' }, reactions: {} }]);
+    // UPDATED: Added isYou: true
+    setMessages(prev => [...prev, { id: 'sys-end-me', type: 'system', data: { name: username, action: 'disconnected', isYou: true }, reactions: {} }]);
   };
 
   const handleStartSearch = () => { startSearch(); };
@@ -530,7 +532,8 @@ export default function ChatItNow() {
     const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
     if (msg.data.action === 'connected') return <span>You are now chatting with <span style={boldStyle}>{msg.data.name}</span>{msg.data.field ? <> who is in <span style={boldStyle}>{msg.data.field}</span></> : "."}</span>;
     if (msg.data.action === 'disconnected') {
-      if (msg.data.name === username) return <span><span style={boldStyle}>You</span> disconnected from the chat.</span>;
+      // UPDATED: Logic now checks msg.data.isYou specifically to fix duplicate name bug
+      if (msg.data.isYou) return <span><span style={boldStyle}>You</span> disconnected from the chat.</span>;
       return <span><span style={boldStyle}>{msg.data.name}</span> disconnected from the chat.</span>;
     }
     return null;
