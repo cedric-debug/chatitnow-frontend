@@ -772,7 +772,7 @@ export default function ChatItNow() {
                      
                      {/* FIXED: SMILEY POSITIONING */}
                      {/* You: Smiley Left. Stranger: Smiley Right. */}
-                     <div className={`flex items-end gap-2 w-fit ${msg.type === 'you' ? 'ml-auto flex-row-reverse' : 'flex-row'} max-w-[85%]`}>
+                     <div className={`flex items-end gap-2 w-fit flex-row ${msg.type === 'you' ? 'ml-auto' : ''} max-w-[85%]`}>
                         
                         {/* LEFT SMILEY (FOR YOU) */}
                         {msg.type === 'you' && (
