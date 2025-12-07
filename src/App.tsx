@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip, AlertTriangle, EyeOff, Loader2 } from 'lucide-react';
+import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip, AlertTriangle, EyeOff, Loader2, Info } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 import * as nsfwjs from 'nsfwjs';
@@ -91,14 +91,15 @@ const MediaMessage = ({ msg }: { msg: Message }) => {
     <div className="relative group">
       {/* NSFW OVERLAY */}
       {!isRevealed && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md rounded-lg cursor-pointer transition-colors hover:bg-black/70" onClick={toggleReveal}>
-           <AlertTriangle className="text-red-500 mb-1" size={24} />
-           <span className="text-red-500 font-bold text-xs uppercase tracking-wider">NSFW Content</span>
-           <span className="text-gray-300 text-[10px] mt-1">Click to view</span>
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl rounded-lg cursor-pointer transition-colors hover:bg-black/80" onClick={toggleReveal}>
+           <AlertTriangle className="text-red-500 mb-2" size={32} />
+           <span className="text-red-500 font-bold text-sm uppercase tracking-wider mb-1">Sensitive Content</span>
+           <span className="text-gray-400 text-xs">(NSFW / Gore)</span>
+           <span className="text-gray-300 text-[10px] mt-4 border border-gray-600 px-3 py-1 rounded-full">Click to view</span>
         </div>
       )}
 
-      <div className={`${!isRevealed ? 'filter blur-sm opacity-50' : ''} transition-all duration-300`}>
+      <div className={`${!isRevealed ? 'filter blur-xl opacity-0' : 'opacity-100'} transition-all duration-300`}>
         {msg.image && (
           <img 
             src={msg.image} 
@@ -601,7 +602,7 @@ export default function ChatItNow() {
     }
   };
 
-  // --- AI SCANNERS (STRICTER FILTER) ---
+  // --- AI SCANNERS (STRICTER FILTER: 25%) ---
   const checkImageContent = async (base64Data: string): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
@@ -623,7 +624,6 @@ export default function ChatItNow() {
     });
   };
 
-  // --- UPDATED VIDEO SCANNER (3 SCANS) ---
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
     
@@ -634,17 +634,14 @@ export default function ChatItNow() {
       video.muted = true;
       video.playsInline = true;
 
-      // We will check 3 points. Using a list to manage sequence.
-      const scanQueue: number[] = []; // Timestamps to scan
+      const scanQueue: number[] = []; 
 
       const scanNext = async () => {
          if(scanQueue.length === 0) {
-             // All checks passed
              URL.revokeObjectURL(video.src);
              resolve(false);
              return;
          }
-
          const nextTime = scanQueue.shift();
          video.currentTime = nextTime!;
       };
@@ -652,13 +649,13 @@ export default function ChatItNow() {
       video.onloadeddata = () => {
          const dur = video.duration;
          if(dur && dur > 1) {
-            scanQueue.push(dur * 0.1); // 10% Start
-            scanQueue.push(dur * 0.5); // 50% Middle
-            scanQueue.push(dur * 0.9); // 90% End
+            scanQueue.push(dur * 0.1); 
+            scanQueue.push(dur * 0.5); 
+            scanQueue.push(dur * 0.9); 
          } else {
-            scanQueue.push(0); // Very short video
+            scanQueue.push(0); 
          }
-         scanNext(); // Start the chain
+         scanNext(); 
       };
 
       video.onseeked = async () => {
@@ -679,18 +676,16 @@ export default function ChatItNow() {
                  );
 
                  if (isNsfw) {
-                     // Caught NSFW! Stop scanning and report True.
                      URL.revokeObjectURL(video.src);
                      resolve(true);
                      return;
                  }
              }
-             // If safe, move to next timestamp
              scanNext();
 
          } catch(e) { 
              console.error("Frame scan failed", e);
-             scanNext(); // Continue to next frame just in case
+             scanNext(); 
          }
       };
 
@@ -698,7 +693,7 @@ export default function ChatItNow() {
     });
   };
 
-  // --- FILE SELECT LOGIC (AUTO SCAN) ---
+  // --- FILE SELECT LOGIC ---
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -730,7 +725,7 @@ export default function ChatItNow() {
 
     setIsAnalyzing(false);
     setFilePreview({ base64, type: isImage ? 'image' : 'video' });
-    setIsNSFWMarked(detectedNSFW); 
+    setIsNSFWMarked(detectedNSFW); // Auto-checked if detected
     
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -1246,7 +1241,7 @@ export default function ChatItNow() {
                  {isAnalyzing ? (
                     <div className="flex flex-col items-center justify-center h-40">
                        <Loader2 className="animate-spin text-purple-600 mb-2" size={32} />
-                       <span className="text-xs text-gray-500">Scanning for NSFW content...</span>
+                       <span className="text-xs text-gray-500">Scanning content...</span>
                     </div>
                  ) : filePreview.type === 'image' ? (
                     <img src={filePreview.base64} alt="Preview" className="max-h-full rounded object-contain" />
@@ -1255,24 +1250,26 @@ export default function ChatItNow() {
                  )}
               </div>
 
-              {/* AUTOMATIC NSFW LABEL */}
-              {isNSFWMarked ? (
-                  <div className="mb-6 p-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3">
-                      <AlertTriangle className="text-red-600 dark:text-red-400" size={20} />
-                      <div className="flex flex-col">
-                          <span className="font-bold text-sm text-red-700 dark:text-red-400">Content Flagged</span>
-                          <span className="text-xs text-red-600/80 dark:text-red-400/80">Will be blurred for receiver</span>
-                      </div>
-                  </div>
-              ) : (
-                  <div className="mb-6 p-3 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-3">
-                      <Check className="text-green-600 dark:text-green-400" size={20} />
-                       <div className="flex flex-col">
-                          <span className="font-bold text-sm text-green-700 dark:text-green-400">Content Safe</span>
-                          <span className="text-xs text-green-600/80 dark:text-green-400/80">Sending normally</span>
-                      </div>
-                  </div>
-              )}
+              {/* MANUAL NSFW CHECKBOX (RESTORED) */}
+              <label className={`flex items-center gap-3 mb-2 cursor-pointer p-3 rounded-lg border transition ${isNSFWMarked ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : 'hover:bg-gray-50 dark:hover:bg-[#374151]'}`}>
+                 <input 
+                   type="checkbox" 
+                   checked={isNSFWMarked} 
+                   onChange={(e) => setIsNSFWMarked(e.target.checked)}
+                   className="w-5 h-5 text-red-600 rounded focus:ring-red-500" 
+                 />
+                 <div className="flex flex-col">
+                    <span className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>Mark as Sensitive (NSFW / Gore)</span>
+                    <span className="text-xs text-gray-500">Blur content for receiver</span>
+                 </div>
+              </label>
+              
+              <div className="flex items-start gap-2 mb-6 px-1">
+                 <Info size={14} className="text-gray-400 mt-0.5 shrink-0" />
+                 <p className="text-[10px] text-gray-400">
+                    AI automatically flags nudity. Please manually check this box for violence or gore.
+                 </p>
+              </div>
 
               <div className="flex gap-3">
                  <button onClick={() => setFilePreview(null)} className="flex-1 py-3 rounded-lg font-bold bg-gray-200 hover:bg-gray-300 text-gray-800 transition">Cancel</button>
