@@ -535,7 +535,7 @@ export default function ChatItNow() {
                     console.log("Fast Image Scan:", predictions);
                     const isNsfw = predictions.some(p => 
                         (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
-                        && p.probability > 0.05
+                        && p.probability > 0.15
                     );
                     resolve(isNsfw);
                 }).catch(() => resolve(false));
@@ -594,7 +594,7 @@ export default function ChatItNow() {
                  
                  const isNsfw = predictions.some(p => 
                      (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
-                     && p.probability > 0.05
+                     && p.probability > 0.15
                  );
 
                  if (isNsfw) {
