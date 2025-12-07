@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff } from 'lucide-react';
+import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 
@@ -31,6 +31,15 @@ const generateMessageID = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
+const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
 // --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
   autoConnect: false,
@@ -53,6 +62,7 @@ interface Message {
   id: string; 
   type: 'system' | 'you' | 'stranger' | 'warning';
   text?: React.ReactNode;
+  audio?: string;
   replyTo?: ReplyData;
   timestamp?: string;
   reaction?: string; 
@@ -60,7 +70,6 @@ interface Message {
     you?: string | null;
     stranger?: string | null;
   };
-  // UPDATED: Added isYou to data interface
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; isYou?: boolean; };
 }
 
@@ -213,6 +222,13 @@ export default function ChatItNow() {
   const [replyingTo, setReplyingTo] = useState<ReplyData | null>(null);
   const [activeReactionId, setActiveReactionId] = useState<string | null>(null);
 
+  // --- AUDIO RECORDING STATES ---
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<number | null>(null);
+
   const audioSentRef = useRef<HTMLAudioElement | null>(null);
   const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
 
@@ -295,6 +311,98 @@ export default function ChatItNow() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTyping, replyingTo]); 
 
+  // --- RECORDING LOGIC ---
+  const startRecording = async () => {
+    if (!isConnected) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+
+      // Start Timer
+      recordingTimerRef.current = window.setInterval(() => {
+        setRecordingDuration(prev => {
+          if (prev >= 15) {
+             // Auto stop at 15s
+             stopRecordingAndSend();
+             return 15;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      alert("Could not access microphone.");
+    }
+  };
+
+  const stopRecordingAndSend = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.onstop = async () => {
+         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+         const base64Audio = await blobToBase64(audioBlob);
+         handleSendAudio(base64Audio);
+         
+         // Cleanup
+         if(recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+         mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
+         setIsRecording(false);
+         setRecordingDuration(0);
+      };
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      if(recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+      setRecordingDuration(0);
+      audioChunksRef.current = [];
+    }
+  };
+
+  const handleSendAudio = (base64Audio: string) => {
+      const msgID = generateMessageID();
+      const msgData: any = {
+          id: msgID,
+          text: null,
+          audio: base64Audio,
+          timestamp: getCurrentTime()
+      };
+      if (replyingTo) msgData.replyTo = replyingTo;
+
+      setMessages(prev => [...prev, {
+          id: msgID,
+          type: 'you',
+          text: null,
+          audio: base64Audio,
+          replyTo: replyingTo || undefined,
+          timestamp: msgData.timestamp,
+          reactions: {}
+      }]);
+      socket.emit('send_message', msgData);
+
+      setReplyingTo(null);
+      playSound('sent');
+      resetActivity();
+  };
+
+
   // --- SOCKET HANDLERS ---
   useEffect(() => {
     socket.on('matched', (data: any) => {
@@ -313,7 +421,8 @@ export default function ChatItNow() {
       setMessages(prev => [...prev, { 
         id: msgId,
         type: 'stranger', 
-        text: data.text, 
+        text: data.text,
+        audio: data.audio,
         replyTo: data.replyTo,
         timestamp: data.timestamp || getCurrentTime(),
         reactions: {}
@@ -326,7 +435,7 @@ export default function ChatItNow() {
       // --- SYSTEM NOTIFICATION CHECK ---
       if (!isNotifyMuted && document.hidden && Notification.permission === "granted") {
           new Notification(`New message from ${partnerNameRef.current || 'Partner'}`, {
-              body: data.text || "Sent a message",
+              body: data.audio ? "Sent a voice message" : (data.text || "Sent a message"),
               icon: "/favicon.ico" 
           });
       }
@@ -346,8 +455,9 @@ export default function ChatItNow() {
       setPartnerStatus('disconnected');
       setIsTyping(false); 
       setReplyingTo(null); 
+      if(isRecording) cancelRecording();
+
       const nameToShow = partnerNameRef.current || 'Partner';
-      // UPDATED: Added isYou: false
       setMessages(prev => [...prev, { id: 'sys-end', type: 'system', data: { name: nameToShow, action: 'disconnected', isYou: false }, reactions: {} }]);
     });
 
@@ -371,7 +481,7 @@ export default function ChatItNow() {
       socket.off('partner_reconnecting_server'); 
       socket.off('partner_connected'); 
     };
-  }, [isMuted, isConnected, isNotifyMuted]); 
+  }, [isMuted, isConnected, isNotifyMuted, isRecording]); 
 
   // --- THEME & ADDRESS BAR COLOR ---
   useLayoutEffect(() => {
@@ -497,7 +607,6 @@ export default function ChatItNow() {
     setPartnerStatus('disconnected');
     setIsTyping(false);
     setReplyingTo(null);
-    // UPDATED: Added isYou: true
     setMessages(prev => [...prev, { id: 'sys-end-me', type: 'system', data: { name: username, action: 'disconnected', isYou: true }, reactions: {} }]);
   };
 
@@ -506,7 +615,7 @@ export default function ChatItNow() {
   const initiateReply = (text: any, type: string) => {
     if (!isConnected) return;
     const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
-    setReplyingTo({ text: typeof text === 'string' ? text : 'Content', name: senderName, isYou: type === 'you' });
+    setReplyingTo({ text: typeof text === 'string' ? text : 'Voice Message', name: senderName, isYou: type === 'you' });
     const input = document.querySelector('input[type="text"]') as HTMLInputElement;
     if(input) input.focus();
   };
@@ -532,7 +641,6 @@ export default function ChatItNow() {
     const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
     if (msg.data.action === 'connected') return <span>You are now chatting with <span style={boldStyle}>{msg.data.name}</span>{msg.data.field ? <> who is in <span style={boldStyle}>{msg.data.field}</span></> : "."}</span>;
     if (msg.data.action === 'disconnected') {
-      // UPDATED: Logic now checks msg.data.isYou specifically to fix duplicate name bug
       if (msg.data.isYou) return <span><span style={boldStyle}>You</span> disconnected from the chat.</span>;
       return <span><span style={boldStyle}>{msg.data.name}</span> disconnected from the chat.</span>;
     }
@@ -663,6 +771,13 @@ export default function ChatItNow() {
           50% { transform: translateY(-4px); opacity: 1; }
         }
         .animate-typing { animation: typing-bounce 1.4s infinite ease-in-out both; }
+        
+        @keyframes pulse-red {
+          0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+          70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .animate-pulse-red { animation: pulse-red 1.5s infinite; }
       `}</style>
 
       <div className={`
@@ -816,7 +931,14 @@ export default function ChatItNow() {
                               ? 'bg-purple-600 text-white rounded-br-none' 
                               : `${darkMode ? 'bg-[#374151] text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
                           }`}>
-                            {msg.text}
+                            
+                            {/* --- RENDER TEXT OR AUDIO --- */}
+                            {msg.audio ? (
+                                <audio controls src={msg.audio} className="h-8 max-w-[200px]" />
+                            ) : (
+                                msg.text
+                            )}
+
                             {msg.timestamp && (
                               <span className={`text-[10px] block mt-1 select-none ${
                                 msg.type === 'you' 
@@ -900,12 +1022,61 @@ export default function ChatItNow() {
               <button type="button" onClick={() => setShowNextConfirm(false)} className="h-full px-4 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition text-sm">Cancel</button>
             </div>
           ) : (
-            <form className="flex gap-2 items-center h-[60px]" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
-              <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full px-3 w-16 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-[#374151] text-white hover:bg-[#323844]' : 'border-gray-200 text-black hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
-              
-              <input type="text" value={currentMessage} onChange={handleTyping} enterKeyHint="send" placeholder={isConnected ? (replyingTo ? `Replying to ${replyingTo.name}...` : "Say something...") : "Waiting..."} disabled={!isConnected} className={`flex-1 h-full px-3 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-[#111827] border-[#374151] text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'}`} />
-              <button type="submit" disabled={!isConnected || !currentMessage.trim()} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
-            </form>
+            // --- UPDATED FORM AREA TO HANDLE RECORDING UI ---
+            isRecording ? (
+               <div className="flex gap-2 items-center h-[60px] w-full px-2">
+                 <div className="flex-1 flex items-center gap-3">
+                   <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse-red"></div>
+                   <span className={`font-mono font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>
+                      {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')} / 0:15
+                   </span>
+                 </div>
+                 <button type="button" onClick={cancelRecording} className="p-3 text-red-500 hover:bg-red-100 rounded-full transition">
+                   <Trash2 size={24} />
+                 </button>
+                 <button type="button" onClick={stopRecordingAndSend} className="p-3 bg-purple-600 text-white rounded-full hover:bg-purple-700 transition">
+                   <span className="text-xs font-bold">SEND</span>
+                 </button>
+               </div>
+            ) : (
+              <form className="flex gap-2 items-center h-[60px]" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
+                
+                {/* SKIP BUTTON */}
+                <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full px-3 w-16 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-[#374151] text-white hover:bg-[#323844]' : 'border-gray-200 text-black hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
+                
+                {/* INPUT CONTAINER */}
+                <div className="relative flex-1 h-full flex items-center">
+                  <input 
+                    type="text" 
+                    value={currentMessage} 
+                    onChange={handleTyping} 
+                    enterKeyHint="send" 
+                    placeholder={isConnected ? (replyingTo ? `Replying to ${replyingTo.name}...` : "Say something...") : "Waiting..."} 
+                    disabled={!isConnected} 
+                    // Added padding-right (pr-12) only when empty to avoid text hitting icon
+                    className={`w-full h-full px-4 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-[#111827] border-[#374151] text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'} ${!currentMessage.trim() ? 'pr-12' : ''}`} 
+                  />
+                  
+                  {/* MIC ICON INSIDE INPUT (ONLY SHOWS WHEN TEXT IS EMPTY) */}
+                  {!currentMessage.trim() && (
+                    <button 
+                      type="button" 
+                      onClick={startRecording} 
+                      disabled={!isConnected} 
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors ${darkMode ? 'text-gray-400 hover:bg-[#374151]' : 'text-gray-500 hover:bg-gray-100'} disabled:opacity-50`}
+                    >
+                      <AudioLines size={20} />
+                    </button>
+                  )}
+                </div>
+
+                {/* SEND BUTTON (ONLY SHOWS WHEN TYPING) */}
+                {currentMessage.trim() && (
+                  <button type="submit" disabled={!isConnected} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
+                )}
+
+              </form>
+            )
           )}
         </div>
 
