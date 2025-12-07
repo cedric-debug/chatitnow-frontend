@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip } from 'lucide-react';
+import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip, AlertTriangle, EyeOff, Loader2 } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
+import * as nsfwjs from 'nsfwjs';
 
 // --- CONFIGURATION ---
 const PROD_URL = "https://chatitnow-backend.onrender.com"; 
@@ -65,6 +66,7 @@ interface Message {
   audio?: string;
   image?: string;
   video?: string;
+  isNSFW?: boolean;
   replyTo?: ReplyData;
   timestamp?: string;
   status?: 'sent' | 'read';
@@ -76,38 +78,72 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; isYou?: boolean; };
 }
 
-// --- CUSTOM AUDIO PLAYER COMPONENT (FIXED) ---
+// --- MEDIA MESSAGE COMPONENT (Fixed: Removed unused darkMode prop) ---
+const MediaMessage = ({ msg }: { msg: Message }) => {
+  const [isRevealed, setIsRevealed] = useState(msg.type === 'you' || !msg.isNSFW);
+
+  const toggleReveal = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsRevealed(!isRevealed);
+  };
+
+  return (
+    <div className="relative group">
+      {/* NSFW OVERLAY */}
+      {!isRevealed && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md rounded-lg cursor-pointer transition-colors hover:bg-black/70" onClick={toggleReveal}>
+           <AlertTriangle className="text-red-500 mb-1" size={24} />
+           <span className="text-red-500 font-bold text-xs uppercase tracking-wider">NSFW Content</span>
+           <span className="text-gray-300 text-[10px] mt-1">Click to view</span>
+        </div>
+      )}
+
+      <div className={`${!isRevealed ? 'filter blur-sm opacity-50' : ''} transition-all duration-300`}>
+        {msg.image && (
+          <img 
+            src={msg.image} 
+            alt="Sent content" 
+            className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1 cursor-pointer"
+            onClick={() => isRevealed && window.open(msg.image)} 
+          />
+        )}
+        
+        {msg.video && (
+          <video 
+            src={msg.video} 
+            controls={isRevealed}
+            className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1" 
+          />
+        )}
+      </div>
+
+      {isRevealed && msg.isNSFW && (
+        <button 
+          onClick={toggleReveal}
+          className="absolute top-2 right-2 z-30 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Hide Content"
+        >
+          <EyeOff size={14} />
+        </button>
+      )}
+    </div>
+  );
+};
+
+// --- CUSTOM AUDIO PLAYER COMPONENT ---
 const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isOwnMessage: boolean, isDarkMode: boolean }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Reload audio when src changes
-  useEffect(() => {
-    if (audioRef.current) {
-        audioRef.current.load();
-        setIsPlaying(false);
-        setCurrentTime(0);
-        setDuration(0);
-    }
-  }, [src]);
-
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation(); 
-    const audio = audioRef.current;
-    if (!audio) return;
-
+    if (!audioRef.current) return;
     if (isPlaying) {
-      audio.pause();
+      audioRef.current.pause();
     } else {
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-          playPromise.catch(error => {
-              console.error("Playback failed:", error);
-              setIsPlaying(false);
-          });
-      }
+      audioRef.current.play().catch(e => console.error("Play failed", e));
     }
     setIsPlaying(!isPlaying);
   };
@@ -116,45 +152,25 @@ const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isO
     const audio = audioRef.current;
     if (!audio) return;
 
-    const onTimeUpdate = () => {
-        // Fallback: If duration is Infinity, we can sometimes deduce it from buffered end, 
-        // but typically we just handle the UI gracefully.
-        if (audio.duration === Infinity) {
-            setDuration(0); // Signals "Unknown"
-        }
-        setCurrentTime(audio.currentTime);
-    };
-
+    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
     const onLoadedMetadata = () => {
         if(audio.duration !== Infinity && !isNaN(audio.duration)) {
             setDuration(audio.duration);
-        } else {
-            // FIX: Handle WebM Infinity Duration issue
-            // We set it to 0 so the UI knows it's streaming/unknown
-            setDuration(0);
-        }
+        } else { setDuration(0); }
     };
-
     const onEnded = () => {
         setIsPlaying(false);
         setCurrentTime(0);
     };
 
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
-
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('ended', onEnded);
-    audio.addEventListener('play', onPlay);
-    audio.addEventListener('pause', onPause);
 
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
       audio.removeEventListener('ended', onEnded);
-      audio.removeEventListener('play', onPlay);
-      audio.removeEventListener('pause', onPause);
     };
   }, []);
 
@@ -165,17 +181,7 @@ const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isO
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  // FIX: Calculate percentage carefully to avoid NaN
-  let progressPercent = 0;
-  if (duration > 0) {
-      progressPercent = (currentTime / duration) * 100;
-  } else if (currentTime > 0) {
-      // If duration is unknown (Infinity), just show a "loading" style or keep it moving?
-      // Since max is 15s, we can cheat visually if we really wanted to, 
-      // but keeping it 0 or full is safer for "Live" feel. 
-      // Let's just keep it at 0 if unknown, but timer ticks.
-      progressPercent = 0; 
-  }
+  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   const btnColor = isOwnMessage ? "text-white" : (isDarkMode ? "text-gray-200" : "text-gray-700");
   const trackBg = isOwnMessage ? "bg-purple-400/50" : (isDarkMode ? "bg-gray-600" : "bg-gray-300");
@@ -200,13 +206,13 @@ const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isO
       </div>
 
       <span className={`text-[10px] font-mono w-[30px] text-right ${timeColor} pt-0.5`}>
-        {formatTime(currentTime)}
+        {formatTime(isPlaying ? currentTime : duration)}
       </span>
     </div>
   );
 };
 
-// --- SWIPEABLE MESSAGE COMPONENT ---
+// --- SWIPEABLE COMPONENT ---
 const SwipeableMessage = ({ 
   children, 
   onReply, 
@@ -358,13 +364,19 @@ export default function ChatItNow() {
   const [replyingTo, setReplyingTo] = useState<ReplyData | null>(null);
   const [activeReactionId, setActiveReactionId] = useState<string | null>(null);
 
-  // --- MEDIA & RECORDING STATES ---
+  // --- MEDIA STATES ---
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null); 
+  
+  // --- FILE PREVIEW & NSFW ---
+  const [filePreview, setFilePreview] = useState<{ base64: string, type: 'image' | 'video' } | null>(null);
+  const [isNSFWMarked, setIsNSFWMarked] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false); 
+  const [nsfwModel, setNsfwModel] = useState<nsfwjs.NSFWJS | null>(null); 
 
   const audioSentRef = useRef<HTMLAudioElement | null>(null);
   const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
@@ -375,6 +387,20 @@ export default function ChatItNow() {
     }
     return false;
   });
+
+  // --- LOAD NSFW MODEL ---
+  useEffect(() => {
+    const loadModel = async () => {
+        try {
+            const _model = await nsfwjs.load();
+            setNsfwModel(_model);
+            console.log("NSFW Model Loaded");
+        } catch (e) {
+            console.error("Failed to load NSFW model", e);
+        }
+    };
+    loadModel();
+  }, []);
 
   // --- REGISTER SERVICE WORKER ---
   useEffect(() => {
@@ -509,16 +535,15 @@ export default function ChatItNow() {
   // --- RECORDING LOGIC ---
   const startRecording = async () => {
     try {
-      // Determine supported MIME type for this device
-      let mimeType = 'audio/webm'; // Default for Chrome/Android
+      let mimeType = 'audio/webm'; 
       if (MediaRecorder.isTypeSupported('audio/mp4')) {
-          mimeType = 'audio/mp4'; // Safari
+          mimeType = 'audio/mp4'; 
       } else if (MediaRecorder.isTypeSupported('audio/aac')) {
           mimeType = 'audio/aac';
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType }); // Explicitly use supported type
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -550,7 +575,7 @@ export default function ChatItNow() {
 
   const stopRecordingAndSend = () => {
     if (mediaRecorderRef.current && isRecording) {
-      const mimeType = mediaRecorderRef.current.mimeType; // Get the actual type used
+      const mimeType = mediaRecorderRef.current.mimeType;
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.onstop = async () => {
          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
@@ -576,7 +601,63 @@ export default function ChatItNow() {
     }
   };
 
-  // --- FILE SELECT LOGIC ---
+  // --- AI SCANNERS ---
+  const checkImageContent = async (base64Data: string): Promise<boolean> => {
+    if (!nsfwModel) return false;
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = base64Data;
+        img.onload = async () => {
+            try {
+                const predictions = await nsfwModel.classify(img);
+                const isNsfw = predictions.some(p => (p.className === 'Porn' || p.className === 'Hentai') && p.probability > 0.60);
+                resolve(isNsfw);
+            } catch (err) { resolve(false); }
+        };
+        img.onerror = () => resolve(false);
+    });
+  };
+
+  const checkVideoContent = async (file: File): Promise<boolean> => {
+    if (!nsfwModel) return false;
+    
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.src = URL.createObjectURL(file);
+      video.muted = true;
+      video.playsInline = true;
+
+      video.onloadeddata = () => {
+         let seekTime = 1;
+         if(video.duration && video.duration > 2) {
+             seekTime = video.duration * 0.2; 
+         }
+         video.currentTime = seekTime;
+      };
+
+      video.onseeked = async () => {
+         try {
+             const canvas = document.createElement('canvas');
+             canvas.width = video.videoWidth;
+             canvas.height = video.videoHeight;
+             const ctx = canvas.getContext('2d');
+             if(ctx) {
+                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                 const predictions = await nsfwModel.classify(canvas);
+                 const isNsfw = predictions.some(p => (p.className === 'Porn' || p.className === 'Hentai') && p.probability > 0.60);
+                 URL.revokeObjectURL(video.src);
+                 resolve(isNsfw);
+             } else { resolve(false); }
+         } catch(e) { resolve(false); }
+      };
+
+      video.onerror = () => resolve(false);
+    });
+  };
+
+  // --- FILE SELECT LOGIC (AUTO SCAN) ---
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -586,10 +667,6 @@ export default function ChatItNow() {
       return;
     }
 
-    const base64 = await blobToBase64(file);
-    const msgID = generateMessageID();
-    const timestamp = getCurrentTime();
-    
     const isImage = file.type.startsWith('image/');
     const isVideo = file.type.startsWith('video/');
 
@@ -598,12 +675,38 @@ export default function ChatItNow() {
       return;
     }
 
+    setIsAnalyzing(true);
+    const base64 = await blobToBase64(file);
+    let detectedNSFW = false;
+    
+    if (nsfwModel) {
+        if (isImage) {
+            detectedNSFW = await checkImageContent(base64);
+        } else if (isVideo) {
+            detectedNSFW = await checkVideoContent(file);
+        }
+    }
+
+    setIsAnalyzing(false);
+    setFilePreview({ base64, type: isImage ? 'image' : 'video' });
+    setIsNSFWMarked(detectedNSFW); 
+    
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleConfirmSendFile = () => {
+    if(!filePreview) return;
+
+    const msgID = generateMessageID();
+    const timestamp = getCurrentTime();
+    
     const msgData: any = {
       id: msgID,
       text: null,
       timestamp: timestamp,
-      image: isImage ? base64 : null,
-      video: isVideo ? base64 : null,
+      image: filePreview.type === 'image' ? filePreview.base64 : null,
+      video: filePreview.type === 'video' ? filePreview.base64 : null,
+      isNSFW: isNSFWMarked
     };
 
     if (replyingTo) msgData.replyTo = replyingTo;
@@ -612,8 +715,9 @@ export default function ChatItNow() {
       id: msgID,
       type: 'you',
       text: null,
-      image: isImage ? base64 : undefined,
-      video: isVideo ? base64 : undefined,
+      image: filePreview.type === 'image' ? filePreview.base64 : undefined,
+      video: filePreview.type === 'video' ? filePreview.base64 : undefined,
+      isNSFW: isNSFWMarked,
       replyTo: replyingTo || undefined,
       timestamp: timestamp,
       status: 'sent',
@@ -625,8 +729,7 @@ export default function ChatItNow() {
     setReplyingTo(null);
     playSound('sent');
     resetActivity();
-    
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    setFilePreview(null); 
   };
 
   const handleSendAudio = (base64Audio: string) => {
@@ -680,6 +783,7 @@ export default function ChatItNow() {
         audio: data.audio,
         image: data.image,
         video: data.video,
+        isNSFW: data.isNSFW,
         replyTo: data.replyTo,
         timestamp: data.timestamp || getCurrentTime(),
         reactions: {}
@@ -1090,6 +1194,54 @@ export default function ChatItNow() {
         .animate-pulse-red { animation: pulse-red 1.5s infinite; }
       `}</style>
 
+      {/* --- PREVIEW MODAL --- */}
+      {filePreview && (
+        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+           <div className={`rounded-xl shadow-2xl p-6 w-full max-w-sm ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
+              <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Send File?</h3>
+              
+              {/* IMAGE/VIDEO PREVIEW */}
+              <div className="mb-4 flex justify-center bg-black/20 rounded-lg p-2 max-h-[300px] overflow-hidden">
+                 {isAnalyzing ? (
+                    <div className="flex flex-col items-center justify-center h-40">
+                       <Loader2 className="animate-spin text-purple-600 mb-2" size={32} />
+                       <span className="text-xs text-gray-500">Scanning for NSFW content...</span>
+                    </div>
+                 ) : filePreview.type === 'image' ? (
+                    <img src={filePreview.base64} alt="Preview" className="max-h-full rounded object-contain" />
+                 ) : (
+                    <video src={filePreview.base64} controls className="max-h-full rounded" />
+                 )}
+              </div>
+
+              {/* NSFW CHECKBOX (Auto-checked if AI detects it) */}
+              <label className="flex items-center gap-3 mb-6 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 dark:hover:bg-[#374151] transition">
+                 <input 
+                   type="checkbox" 
+                   checked={isNSFWMarked} 
+                   onChange={(e) => setIsNSFWMarked(e.target.checked)}
+                   className="w-5 h-5 text-red-600 rounded focus:ring-red-500" 
+                 />
+                 <div className="flex flex-col">
+                    <span className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>Mark as NSFW / Sensitive</span>
+                    <span className="text-xs text-gray-500">Blur content for receiver</span>
+                 </div>
+              </label>
+
+              <div className="flex gap-3">
+                 <button onClick={() => setFilePreview(null)} className="flex-1 py-3 rounded-lg font-bold bg-gray-200 hover:bg-gray-300 text-gray-800 transition">Cancel</button>
+                 <button 
+                   onClick={handleConfirmSendFile} 
+                   disabled={isAnalyzing}
+                   className="flex-1 py-3 rounded-lg font-bold bg-purple-600 hover:bg-purple-700 text-white transition disabled:opacity-50"
+                 >
+                   Send
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
       <div className={`
         relative w-full h-[100dvh] overflow-hidden
         sm:w-[650px] sm:shadow-2xl 
@@ -1246,21 +1398,8 @@ export default function ChatItNow() {
                           }`}>
                             
                             {/* --- RENDER MEDIA CONTENT --- */}
-                            {msg.image && (
-                              <img 
-                                src={msg.image} 
-                                alt="Sent image" 
-                                className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1 cursor-pointer"
-                                onClick={() => window.open(msg.image)} // Simple full screen view
-                              />
-                            )}
-                            
-                            {msg.video && (
-                              <video 
-                                src={msg.video} 
-                                controls 
-                                className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1" 
-                              />
+                            {(msg.image || msg.video) && (
+                                <MediaMessage msg={msg} />
                             )}
 
                             {msg.audio && (
