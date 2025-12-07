@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck } from 'lucide-react';
+import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 
@@ -63,9 +63,11 @@ interface Message {
   type: 'system' | 'you' | 'stranger' | 'warning';
   text?: React.ReactNode;
   audio?: string;
+  image?: string; // UPDATED
+  video?: string; // UPDATED
   replyTo?: ReplyData;
   timestamp?: string;
-  status?: 'sent' | 'read'; // Added status
+  status?: 'sent' | 'read';
   reaction?: string; 
   reactions?: {
     you?: string | null;
@@ -302,19 +304,19 @@ export default function ChatItNow() {
   const [isMuted, setIsMuted] = useState(false);
   const [isNotifyMuted, setIsNotifyMuted] = useState(false);
   
-  // --- READ RECEIPTS STATE ---
   const [isReadReceiptsEnabled, setIsReadReceiptsEnabled] = useState(true);
   const [partnerHasReadReceipts, setPartnerHasReadReceipts] = useState(true);
 
   const [replyingTo, setReplyingTo] = useState<ReplyData | null>(null);
   const [activeReactionId, setActiveReactionId] = useState<string | null>(null);
 
-  // --- AUDIO RECORDING STATES ---
+  // --- MEDIA & RECORDING STATES ---
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null); // UPDATED: File Input Ref
 
   const audioSentRef = useRef<HTMLAudioElement | null>(null);
   const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
@@ -335,7 +337,7 @@ export default function ChatItNow() {
     }
   }, []);
 
-  // --- AUTO-RECONNECT ON VISIBILITY ---
+  // --- AUTO-RECONNECT ---
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && !socket.connected && isLoggedIn) {
@@ -383,7 +385,6 @@ export default function ChatItNow() {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
     
-    // ANDROID FIX: Preload
     [audioSentRef.current, audioReceivedRef.current].forEach(audio => {
         if(audio) {
             audio.volume = 1.0;
@@ -438,7 +439,7 @@ export default function ChatItNow() {
         const playPromise = audio.play();
         if (playPromise !== undefined) {
           playPromise.catch((error: any) => {
-             console.log("Audio play failed (interaction likely needed):", error);
+             console.log("Audio play failed", error);
           });
         }
       }
@@ -449,7 +450,6 @@ export default function ChatItNow() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTyping, replyingTo]); 
 
-  // --- HANDLE READ RECEIPTS TOGGLE ---
   const toggleReadReceipts = () => {
     const newState = !isReadReceiptsEnabled;
     setIsReadReceiptsEnabled(newState);
@@ -519,6 +519,59 @@ export default function ChatItNow() {
     }
   };
 
+  // --- FILE SELECT LOGIC (UPDATED) ---
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) { // 10MB
+      alert("File is too large. Max size is 10MB.");
+      return;
+    }
+
+    const base64 = await blobToBase64(file);
+    const msgID = generateMessageID();
+    const timestamp = getCurrentTime();
+    
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+
+    if (!isImage && !isVideo) {
+      alert("Only images and videos are supported.");
+      return;
+    }
+
+    const msgData: any = {
+      id: msgID,
+      text: null,
+      timestamp: timestamp,
+      image: isImage ? base64 : null,
+      video: isVideo ? base64 : null,
+    };
+
+    if (replyingTo) msgData.replyTo = replyingTo;
+
+    setMessages(prev => [...prev, {
+      id: msgID,
+      type: 'you',
+      text: null,
+      image: isImage ? base64 : undefined,
+      video: isVideo ? base64 : undefined,
+      replyTo: replyingTo || undefined,
+      timestamp: timestamp,
+      status: 'sent',
+      reactions: {}
+    }]);
+
+    socket.emit('send_message', msgData);
+    
+    setReplyingTo(null);
+    playSound('sent');
+    resetActivity();
+    
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleSendAudio = (base64Audio: string) => {
       const msgID = generateMessageID();
       const msgData: any = {
@@ -536,7 +589,7 @@ export default function ChatItNow() {
           audio: base64Audio,
           replyTo: replyingTo || undefined,
           timestamp: msgData.timestamp,
-          status: 'sent', // Initially sent
+          status: 'sent',
           reactions: {}
       }]);
       socket.emit('send_message', msgData);
@@ -555,7 +608,6 @@ export default function ChatItNow() {
       setIsConnected(true);
       setShowNextConfirm(false);
       partnerNameRef.current = data.name; 
-      // Set partner read settings from match data
       setPartnerHasReadReceipts(data.partnerReadReceipts !== false); 
       setMessages([{ id: 'sys-start', type: 'system', data: { name: data.name, field: data.field, action: 'connected' }, reactions: {} }]);
       resetActivity();
@@ -569,6 +621,8 @@ export default function ChatItNow() {
         type: 'stranger', 
         text: data.text,
         audio: data.audio,
+        image: data.image, // UPDATED
+        video: data.video, // UPDATED
         replyTo: data.replyTo,
         timestamp: data.timestamp || getCurrentTime(),
         reactions: {}
@@ -578,17 +632,14 @@ export default function ChatItNow() {
       playSound('received');
       resetActivity();
 
-      // --- AUTOMATIC READ RECEIPT ---
-      // If window is visible and both have receipts enabled, mark as read immediately
       if (!document.hidden && isReadReceiptsEnabled && partnerHasReadReceipts) {
          socket.emit('mark_read', msgId);
       }
 
-      // --- SYSTEM NOTIFICATION CHECK ---
       if (!isNotifyMuted && document.hidden) {
           if (Notification.permission === "granted") {
               const notifTitle = `New message from ${partnerNameRef.current || 'Partner'}`;
-              const notifBody = data.audio ? "Sent a voice message" : (data.text || "Sent a message");
+              const notifBody = data.image ? "Sent a photo" : (data.video ? "Sent a video" : (data.audio ? "Sent a voice message" : (data.text || "Sent a message")));
               
               if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
                  navigator.serviceWorker.ready.then(registration => {
@@ -607,14 +658,12 @@ export default function ChatItNow() {
       }
     });
 
-    // --- NEW: LISTEN FOR READ RECEIPTS ---
     socket.on('message_read_by_partner', (msgId: string) => {
         setMessages(prev => prev.map(msg => 
             msg.id === msgId ? { ...msg, status: 'read' } : msg
         ));
     });
 
-    // --- NEW: LISTEN FOR PARTNER SETTINGS CHANGE ---
     socket.on('partner_receipt_setting', (isEnabled: boolean) => {
         setPartnerHasReadReceipts(isEnabled);
     });
@@ -718,13 +767,10 @@ export default function ChatItNow() {
     }
   }, [isConnected, lastActivity, showInactivityAd, showTabReturnAd]);
 
-  // Handle marking read when returning to tab
   useEffect(() => {
     const handleVis = () => { 
         if (!document.hidden && isConnected) {
             if(!showInactivityAd) setShowTabReturnAd(true);
-            
-            // Mark last stranger message as read if features enabled
             if(isReadReceiptsEnabled && partnerHasReadReceipts) {
                 const lastMsg = messages[messages.length - 1];
                 if(lastMsg && lastMsg.type === 'stranger') {
@@ -747,7 +793,6 @@ export default function ChatItNow() {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
 
-      // --- MOBILE AUDIO UNLOCK ---
       if (audioReceivedRef.current) {
         audioReceivedRef.current.play().then(() => {
            audioReceivedRef.current?.pause();
@@ -755,7 +800,6 @@ export default function ChatItNow() {
         }).catch(e => console.log("Audio unlock failed", e));
       }
 
-      // --- PERMISSION REQUEST FIX ---
       if ('Notification' in window) {
         Notification.requestPermission().then((permission) => {
           if (permission === 'granted') {
@@ -797,7 +841,7 @@ export default function ChatItNow() {
         text: currentMessage, 
         replyTo: replyingTo || undefined,
         timestamp: msgData.timestamp,
-        status: 'sent', // Add status
+        status: 'sent',
         reactions: {}
       }]);
       socket.emit('send_message', msgData);
@@ -824,7 +868,7 @@ export default function ChatItNow() {
 
   const initiateReply = (text: any, type: string) => {
     const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
-    setReplyingTo({ text: typeof text === 'string' ? text : 'Voice Message', name: senderName, isYou: type === 'you' });
+    setReplyingTo({ text: typeof text === 'string' ? text : 'Media Content', name: senderName, isYou: type === 'you' });
     const input = document.querySelector('input[type="text"]') as HTMLInputElement;
     if(input) input.focus();
   };
@@ -1144,11 +1188,30 @@ export default function ChatItNow() {
                               : `${darkMode ? 'bg-[#374151] text-gray-100' : 'bg-gray-100 text-gray-900'} rounded-bl-none`
                           }`}>
                             
-                            {/* --- RENDER TEXT OR CUSTOM AUDIO --- */}
-                            {msg.audio ? (
+                            {/* --- RENDER MEDIA CONTENT --- */}
+                            {msg.image && (
+                              <img 
+                                src={msg.image} 
+                                alt="Sent image" 
+                                className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1 cursor-pointer"
+                                onClick={() => window.open(msg.image)} // Simple full screen view
+                              />
+                            )}
+                            
+                            {msg.video && (
+                              <video 
+                                src={msg.video} 
+                                controls 
+                                className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1" 
+                              />
+                            )}
+
+                            {msg.audio && (
                                 <CustomAudioPlayer src={msg.audio} isOwnMessage={msg.type === 'you'} isDarkMode={darkMode} />
-                            ) : (
-                                msg.text
+                            )}
+
+                            {msg.text && (
+                                <span>{msg.text}</span>
                             )}
 
                             {/* TIMESTAMPS & TICKS */}
@@ -1264,6 +1327,22 @@ export default function ChatItNow() {
                 <button type="button" onClick={handleNext} className={`h-full px-3 w-16 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-[#374151] text-white hover:bg-[#323844]' : 'border-gray-200 text-black hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
                 
                 {/* INPUT CONTAINER */}
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  accept="image/*,video/*" 
+                  onChange={handleFileSelect} 
+                />
+
+                <button 
+                  type="button" 
+                  onClick={() => fileInputRef.current?.click()} 
+                  className={`h-full px-3 w-12 rounded-xl flex items-center justify-center transition ${darkMode ? 'text-gray-400 hover:bg-[#374151]' : 'text-gray-500 hover:bg-gray-100'}`}
+                >
+                  <Paperclip size={20} />
+                </button>
+
                 <div className="relative flex-1 h-full flex items-center">
                   <input 
                     type="text" 
