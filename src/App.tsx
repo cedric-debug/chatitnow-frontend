@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+// REMOVED 'Eye' from imports to fix the error
 import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip, AlertTriangle, EyeOff, Loader2, Info } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
@@ -602,7 +603,7 @@ export default function ChatItNow() {
     }
   };
 
-  // --- AI SCANNERS (STRICTER FILTER: 25%) ---
+  // --- AI SCANNERS (STRICTER FILTER) ---
   const checkImageContent = async (base64Data: string): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
@@ -626,7 +627,6 @@ export default function ChatItNow() {
 
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
-    
     return new Promise((resolve) => {
       const video = document.createElement('video');
       video.preload = 'metadata';
@@ -693,13 +693,13 @@ export default function ChatItNow() {
     });
   };
 
-  // --- FILE SELECT LOGIC ---
+  // --- FILE SELECT LOGIC (AUTO SCAN) ---
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) { 
-      alert("File is too large. Max size is 10MB.");
+    if (file.size > 50 * 1024 * 1024) { 
+      alert("File is too large. Max size is 50MB.");
       return;
     }
 
@@ -725,7 +725,7 @@ export default function ChatItNow() {
 
     setIsAnalyzing(false);
     setFilePreview({ base64, type: isImage ? 'image' : 'video' });
-    setIsNSFWMarked(detectedNSFW); // Auto-checked if detected
+    setIsNSFWMarked(detectedNSFW); 
     
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
@@ -989,24 +989,10 @@ export default function ChatItNow() {
   const handleLogin = () => {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
-
-      if (audioReceivedRef.current) {
-        audioReceivedRef.current.play().then(() => {
-           audioReceivedRef.current?.pause();
-           if(audioReceivedRef.current) audioReceivedRef.current.currentTime = 0;
-        }).catch(e => console.log("Audio unlock failed", e));
+      // Request Notification Permission on Login
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        Notification.requestPermission();
       }
-
-      if ('Notification' in window) {
-        Notification.requestPermission().then((permission) => {
-          if (permission === 'granted') {
-             console.log("Notification permission granted.");
-          } else {
-             console.log("Notification permission denied/default.");
-          }
-        });
-      }
-
       socket.connect();
       startSearch();
     } else {
@@ -1023,7 +1009,7 @@ export default function ChatItNow() {
   };
 
   const handleSendMessage = () => {
-    if (currentMessage.trim()) {
+    if (currentMessage.trim() && isConnected) {
       const msgID = generateMessageID(); 
       const msgData: any = { 
         id: msgID,
@@ -1038,7 +1024,6 @@ export default function ChatItNow() {
         text: currentMessage, 
         replyTo: replyingTo || undefined,
         timestamp: msgData.timestamp,
-        status: 'sent',
         reactions: {}
       }]);
       socket.emit('send_message', msgData);
@@ -1064,8 +1049,9 @@ export default function ChatItNow() {
   const handleStartSearch = () => { startSearch(); };
 
   const initiateReply = (text: any, type: string) => {
+    if (!isConnected) return;
     const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
-    setReplyingTo({ text: typeof text === 'string' ? text : 'Media Content', name: senderName, isYou: type === 'you' });
+    setReplyingTo({ text: typeof text === 'string' ? text : 'Content', name: senderName, isYou: type === 'you' });
     const input = document.querySelector('input[type="text"]') as HTMLInputElement;
     if(input) input.focus();
   };
@@ -1192,12 +1178,27 @@ export default function ChatItNow() {
             <div className={`rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
               <h2 className={`text-2xl font-bold mb-4 sticky top-0 pb-2 ${darkMode ? 'text-white bg-[#1f2937]' : 'text-gray-900 bg-white'}`}>Terms & Conditions</h2>
               <div className={`space-y-4 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                <p>Last updated: December 6, 2025</p>
-                <p><strong>Agreement to Terms</strong><br/>By accessing ChatItNow.com (the "Site"), an anonymous text-only chat platform made for Filipinos, you affirm and agree to these Terms and Conditions.</p>
-                <p><strong>You Are 18+</strong><br/>You affirm you are at least 18 years old.</p>
-                <p><strong>Prohibited Conduct</strong><br/>Do not make threats, promote negativity, hate speech, harassment, discrimination, scams, or illegal content.</p>
-                <p><strong>Use at Your Own Risk</strong><br/>You use this Site at your own risk, fully aware of the dangers of chatting with strangers whose identities are not verified. We are not responsible for impersonation, misinformation, scams, or any harms from anonymous interactions.</p>
-                <p><strong>Disclaimer of Liability</strong><br/>The Site is provided "as is" and "as available" with no warranties of any kind, express or implied. To the fullest extent permitted by Philippine law ChatItNow.com disclaim all liability, direct or indirect, for user interactions, content, advice, disputes, harms (emotional, financial, reputational), illegal acts, or any loss arising from Site use.</p>
+                <p>Last updated: December 7, 2025</p>
+                
+                <p><strong>1. Agreement to Terms</strong><br/>
+                By accessing ChatItNow.com, an anonymous multimedia chat platform, you agree to these Terms. You acknowledge that this platform allows the transmission of text, voice, images, and videos.</p>
+                
+                <p><strong>2. Age Restriction (18+)</strong><br/>
+                You affirm you are at least 18 years old. This site contains User Generated Content (UGC) that may be mature in nature.</p>
+                
+                <p><strong>3. Media & Content Policy</strong><br/>
+                You are responsible for the media you send.
+                <br/>&bull; <strong>NSFW Content:</strong> Our AI attempts to automatically blur nudity, but it is not error-proof.
+                <br/>&bull; <strong>Gore & Violence:</strong> The AI <u>does not</u> detect gore. You are <strong>REQUIRED</strong> to manually check the "Mark as Sensitive" box before sending any graphic or violent content. Failure to do so is a violation of these terms.</p>
+                
+                <p><strong>4. Prohibited Conduct</strong><br/>
+                Do not share illegal content (CSAM), non-consensual sexual content, or make threats. We do not permanently store messages.</p>
+                
+                <p><strong>5. AI & Feature Disclaimer</strong><br/>
+                You use this site at your own risk. The "Read Receipts" and "NSFW Filter" are convenience features, not guarantees. We are not liable for AI misclassification (false positives/negatives) or if a stranger bypasses privacy features.</p>
+                
+                <p><strong>6. Limitation of Liability</strong><br/>
+                The Site is provided "as is". ChatItNow.com disclaims all liability for user interactions, emotional distress, data consumption, or harms arising from anonymous media exchange.</p>
               </div>
               <div className={`mt-6 flex gap-3 sticky bottom-0 pt-4 border-t ${darkMode ? 'bg-[#1f2937] border-[#374151]' : 'bg-white border-gray-100'}`}>
                 <button onClick={() => { setShowTerms(false); setAcceptedTerms(true); }} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg transition">Accept Terms</button>
