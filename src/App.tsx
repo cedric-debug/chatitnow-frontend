@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause } from 'lucide-react';
+import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 
@@ -65,6 +65,7 @@ interface Message {
   audio?: string;
   replyTo?: ReplyData;
   timestamp?: string;
+  status?: 'sent' | 'read'; // Added status
   reaction?: string; 
   reactions?: {
     you?: string | null;
@@ -300,6 +301,10 @@ export default function ChatItNow() {
   
   const [isMuted, setIsMuted] = useState(false);
   const [isNotifyMuted, setIsNotifyMuted] = useState(false);
+  
+  // --- READ RECEIPTS STATE ---
+  const [isReadReceiptsEnabled, setIsReadReceiptsEnabled] = useState(true);
+  const [partnerHasReadReceipts, setPartnerHasReadReceipts] = useState(true);
 
   const [replyingTo, setReplyingTo] = useState<ReplyData | null>(null);
   const [activeReactionId, setActiveReactionId] = useState<string | null>(null);
@@ -341,11 +346,9 @@ export default function ChatItNow() {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [isLoggedIn]);
 
-  // --- FORCE DISCONNECT ON RELOAD (RESTORED) ---
+  // --- FORCE DISCONNECT ON RELOAD ---
   useEffect(() => {
     const handleBeforeUnload = () => {
-        // This will kill the session if the user Refreshes or Closes the tab.
-        // It does NOT fire if the internet connection simply drops.
         socket.emit('disconnect_partner');
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -446,6 +449,15 @@ export default function ChatItNow() {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTyping, replyingTo]); 
 
+  // --- HANDLE READ RECEIPTS TOGGLE ---
+  const toggleReadReceipts = () => {
+    const newState = !isReadReceiptsEnabled;
+    setIsReadReceiptsEnabled(newState);
+    if(isConnected) {
+      socket.emit('toggle_read_receipts', newState);
+    }
+  };
+
   // --- RECORDING LOGIC ---
   const startRecording = async () => {
     try {
@@ -464,11 +476,9 @@ export default function ChatItNow() {
       setIsRecording(true);
       setRecordingDuration(0);
 
-      // Start Timer
       recordingTimerRef.current = window.setInterval(() => {
         setRecordingDuration(prev => {
           if (prev >= 15) {
-             // Auto stop at 15s
              stopRecordingAndSend();
              return 15;
           }
@@ -490,7 +500,6 @@ export default function ChatItNow() {
          const base64Audio = await blobToBase64(audioBlob);
          handleSendAudio(base64Audio);
          
-         // Cleanup
          if(recordingTimerRef.current) clearInterval(recordingTimerRef.current);
          mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
          setIsRecording(false);
@@ -511,7 +520,6 @@ export default function ChatItNow() {
   };
 
   const handleSendAudio = (base64Audio: string) => {
-      // Allow sending even if !isConnected. Socket.io will buffer it.
       const msgID = generateMessageID();
       const msgData: any = {
           id: msgID,
@@ -528,6 +536,7 @@ export default function ChatItNow() {
           audio: base64Audio,
           replyTo: replyingTo || undefined,
           timestamp: msgData.timestamp,
+          status: 'sent', // Initially sent
           reactions: {}
       }]);
       socket.emit('send_message', msgData);
@@ -546,6 +555,8 @@ export default function ChatItNow() {
       setIsConnected(true);
       setShowNextConfirm(false);
       partnerNameRef.current = data.name; 
+      // Set partner read settings from match data
+      setPartnerHasReadReceipts(data.partnerReadReceipts !== false); 
       setMessages([{ id: 'sys-start', type: 'system', data: { name: data.name, field: data.field, action: 'connected' }, reactions: {} }]);
       resetActivity();
     });
@@ -567,13 +578,18 @@ export default function ChatItNow() {
       playSound('received');
       resetActivity();
 
-      // --- SYSTEM NOTIFICATION CHECK (ANDROID SW) ---
+      // --- AUTOMATIC READ RECEIPT ---
+      // If window is visible and both have receipts enabled, mark as read immediately
+      if (!document.hidden && isReadReceiptsEnabled && partnerHasReadReceipts) {
+         socket.emit('mark_read', msgId);
+      }
+
+      // --- SYSTEM NOTIFICATION CHECK ---
       if (!isNotifyMuted && document.hidden) {
           if (Notification.permission === "granted") {
               const notifTitle = `New message from ${partnerNameRef.current || 'Partner'}`;
               const notifBody = data.audio ? "Sent a voice message" : (data.text || "Sent a message");
               
-              // Use Service Worker for Android support
               if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
                  navigator.serviceWorker.ready.then(registration => {
                     registration.showNotification(notifTitle, {
@@ -582,7 +598,6 @@ export default function ChatItNow() {
                     });
                  }).catch(err => console.error("SW Notif failed", err));
               } else {
-                 // Fallback
                  new Notification(notifTitle, {
                     body: notifBody,
                     icon: "/favicon.ico" 
@@ -590,6 +605,18 @@ export default function ChatItNow() {
               }
           }
       }
+    });
+
+    // --- NEW: LISTEN FOR READ RECEIPTS ---
+    socket.on('message_read_by_partner', (msgId: string) => {
+        setMessages(prev => prev.map(msg => 
+            msg.id === msgId ? { ...msg, status: 'read' } : msg
+        ));
+    });
+
+    // --- NEW: LISTEN FOR PARTNER SETTINGS CHANGE ---
+    socket.on('partner_receipt_setting', (isEnabled: boolean) => {
+        setPartnerHasReadReceipts(isEnabled);
     });
 
     socket.on('receive_reaction', (data: { messageID: string, reaction: string | null }) => {
@@ -631,8 +658,10 @@ export default function ChatItNow() {
       socket.off('session_restored'); 
       socket.off('partner_reconnecting_server'); 
       socket.off('partner_connected'); 
+      socket.off('message_read_by_partner');
+      socket.off('partner_receipt_setting');
     };
-  }, [isMuted, isConnected, isNotifyMuted, isRecording]); 
+  }, [isMuted, isConnected, isNotifyMuted, isRecording, isReadReceiptsEnabled, partnerHasReadReceipts]); 
 
   // --- THEME & ADDRESS BAR COLOR ---
   useLayoutEffect(() => {
@@ -689,11 +718,24 @@ export default function ChatItNow() {
     }
   }, [isConnected, lastActivity, showInactivityAd, showTabReturnAd]);
 
+  // Handle marking read when returning to tab
   useEffect(() => {
-    const handleVis = () => { if (!document.hidden && isConnected && !showInactivityAd) setShowTabReturnAd(true); };
+    const handleVis = () => { 
+        if (!document.hidden && isConnected) {
+            if(!showInactivityAd) setShowTabReturnAd(true);
+            
+            // Mark last stranger message as read if features enabled
+            if(isReadReceiptsEnabled && partnerHasReadReceipts) {
+                const lastMsg = messages[messages.length - 1];
+                if(lastMsg && lastMsg.type === 'stranger') {
+                    socket.emit('mark_read', lastMsg.id);
+                }
+            }
+        }
+    };
     document.addEventListener('visibilitychange', handleVis);
     return () => document.removeEventListener('visibilitychange', handleVis);
-  }, [isConnected, showInactivityAd]);
+  }, [isConnected, showInactivityAd, messages, isReadReceiptsEnabled, partnerHasReadReceipts]);
 
   const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCurrentMessage(e.target.value);
@@ -740,7 +782,6 @@ export default function ChatItNow() {
   };
 
   const handleSendMessage = () => {
-    // UPDATED: Allow sending even if !isConnected. Socket.io will buffer it.
     if (currentMessage.trim()) {
       const msgID = generateMessageID(); 
       const msgData: any = { 
@@ -756,6 +797,7 @@ export default function ChatItNow() {
         text: currentMessage, 
         replyTo: replyingTo || undefined,
         timestamp: msgData.timestamp,
+        status: 'sent', // Add status
         reactions: {}
       }]);
       socket.emit('send_message', msgData);
@@ -781,7 +823,6 @@ export default function ChatItNow() {
   const handleStartSearch = () => { startSearch(); };
 
   const initiateReply = (text: any, type: string) => {
-    // UPDATED: Allow reply UI even if offline
     const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
     setReplyingTo({ text: typeof text === 'string' ? text : 'Voice Message', name: senderName, isYou: type === 'you' });
     const input = document.querySelector('input[type="text"]') as HTMLInputElement;
@@ -846,11 +887,11 @@ export default function ChatItNow() {
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
-             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
-                <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
-                <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
-                <p>As a university student who knows what it feels like to crave real, genuine connection in a world thats getting more digital and more distant every year. Sometimes, even if we're surrounded by people, we still feel like no one really listens. That's why I built this platform to create a space where Filipinos can express themselves openly, share their stories, and find comfort from people who might actually understand what they're going through—even if they're total strangers.</p>
-                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is completely free to use and always will be. It's meant to be simple, accessible, and welcoming to everyone. Just hop in, start a conversation, and see where it goes. One chat might not change your whole life, but it might change your day—and sometimes, that's already more than enough.</p>
+            <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p>
+                <p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p>
+                <p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p>
+                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is completely free and anonymous. Connect with fellow Filipinos, one conversation at a time.</p>
             </div>
             <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
           </div>
@@ -1018,6 +1059,9 @@ export default function ChatItNow() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button onClick={toggleReadReceipts} className={`p-2 rounded-full ${darkMode ? 'bg-[#374151] text-gray-300 hover:bg-[#4B5563]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+              {isReadReceiptsEnabled ? <CheckCheck size={18} className="text-green-500" /> : <Check size={18} />}
+            </button>
             <button onClick={() => setIsNotifyMuted(!isNotifyMuted)} className={`p-2 rounded-full ${darkMode ? 'bg-[#374151] text-gray-300 hover:bg-[#4B5563]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               {isNotifyMuted ? <BellOff size={18} /> : <Bell size={18} />}
             </button>
@@ -1107,15 +1151,22 @@ export default function ChatItNow() {
                                 msg.text
                             )}
 
-                            {msg.timestamp && (
-                              <span className={`text-[10px] block mt-1 select-none ${
+                            {/* TIMESTAMPS & TICKS */}
+                            <div className={`flex items-center gap-1 justify-end mt-1 select-none ${
                                 msg.type === 'you' 
-                                  ? 'text-right text-white/70' 
-                                  : (darkMode ? 'text-left text-gray-400' : 'text-left text-gray-500')
+                                  ? 'text-white/70' 
+                                  : (darkMode ? 'text-gray-400' : 'text-gray-500')
                               }`}>
-                                {msg.timestamp}
-                              </span>
-                            )}
+                                <span className="text-[10px]">{msg.timestamp}</span>
+                                {/* SHOW TICKS ONLY FOR YOUR MESSAGES IF ENABLED */}
+                                {msg.type === 'you' && isReadReceiptsEnabled && partnerHasReadReceipts && (
+                                    msg.status === 'read' ? (
+                                        <CheckCheck size={12} className="text-white" />
+                                    ) : (
+                                        <Check size={12} className="text-white/70" />
+                                    )
+                                )}
+                            </div>
 
                             {/* --- REACTION BADGES --- */}
                             <div className={`absolute -bottom-2 ${msg.type === 'you' ? '-left-2' : '-right-2'} flex gap-[-5px]`}>
@@ -1210,12 +1261,10 @@ export default function ChatItNow() {
               <form className="flex gap-2 items-center h-[60px]" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
                 
                 {/* SKIP BUTTON */}
-                {/* UPDATED: Removed disabled={partnerStatus === 'searching'} so user can force skip if stuck */}
                 <button type="button" onClick={handleNext} className={`h-full px-3 w-16 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-[#374151] text-white hover:bg-[#323844]' : 'border-gray-200 text-black hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
                 
                 {/* INPUT CONTAINER */}
                 <div className="relative flex-1 h-full flex items-center">
-                  {/* UPDATED: Removed disabled={!isConnected} */}
                   <input 
                     type="text" 
                     value={currentMessage} 
@@ -1226,7 +1275,6 @@ export default function ChatItNow() {
                   />
                   
                   {/* MIC ICON INSIDE INPUT */}
-                  {/* UPDATED: Removed disabled={!isConnected} */}
                   {!currentMessage.trim() && (
                     <button 
                       type="button" 
@@ -1239,7 +1287,6 @@ export default function ChatItNow() {
                 </div>
 
                 {/* SEND BUTTON */}
-                {/* UPDATED: Removed disabled={!isConnected} */}
                 {currentMessage.trim() && (
                   <button type="submit" className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
                 )}
