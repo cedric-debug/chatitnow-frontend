@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip, AlertTriangle, EyeOff, Loader2, Info } from 'lucide-react';
+// REMOVED 'Eye' import
+import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip, AlertTriangle, EyeOff, Loader2, Info, Shield, ShieldCheck } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 import * as nsfwjs from 'nsfwjs';
@@ -79,8 +80,12 @@ interface Message {
 }
 
 // --- MEDIA MESSAGE COMPONENT ---
-const MediaMessage = ({ msg }: { msg: Message }) => {
-  const [isRevealed, setIsRevealed] = useState(msg.type === 'you' || !msg.isNSFW);
+const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) => {
+  // Blur if: It's NOT you AND (It is NSFW OR SafeMode is ON)
+  const shouldBlur = msg.type !== 'you' && (msg.isNSFW || safeMode);
+  
+  // Initialize state based on blur requirement
+  const [isRevealed, setIsRevealed] = useState(!shouldBlur);
 
   const toggleReveal = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -89,12 +94,30 @@ const MediaMessage = ({ msg }: { msg: Message }) => {
 
   return (
     <div className="relative group">
-      {/* NSFW OVERLAY */}
+      
+      {/* BLUR OVERLAY */}
       {!isRevealed && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 backdrop-blur-xl rounded-lg cursor-pointer transition-colors hover:bg-black/80" onClick={toggleReveal}>
-           <AlertTriangle className="text-red-500 mb-2" size={32} />
-           <span className="text-red-500 font-bold text-sm uppercase tracking-wider mb-1">Sensitive Content</span>
-           <span className="text-gray-400 text-xs">(NSFW / Gore)</span>
+        <div 
+          className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-lg cursor-pointer transition-colors backdrop-blur-xl"
+          style={{ 
+            backgroundColor: msg.isNSFW ? 'rgba(0,0,0,0.9)' : 'rgba(30, 41, 59, 0.9)' 
+          }}
+          onClick={toggleReveal}
+        >
+           {msg.isNSFW ? (
+             <>
+               <AlertTriangle className="text-red-500 mb-2" size={32} />
+               <span className="text-red-500 font-bold text-sm uppercase tracking-wider mb-1">Sensitive Content</span>
+               <span className="text-gray-400 text-xs">(NSFW / Gore)</span>
+             </>
+           ) : (
+             <>
+               <EyeOff className="text-blue-400 mb-2" size={32} />
+               <span className="text-blue-400 font-bold text-sm uppercase tracking-wider mb-1">Hidden Media</span>
+               <span className="text-gray-400 text-xs">Safe Mode Active</span>
+             </>
+           )}
+           
            <span className="text-gray-300 text-[10px] mt-4 border border-gray-600 px-3 py-1 rounded-full">Click to view</span>
         </div>
       )}
@@ -118,7 +141,8 @@ const MediaMessage = ({ msg }: { msg: Message }) => {
         )}
       </div>
 
-      {isRevealed && msg.isNSFW && (
+      {/* RE-HIDE BUTTON */}
+      {isRevealed && (msg.isNSFW || safeMode) && (
         <button 
           onClick={toggleReveal}
           className="absolute top-2 right-2 z-30 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
@@ -361,6 +385,9 @@ export default function ChatItNow() {
   
   const [isReadReceiptsEnabled, setIsReadReceiptsEnabled] = useState(true);
   const [partnerHasReadReceipts, setPartnerHasReadReceipts] = useState(true);
+  
+  // --- SAFE MODE STATE ---
+  const [safeMode, setSafeMode] = useState(true);
 
   const [replyingTo, setReplyingTo] = useState<ReplyData | null>(null);
   const [activeReactionId, setActiveReactionId] = useState<string | null>(null);
@@ -390,14 +417,13 @@ export default function ChatItNow() {
     return false;
   });
 
-  // --- LOAD NSFW MODEL (OPTIMIZED) ---
+  // --- LOAD NSFW MODEL ---
   useEffect(() => {
     const loadModel = async () => {
         try {
-            // UPDATED: Load 'MobileNetV2Mid' - Faster than default
-            const _model = await nsfwjs.load('MobileNetV2Mid');
+            const _model = await nsfwjs.load();
             setNsfwModel(_model);
-            console.log("NSFW Model Loaded (MobileNetV2Mid)");
+            console.log("NSFW Model Loaded");
         } catch (e) {
             console.error("Failed to load NSFW model", e);
         }
@@ -604,7 +630,7 @@ export default function ChatItNow() {
     }
   };
 
-  // --- AI SCANNERS (OPTIMIZED SPEED) ---
+  // --- AI SCANNERS (STRICTER FILTER) ---
   const checkImageContent = async (base64Data: string): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
@@ -613,30 +639,21 @@ export default function ChatItNow() {
         img.src = base64Data;
         img.onload = async () => {
             try {
-                // Resize for speed (224x224 is standard model input)
-                const canvas = document.createElement('canvas');
-                canvas.width = 224;
-                canvas.height = 224;
-                const ctx = canvas.getContext('2d');
-                if(ctx) {
-                    ctx.drawImage(img, 0, 0, 224, 224);
-                    const predictions = await nsfwModel.classify(canvas);
-                    const isNsfw = predictions.some(p => 
-                        (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
-                        && p.probability > 0.25
-                    );
-                    resolve(isNsfw);
-                } else { resolve(false); }
+                const predictions = await nsfwModel.classify(img);
+                console.log("NSFW Analysis (Image):", predictions);
+                const isNsfw = predictions.some(p => 
+                    (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
+                    && p.probability > 0.25
+                );
+                resolve(isNsfw);
             } catch (err) { resolve(false); }
         };
         img.onerror = () => resolve(false);
     });
   };
 
-  // --- VIDEO SCANNER (OPTIMIZED SPEED + 3 CHECKS) ---
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
-    
     return new Promise((resolve) => {
       const video = document.createElement('video');
       video.preload = 'metadata';
@@ -670,15 +687,15 @@ export default function ChatItNow() {
 
       video.onseeked = async () => {
          try {
-             // OPTIMIZATION: Resize to 224x224
              const canvas = document.createElement('canvas');
-             canvas.width = 224;
-             canvas.height = 224;
+             canvas.width = video.videoWidth;
+             canvas.height = video.videoHeight;
              const ctx = canvas.getContext('2d');
              
              if(ctx) {
-                 ctx.drawImage(video, 0, 0, 224, 224);
+                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                  const predictions = await nsfwModel.classify(canvas);
+                 console.log("NSFW Analysis (Video Frame):", predictions);
                  
                  const isNsfw = predictions.some(p => 
                      (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
@@ -703,7 +720,7 @@ export default function ChatItNow() {
     });
   };
 
-  // --- FILE SELECT LOGIC (UPDATED: 20MB) ---
+  // --- FILE SELECT LOGIC (UPDATED: 20MB LIMIT) ---
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1037,7 +1054,7 @@ export default function ChatItNow() {
   };
 
   const handleSendMessage = () => {
-    if (currentMessage.trim()) {
+    if (currentMessage.trim() && isConnected) {
       const msgID = generateMessageID(); 
       const msgData: any = { 
         id: msgID,
@@ -1399,6 +1416,9 @@ export default function ChatItNow() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button onClick={() => setSafeMode(!safeMode)} className={`p-2 rounded-full ${darkMode ? 'bg-[#374151] text-gray-300 hover:bg-[#4B5563]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+              {safeMode ? <ShieldCheck size={18} className="text-green-500" /> : <Shield size={18} />}
+            </button>
             <button onClick={toggleReadReceipts} className={`p-2 rounded-full ${darkMode ? 'bg-[#374151] text-gray-300 hover:bg-[#4B5563]' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
               {isReadReceiptsEnabled ? <CheckCheck size={18} className="text-green-500" /> : <Check size={18} />}
             </button>
@@ -1486,7 +1506,7 @@ export default function ChatItNow() {
                             
                             {/* --- RENDER MEDIA CONTENT --- */}
                             {(msg.image || msg.video) && (
-                                <MediaMessage msg={msg} />
+                                <MediaMessage msg={msg} safeMode={safeMode} />
                             )}
 
                             {msg.audio && (
