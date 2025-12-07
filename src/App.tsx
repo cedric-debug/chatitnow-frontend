@@ -78,7 +78,7 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; isYou?: boolean; };
 }
 
-// --- MEDIA MESSAGE COMPONENT (Fixed: Removed unused darkMode prop) ---
+// --- MEDIA MESSAGE COMPONENT ---
 const MediaMessage = ({ msg }: { msg: Message }) => {
   const [isRevealed, setIsRevealed] = useState(msg.type === 'you' || !msg.isNSFW);
 
@@ -601,7 +601,7 @@ export default function ChatItNow() {
     }
   };
 
-  // --- AI SCANNERS ---
+  // --- AI SCANNERS (STRICTER FILTER) ---
   const checkImageContent = async (base64Data: string): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
@@ -611,7 +611,12 @@ export default function ChatItNow() {
         img.onload = async () => {
             try {
                 const predictions = await nsfwModel.classify(img);
-                const isNsfw = predictions.some(p => (p.className === 'Porn' || p.className === 'Hentai') && p.probability > 0.60);
+                console.log("NSFW Analysis (Image):", predictions);
+                
+                const isNsfw = predictions.some(p => 
+                    (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
+                    && p.probability > 0.25
+                );
                 resolve(isNsfw);
             } catch (err) { resolve(false); }
         };
@@ -646,7 +651,12 @@ export default function ChatItNow() {
              if(ctx) {
                  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                  const predictions = await nsfwModel.classify(canvas);
-                 const isNsfw = predictions.some(p => (p.className === 'Porn' || p.className === 'Hentai') && p.probability > 0.60);
+                 console.log("NSFW Analysis (Video):", predictions);
+                 
+                 const isNsfw = predictions.some(p => 
+                     (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
+                     && p.probability > 0.25
+                 );
                  URL.revokeObjectURL(video.src);
                  resolve(isNsfw);
              } else { resolve(false); }
@@ -1214,19 +1224,24 @@ export default function ChatItNow() {
                  )}
               </div>
 
-              {/* NSFW CHECKBOX (Auto-checked if AI detects it) */}
-              <label className="flex items-center gap-3 mb-6 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 dark:hover:bg-[#374151] transition">
-                 <input 
-                   type="checkbox" 
-                   checked={isNSFWMarked} 
-                   onChange={(e) => setIsNSFWMarked(e.target.checked)}
-                   className="w-5 h-5 text-red-600 rounded focus:ring-red-500" 
-                 />
-                 <div className="flex flex-col">
-                    <span className={`font-bold text-sm ${darkMode ? 'text-white' : 'text-gray-800'}`}>Mark as NSFW / Sensitive</span>
-                    <span className="text-xs text-gray-500">Blur content for receiver</span>
-                 </div>
-              </label>
+              {/* AUTOMATIC NSFW LABEL */}
+              {isNSFWMarked ? (
+                  <div className="mb-6 p-3 bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-3">
+                      <AlertTriangle className="text-red-600 dark:text-red-400" size={20} />
+                      <div className="flex flex-col">
+                          <span className="font-bold text-sm text-red-700 dark:text-red-400">Content Flagged</span>
+                          <span className="text-xs text-red-600/80 dark:text-red-400/80">Will be blurred for receiver</span>
+                      </div>
+                  </div>
+              ) : (
+                  <div className="mb-6 p-3 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg flex items-center gap-3">
+                      <Check className="text-green-600 dark:text-green-400" size={20} />
+                       <div className="flex flex-col">
+                          <span className="font-bold text-sm text-green-700 dark:text-green-400">Content Safe</span>
+                          <span className="text-xs text-green-600/80 dark:text-green-400/80">Sending normally</span>
+                      </div>
+                  </div>
+              )}
 
               <div className="flex gap-3">
                  <button onClick={() => setFilePreview(null)} className="flex-1 py-3 rounded-lg font-bold bg-gray-200 hover:bg-gray-300 text-gray-800 transition">Cancel</button>
