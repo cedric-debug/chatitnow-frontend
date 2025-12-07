@@ -328,7 +328,6 @@ export default function ChatItNow() {
   const recordingTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null); 
   
-  // FIX: Updated Type to include previewUrl
   const [filePreview, setFilePreview] = useState<{ base64: string, type: 'image' | 'video', previewUrl: string } | null>(null);
   const [isNSFWMarked, setIsNSFWMarked] = useState(false);
   const [aiDetectedNSFW, setAiDetectedNSFW] = useState(false); 
@@ -526,7 +525,7 @@ export default function ChatItNow() {
                     console.log("Fast Image Scan:", predictions);
                     const isNsfw = predictions.some(p => 
                         (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
-                        && p.probability > 0.05
+                        && p.probability > 0.15
                     );
                     resolve(isNsfw);
                 }).catch(() => resolve(false));
@@ -535,7 +534,8 @@ export default function ChatItNow() {
     });
   };
 
-  // --- OPTIMIZED VIDEO SCANNER (Reuses Canvas) ---
+  // --- ROBUST VIDEO SCANNER (Reuses Canvas) ---
+  // Re-introduced Canvas Bridge for maximum device compatibility
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
@@ -544,6 +544,12 @@ export default function ChatItNow() {
       video.src = URL.createObjectURL(file);
       video.muted = true;
       video.playsInline = true;
+
+      // Create a canvas for reading frames (Bridge method)
+      const canvas = document.createElement('canvas');
+      canvas.width = 224;
+      canvas.height = 224;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
       const scanQueue: number[] = []; 
 
@@ -571,20 +577,24 @@ export default function ChatItNow() {
 
       video.onseeked = async () => {
          try {
-             const predictions = await nsfwModel!.classify(video);
-             console.log("Fast Video Scan:", predictions);
-             
-             const isNsfw = predictions.some(p => 
-                 (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
-                 && p.probability > 0.05
-             );
+             if(ctx) {
+                 // Draw to canvas first
+                 ctx.drawImage(video, 0, 0, 224, 224);
+                 // Scan the CANVAS pixels
+                 const predictions = await nsfwModel!.classify(canvas);
+                 console.log("Video Scan:", predictions);
+                 
+                 const isNsfw = predictions.some(p => 
+                     (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
+                     && p.probability > 0.15
+                 );
 
-             if (isNsfw) {
-                 URL.revokeObjectURL(video.src);
-                 resolve(true);
-                 return;
+                 if (isNsfw) {
+                     URL.revokeObjectURL(video.src);
+                     resolve(true);
+                     return;
+                 }
              }
-             
              scanNext();
 
          } catch(e) { 
@@ -634,7 +644,7 @@ export default function ChatItNow() {
 
     try {
         const base64 = await blobToBase64(file);
-        // FIX: Use Object URL for video preview to ensure playback works
+        // Use Object URL for preview to ensure playback works
         const previewUrl = isVideo ? URL.createObjectURL(file) : base64;
         
         setFilePreview({ base64, type: isImage ? 'image' : 'video', previewUrl });
@@ -680,12 +690,13 @@ export default function ChatItNow() {
 
     if (replyingTo) msgData.replyTo = replyingTo;
 
+    // Use previewUrl for local message to fix playback
     setMessages(prev => [...prev, {
       id: msgID,
       type: 'you',
       text: null,
       image: filePreview.type === 'image' ? filePreview.base64 : undefined,
-      video: filePreview.type === 'video' ? filePreview.base64 : undefined,
+      video: filePreview.type === 'video' ? filePreview.previewUrl : undefined, 
       isNSFW: finalIsNSFW,
       replyTo: replyingTo || undefined,
       timestamp: timestamp,
@@ -695,11 +706,8 @@ export default function ChatItNow() {
 
     socket.emit('send_message', msgData);
     
-    // Cleanup Object URL if it was a video
-    if (filePreview.type === 'video' && filePreview.previewUrl !== filePreview.base64) {
-        URL.revokeObjectURL(filePreview.previewUrl);
-    }
-
+    // NOTE: We do not revoke the URL immediately so it stays playable
+    
     setReplyingTo(null);
     playSound('sent');
     resetActivity();
@@ -708,7 +716,6 @@ export default function ChatItNow() {
     setAiDetectedNSFW(false);
   };
 
-  // Helper to cleanup on cancel
   const handleCancelPreview = () => {
       if (filePreview?.type === 'video' && filePreview.previewUrl !== filePreview.base64) {
           URL.revokeObjectURL(filePreview.previewUrl);
