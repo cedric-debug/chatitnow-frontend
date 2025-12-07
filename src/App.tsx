@@ -105,11 +105,41 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; isYou?: boolean; };
 }
 
-// --- MEDIA MESSAGE COMPONENT ---
+// --- MEDIA MESSAGE COMPONENT (STRICT LOADING STATE) ---
 const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) => {
   const shouldBlur = msg.type !== 'you' && (msg.isNSFW || safeMode);
   const [isRevealed, setIsRevealed] = useState(!shouldBlur);
   const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // Initialize as null to force a "Loading" state for Receiver
+  // Only initialize immediately if it's already a Blob URL (Sender)
+  const [stableVideoUrl, setStableVideoUrl] = useState<string | null>(
+    msg.video && msg.video.startsWith('blob:') ? msg.video : null
+  );
+
+  useEffect(() => {
+    let activeUrl: string | null = null;
+    let isMounted = true;
+
+    if (msg.video && !stableVideoUrl) {
+        // It is Base64 (Receiver), convert it safely
+        fetch(msg.video)
+            .then(res => res.blob())
+            .then(blob => {
+                if (!isMounted) return;
+                activeUrl = URL.createObjectURL(blob);
+                setStableVideoUrl(activeUrl);
+            })
+            .catch(err => console.error("Video conversion error:", err));
+    }
+
+    return () => {
+        isMounted = false;
+        if (activeUrl) {
+            URL.revokeObjectURL(activeUrl);
+        }
+    };
+  }, [msg.video]); // Only run if source changes
 
   useEffect(() => {
     if (msg.type === 'you') {
@@ -137,7 +167,7 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
     <div className="relative group">
       {!isRevealed && (
         <div 
-          className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-lg cursor-pointer transition-colors backdrop-blur-xl"
+          className="absolute inset-0 z-40 flex flex-col items-center justify-center rounded-lg cursor-pointer transition-colors backdrop-blur-xl"
           style={{ 
             backgroundColor: msg.isNSFW ? 'rgba(0,0,0,0.9)' : 'rgba(30, 41, 59, 0.9)' 
           }}
@@ -165,29 +195,38 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
           <img 
             src={msg.image} 
             alt="Sent content" 
-            className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1 cursor-pointer"
+            className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1 cursor-pointer relative z-10"
             onClick={() => isRevealed && window.open(msg.image)} 
           />
         )}
         
         {msg.video && (
-          <video 
-            ref={videoRef}
-            key={msg.id} 
-            src={msg.video} 
-            controls
-            playsInline 
-            preload="metadata" 
-            className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1 bg-black" 
-            onError={(e) => console.error("Video Error:", e)}
-          />
+            // FIX: If URL isn't ready yet, show Spinner instead of broken player
+            stableVideoUrl ? (
+              <video 
+                ref={videoRef}
+                key={stableVideoUrl} 
+                src={stableVideoUrl} 
+                controls
+                playsInline 
+                preload="metadata" 
+                className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1 bg-black relative z-30" 
+                onError={(e) => console.error("Video Error:", e)}
+                onClick={(e) => e.stopPropagation()} 
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center w-[200px] h-[150px] bg-gray-900 rounded-lg">
+                  <Loader2 className="animate-spin text-purple-500 mb-2" size={24} />
+                  <span className="text-xs text-gray-400">Loading Video...</span>
+              </div>
+            )
         )}
       </div>
 
       {isRevealed && (msg.isNSFW || safeMode) && (
         <button 
           onClick={toggleReveal}
-          className="absolute top-2 right-2 z-30 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-2 right-2 z-50 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
           title="Hide Content"
         >
           <EyeOff size={14} />
@@ -559,7 +598,7 @@ export default function ChatItNow() {
     });
   };
 
-  // --- FIXED: MOBILE-OPTIMIZED VIDEO SCANNER (Canvas Bridge + Force Play) ---
+  // --- ROBUST VIDEO SCANNER (Mobile Optimized / Canvas Bridge) ---
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
