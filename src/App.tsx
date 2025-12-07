@@ -41,10 +41,11 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
 };
 
 // --- SOCKET CONNECTION ---
+// Socket.io automatically buffers packets when disconnected
 const socket: any = io(SERVER_URL, { 
   autoConnect: false,
   reconnection: true,             
-  reconnectionAttempts: 20,       
+  reconnectionAttempts: 50, // Increased attempts for long disconnects      
   reconnectionDelay: 1000,
   auth: {
     sessionID: getSessionID()
@@ -384,18 +385,16 @@ export default function ChatItNow() {
         const audioElements = [audioSentRef.current, audioReceivedRef.current];
         audioElements.forEach(audio => {
             if (audio) {
-                // Hack for Android: Play muted, then pause immediately
                 const originalVolume = audio.volume;
                 audio.muted = true;
                 audio.play().then(() => {
                     audio.pause();
                     audio.currentTime = 0;
-                    audio.muted = false; // Unmute for future use
+                    audio.muted = false; 
                     audio.volume = originalVolume;
                 }).catch(() => {});
             }
         });
-        // Remove listeners once unlocked
         document.removeEventListener('click', unlockAudio);
         document.removeEventListener('touchstart', unlockAudio);
         document.removeEventListener('keydown', unlockAudio);
@@ -439,7 +438,7 @@ export default function ChatItNow() {
 
   // --- RECORDING LOGIC ---
   const startRecording = async () => {
-    if (!isConnected) return;
+    // UPDATED: Removed check for !isConnected so users can record while offline
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -503,6 +502,7 @@ export default function ChatItNow() {
   };
 
   const handleSendAudio = (base64Audio: string) => {
+      // Allow sending even if !isConnected. Socket.io will buffer it.
       const msgID = generateMessageID();
       const msgData: any = {
           id: msgID,
@@ -558,15 +558,14 @@ export default function ChatItNow() {
       playSound('received');
       resetActivity();
 
-      // --- SYSTEM NOTIFICATION CHECK (ANDROID OPTIMIZED) ---
+      // --- SYSTEM NOTIFICATION CHECK ---
       if (!isNotifyMuted && document.hidden) {
           if (Notification.permission === "granted") {
-              const notifTitle = `New message from ${partnerNameRef.current || 'Partner'}`;
-              const notifBody = data.audio ? "Sent a voice message" : (data.text || "Sent a message");
-              
               try {
-                  // Android Chrome often REQUIRES Service Worker for notifications
-                  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                  const notifTitle = `New message from ${partnerNameRef.current || 'Partner'}`;
+                  const notifBody = data.audio ? "Sent a voice message" : (data.text || "Sent a message");
+                  
+                  if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
                      navigator.serviceWorker.ready.then(registration => {
                         registration.showNotification(notifTitle, {
                            body: notifBody,
@@ -574,7 +573,6 @@ export default function ChatItNow() {
                         });
                      });
                   } else {
-                     // Fallback for Desktop / non-SW environments
                      new Notification(notifTitle, {
                         body: notifBody,
                         icon: "/favicon.ico" 
@@ -727,7 +725,8 @@ export default function ChatItNow() {
   };
 
   const handleSendMessage = () => {
-    if (currentMessage.trim() && isConnected) {
+    // UPDATED: Allow sending even if !isConnected. Socket.io will buffer it.
+    if (currentMessage.trim()) {
       const msgID = generateMessageID(); 
       const msgData: any = { 
         id: msgID,
@@ -767,7 +766,7 @@ export default function ChatItNow() {
   const handleStartSearch = () => { startSearch(); };
 
   const initiateReply = (text: any, type: string) => {
-    if (!isConnected) return;
+    // UPDATED: Allow reply UI even if offline
     const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
     setReplyingTo({ text: typeof text === 'string' ? text : 'Voice Message', name: senderName, isYou: type === 'you' });
     const input = document.querySelector('input[type="text"]') as HTMLInputElement;
@@ -1196,27 +1195,27 @@ export default function ChatItNow() {
               <form className="flex gap-2 items-center h-[60px]" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
                 
                 {/* SKIP BUTTON */}
-                <button type="button" onClick={handleNext} disabled={partnerStatus === 'searching'} className={`h-full px-3 w-16 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-[#374151] text-white hover:bg-[#323844]' : 'border-gray-200 text-black hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
+                {/* UPDATED: Removed disabled={partnerStatus === 'searching'} so user can force skip if stuck */}
+                <button type="button" onClick={handleNext} className={`h-full px-3 w-16 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-[#374151] text-white hover:bg-[#323844]' : 'border-gray-200 text-black hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
                 
                 {/* INPUT CONTAINER */}
                 <div className="relative flex-1 h-full flex items-center">
+                  {/* UPDATED: Removed disabled={!isConnected} */}
                   <input 
                     type="text" 
                     value={currentMessage} 
                     onChange={handleTyping} 
                     enterKeyHint="send" 
                     placeholder={isConnected ? (replyingTo ? `Replying to ${replyingTo.name}...` : "Say something...") : "Waiting..."} 
-                    disabled={!isConnected} 
-                    // Added padding-right (pr-12) only when empty to avoid text hitting icon
                     className={`w-full h-full px-4 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-[#111827] border-[#374151] text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'} ${!currentMessage.trim() ? 'pr-12' : ''}`} 
                   />
                   
-                  {/* MIC ICON INSIDE INPUT (ONLY SHOWS WHEN TEXT IS EMPTY) */}
+                  {/* MIC ICON INSIDE INPUT */}
+                  {/* UPDATED: Removed disabled={!isConnected} */}
                   {!currentMessage.trim() && (
                     <button 
                       type="button" 
                       onClick={startRecording} 
-                      disabled={!isConnected} 
                       className={`absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full transition-colors ${darkMode ? 'text-gray-400 hover:bg-[#374151]' : 'text-gray-500 hover:bg-gray-100'} disabled:opacity-50`}
                     >
                       <AudioLines size={20} />
@@ -1224,9 +1223,10 @@ export default function ChatItNow() {
                   )}
                 </div>
 
-                {/* SEND BUTTON (ONLY SHOWS WHEN TYPING) */}
+                {/* SEND BUTTON */}
+                {/* UPDATED: Removed disabled={!isConnected} */}
                 {currentMessage.trim() && (
-                  <button type="submit" disabled={!isConnected} className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
+                  <button type="submit" className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
                 )}
 
               </form>
