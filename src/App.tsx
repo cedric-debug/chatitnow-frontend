@@ -79,7 +79,7 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; isYou?: boolean; };
 }
 
-// --- MEDIA MESSAGE COMPONENT (OPTIMIZED VIDEO) ---
+// --- MEDIA MESSAGE COMPONENT ---
 const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) => {
   const shouldBlur = msg.type !== 'you' && (msg.isNSFW || safeMode);
   const [isRevealed, setIsRevealed] = useState(!shouldBlur);
@@ -102,7 +102,6 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
     const willReveal = !isRevealed;
     setIsRevealed(willReveal);
     
-    // Auto-play video when revealed for smoother UX
     if (willReveal && videoRef.current) {
         videoRef.current.play().catch(err => console.log("Auto-play blocked:", err));
     } else if (!willReveal && videoRef.current) {
@@ -139,7 +138,6 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
         </div>
       )}
 
-      {/* MEDIA CONTENT */}
       <div className={`${!isRevealed ? 'filter blur-xl opacity-0' : 'opacity-100'} transition-all duration-300`}>
         {msg.image && (
           <img 
@@ -350,9 +348,7 @@ export default function ChatItNow() {
     return false;
   });
 
-  // --- CHANGED: FASTER MODEL LOADING ---
-  // Calling nsfwjs.load() without arguments loads the "Lite" MobileNetV2 model
-  // This is ~2MB compared to the Mid model (~15MB), drastically reducing load/scan time.
+  // --- FASTER MODEL LOADING ---
   useEffect(() => {
     const loadModel = async () => {
         try {
@@ -542,7 +538,7 @@ export default function ChatItNow() {
     });
   };
 
-  // --- CHANGED: OPTIMIZED VIDEO SCANNER (Reuses Canvas) ---
+  // --- OPTIMIZED VIDEO SCANNER (Reuses Canvas) ---
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
@@ -630,11 +626,21 @@ export default function ChatItNow() {
       return;
     }
 
-    // --- CHANGED: STRICT FORMAT CHECK FOR FLAWLESS PLAYBACK ---
-    if (isVideo && !['video/mp4', 'video/webm', 'video/ogg'].includes(file.type)) {
-       alert("Video format not supported. Please use standard MP4, WebM, or OGG.");
-       if (fileInputRef.current) fileInputRef.current.value = '';
-       return;
+    // --- EXPANDED FORMAT SUPPORT ---
+    // Added: video/quicktime (.mov for iPhone), video/x-m4v, video/3gpp (old Android)
+    const validVideoTypes = [
+      'video/mp4', 
+      'video/webm', 
+      'video/ogg', 
+      'video/quicktime', 
+      'video/x-m4v', 
+      'video/3gpp'
+    ];
+
+    if (isVideo && !validVideoTypes.includes(file.type)) {
+       // Warning only - let browser try to play it, but warn user
+       // Removing strict block for flexibility with iPhone formats
+       console.log("Warning: Uncommon video format", file.type);
     }
 
     setIsAnalyzing(true);
@@ -1550,7 +1556,7 @@ export default function ChatItNow() {
                   type="file" 
                   ref={fileInputRef} 
                   className="hidden" 
-                  accept="image/*,video/mp4,video/webm,video/ogg" 
+                  accept="image/*,video/mp4,video/webm,video/ogg,video/quicktime,video/x-m4v" 
                   onChange={handleFileSelect} 
                 />
 
