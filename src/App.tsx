@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-// REMOVED 'Eye' import
+// REMOVED 'Eye' from the imports below
 import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip, AlertTriangle, EyeOff, Loader2, Info, Shield, ShieldCheck } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
@@ -81,10 +81,7 @@ interface Message {
 
 // --- MEDIA MESSAGE COMPONENT ---
 const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) => {
-  // Blur if: It's NOT you AND (It is NSFW OR SafeMode is ON)
   const shouldBlur = msg.type !== 'you' && (msg.isNSFW || safeMode);
-  
-  // Initialize state based on blur requirement
   const [isRevealed, setIsRevealed] = useState(!shouldBlur);
 
   const toggleReveal = (e: React.MouseEvent) => {
@@ -1054,7 +1051,7 @@ export default function ChatItNow() {
   };
 
   const handleSendMessage = () => {
-    if (currentMessage.trim() && isConnected) {
+    if (currentMessage.trim()) {
       const msgID = generateMessageID(); 
       const msgData: any = { 
         id: msgID,
@@ -1160,7 +1157,7 @@ export default function ChatItNow() {
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
-             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
+           <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
                 <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
                 <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
                 <p>As a university student who knows what it feels like to crave real, genuine connection in a world thats getting more digital and more distant every year. Sometimes, even if we're surrounded by people, we still feel like no one really listens. That's why I built this platform to create a space where Filipinos can express themselves openly, share their stories, and find comfort from people who might actually understand what they're going through—even if they're total strangers.</p>
