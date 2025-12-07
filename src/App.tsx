@@ -102,9 +102,8 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
     const willReveal = !isRevealed;
     setIsRevealed(willReveal);
     
-    if (willReveal && videoRef.current) {
-        videoRef.current.play().catch(err => console.log("Auto-play blocked:", err));
-    } else if (!willReveal && videoRef.current) {
+    // UPDATED: Only pause if re-hiding. Never auto-play.
+    if (!willReveal && videoRef.current) {
         videoRef.current.pause();
     }
   };
@@ -138,6 +137,7 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
         </div>
       )}
 
+      {/* MEDIA CONTENT */}
       <div className={`${!isRevealed ? 'filter blur-xl opacity-0' : 'opacity-100'} transition-all duration-300`}>
         {msg.image && (
           <img 
@@ -639,7 +639,6 @@ export default function ChatItNow() {
 
     if (isVideo && !validVideoTypes.includes(file.type)) {
        // Warning only - let browser try to play it, but warn user
-       // Removing strict block for flexibility with iPhone formats
        console.log("Warning: Uncommon video format", file.type);
     }
 
