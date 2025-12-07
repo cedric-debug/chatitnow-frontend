@@ -41,6 +41,32 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
+// --- HELPER: DETECT LINKS & FORMAT TEXT ---
+const formatMessageText = (text: string) => {
+  if (!text) return null;
+  // Regex to detect URLs (http/https)
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-300 underline break-all hover:text-blue-200"
+          onClick={(e) => e.stopPropagation()} // Prevent triggering message clicks
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
 // --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
   transports: ['websocket'], 
@@ -540,7 +566,7 @@ export default function ChatItNow() {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
       const video = document.createElement('video');
-      video.preload = 'metadata';
+      video.preload = 'auto'; // Force load for mobile
       video.src = URL.createObjectURL(file);
       video.muted = true;
       video.playsInline = true;
@@ -563,7 +589,8 @@ export default function ChatItNow() {
          video.currentTime = nextTime!;
       };
 
-      video.onloadeddata = () => {
+      // Changed from onloadeddata to onloadedmetadata for better mobile support
+      video.onloadedmetadata = () => {
          const dur = video.duration;
          if(dur && dur > 1) {
             scanQueue.push(dur * 0.1); 
@@ -603,7 +630,10 @@ export default function ChatItNow() {
          }
       };
 
-      video.onerror = () => resolve(false);
+      video.onerror = () => {
+          console.error("Video load error");
+          resolve(false);
+      };
     });
   };
 
@@ -1448,7 +1478,7 @@ export default function ChatItNow() {
 
                             {msg.text && (
                                 <div className="flex flex-col">
-                                  <span className="whitespace-pre-wrap break-words">{msg.text}</span>
+                                  <span className="whitespace-pre-wrap break-words">{formatMessageText(msg.text as string)}</span>
                                   {/* LINK SAFETY WARNING */}
                                   {msg.type === 'stranger' && typeof msg.text === 'string' && /(http|https|www\.)/i.test(msg.text) && (
                                       <div className="mt-2 p-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 flex items-start gap-2">
