@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip, AlertTriangle, EyeOff, Loader2, Info, Shield, ShieldCheck } from 'lucide-react';
+import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip, AlertTriangle, EyeOff, Loader2, Info, Shield, ShieldCheck, ShieldAlert } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 import * as nsfwjs from 'nsfwjs';
@@ -41,9 +41,9 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
-// --- SOCKET CONNECTION (FIXED: Force Websocket) ---
+// --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
-  transports: ['websocket'], // <--- CRITICAL FIX for large files
+  transports: ['websocket'], 
   autoConnect: false,
   reconnection: true,             
   reconnectionAttempts: 50,       
@@ -84,16 +84,15 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
   const shouldBlur = msg.type !== 'you' && (msg.isNSFW || safeMode);
   const [isRevealed, setIsRevealed] = useState(!shouldBlur);
 
-  // Reactive Safe Mode
   useEffect(() => {
     if (msg.type === 'you') {
         setIsRevealed(true);
         return;
     }
     if (safeMode) {
-        setIsRevealed(false);
+        setIsRevealed(false); 
     } else {
-        setIsRevealed(!msg.isNSFW);
+        setIsRevealed(!msg.isNSFW); 
     }
   }, [safeMode, msg.isNSFW, msg.type]);
 
@@ -104,8 +103,6 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
 
   return (
     <div className="relative group">
-      
-      {/* BLUR OVERLAY */}
       {!isRevealed && (
         <div 
           className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-lg cursor-pointer transition-colors backdrop-blur-xl"
@@ -140,21 +137,17 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
             onClick={() => isRevealed && window.open(msg.image)} 
           />
         )}
-        
         {msg.video && (
-          // FIXED: Added key, playsInline, preload
           <video 
-            key={msg.id}
             src={msg.video} 
             controls={isRevealed}
-            playsInline 
+            playsInline
             preload="auto"
             className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1 bg-black" 
           />
         )}
       </div>
 
-      {/* RE-HIDE BUTTON */}
       {isRevealed && (msg.isNSFW || safeMode) && (
         <button 
           onClick={toggleReveal}
@@ -168,7 +161,7 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
   );
 };
 
-// --- CUSTOM AUDIO PLAYER COMPONENT ---
+// --- CUSTOM AUDIO PLAYER ---
 const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isOwnMessage: boolean, isDarkMode: boolean }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -189,22 +182,14 @@ const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isO
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
     const onLoadedMetadata = () => {
-        if(audio.duration !== Infinity && !isNaN(audio.duration)) {
-            setDuration(audio.duration);
-        } else { setDuration(0); }
+        if(audio.duration !== Infinity && !isNaN(audio.duration)) { setDuration(audio.duration); } else { setDuration(0); }
     };
-    const onEnded = () => {
-        setIsPlaying(false);
-        setCurrentTime(0);
-    };
-
+    const onEnded = () => { setIsPlaying(false); setCurrentTime(0); };
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('ended', onEnded);
-
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
@@ -220,7 +205,6 @@ const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isO
   };
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
-
   const btnColor = isOwnMessage ? "text-white" : (isDarkMode ? "text-gray-200" : "text-gray-700");
   const trackBg = isOwnMessage ? "bg-purple-400/50" : (isDarkMode ? "bg-gray-600" : "bg-gray-300");
   const trackFill = isOwnMessage ? "bg-white" : (isDarkMode ? "bg-purple-400" : "bg-purple-600");
@@ -229,20 +213,14 @@ const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isO
   return (
     <div className="flex items-center gap-3 min-w-[180px] py-1 select-none">
       <audio ref={audioRef} src={src} preload="metadata" />
-      
       <button onClick={togglePlay} className={`p-1 rounded-full transition hover:opacity-80 focus:outline-none ${btnColor}`}>
         {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
       </button>
-
       <div className="flex-1 flex flex-col justify-center h-full pt-1">
          <div className={`h-1 w-full rounded-full ${trackBg} overflow-hidden`}>
-            <div 
-              className={`h-full ${trackFill} transition-all duration-100 ease-linear`} 
-              style={{ width: `${progressPercent}%` }}
-            />
+            <div className={`h-full ${trackFill} transition-all duration-100 ease-linear`} style={{ width: `${progressPercent}%` }} />
          </div>
       </div>
-
       <span className={`text-[10px] font-mono w-[30px] text-right ${timeColor} pt-0.5`}>
         {formatTime(isPlaying ? currentTime : duration)}
       </span>
@@ -251,17 +229,7 @@ const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isO
 };
 
 // --- SWIPEABLE COMPONENT ---
-const SwipeableMessage = ({ 
-  children, 
-  onReply, 
-  isSystem, 
-  direction 
-}: { 
-  children: React.ReactNode, 
-  onReply: () => void, 
-  isSystem: boolean,
-  direction: 'left' | 'right'
-}) => {
+const SwipeableMessage = ({ children, onReply, isSystem, direction }: { children: React.ReactNode, onReply: () => void, isSystem: boolean, direction: 'left' | 'right'}) => {
   const [offsetX, setOffsetX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startX = useRef(0);
@@ -271,109 +239,49 @@ const SwipeableMessage = ({
 
   if (isSystem) return <div>{children}</div>;
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    startX.current = e.touches[0].clientX;
-    setIsDragging(true);
-  };
-
+  const handleTouchStart = (e: React.TouchEvent) => { startX.current = e.touches[0].clientX; setIsDragging(true); };
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging) return;
     const currentX = e.touches[0].clientX;
     const diff = currentX - startX.current;
-    
     let finalDrag = 0;
-    
-    if (direction === 'right') {
-       if (diff > 0) {
+    if (direction === 'right' && diff > 0) {
          const absDiff = Math.abs(diff);
-         finalDrag = absDiff > SWIPE_THRESHOLD 
-            ? SWIPE_THRESHOLD + Math.pow(absDiff - SWIPE_THRESHOLD, 0.8)
-            : absDiff;
+         finalDrag = absDiff > SWIPE_THRESHOLD ? SWIPE_THRESHOLD + Math.pow(absDiff - SWIPE_THRESHOLD, 0.8) : absDiff;
          finalDrag = Math.min(finalDrag, MAX_DRAG);
-       }
-    } else {
-       if (diff < 0) {
+    } else if (direction === 'left' && diff < 0) {
          const absDiff = Math.abs(diff);
-         const resisted = absDiff > SWIPE_THRESHOLD 
-            ? SWIPE_THRESHOLD + Math.pow(absDiff - SWIPE_THRESHOLD, 0.8)
-            : absDiff;
+         const resisted = absDiff > SWIPE_THRESHOLD ? SWIPE_THRESHOLD + Math.pow(absDiff - SWIPE_THRESHOLD, 0.8) : absDiff;
          finalDrag = -Math.min(resisted, MAX_DRAG);
-       }
     }
-
     if (finalDrag !== 0) setOffsetX(finalDrag);
   };
-
-  const handleTouchEnd = () => {
-    if (Math.abs(offsetX) > SWIPE_THRESHOLD) onReply();
-    setIsDragging(false);
-    setOffsetX(0);
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    startX.current = e.clientX;
-    setIsDragging(true);
-  };
-
+  const handleTouchEnd = () => { if (Math.abs(offsetX) > SWIPE_THRESHOLD) onReply(); setIsDragging(false); setOffsetX(0); };
+  const handleMouseDown = (e: React.MouseEvent) => { startX.current = e.clientX; setIsDragging(true); };
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
     const currentX = e.clientX;
     const diff = currentX - startX.current;
-
     let finalDrag = 0;
-    if (direction === 'right' && diff > 0) {
-        finalDrag = Math.min(diff, MAX_DRAG);
-    } else if (direction === 'left' && diff < 0) {
-        finalDrag = Math.max(diff, -MAX_DRAG);
-    }
-
+    if (direction === 'right' && diff > 0) finalDrag = Math.min(diff, MAX_DRAG);
+    else if (direction === 'left' && diff < 0) finalDrag = Math.max(diff, -MAX_DRAG);
     if (finalDrag !== 0) setOffsetX(finalDrag);
   };
-
-  const handleMouseUp = () => {
-    if (isDragging) {
-      if (Math.abs(offsetX) > SWIPE_THRESHOLD) onReply();
-      setIsDragging(false);
-      setOffsetX(0);
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (isDragging) {
-      setIsDragging(false);
-      setOffsetX(0);
-    }
-  };
+  const handleMouseUp = () => { if (isDragging) { if (Math.abs(offsetX) > SWIPE_THRESHOLD) onReply(); setIsDragging(false); setOffsetX(0); } };
+  const handleMouseLeave = () => { if (isDragging) { setIsDragging(false); setOffsetX(0); } };
 
   return (
     <div 
       className="relative w-full select-none touch-pan-y"
       style={{ touchAction: 'pan-y' }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
+      onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseLeave}
       onDoubleClick={onReply}
     >
-      <div 
-        className={`absolute top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400 transition-opacity duration-200 ${direction === 'right' ? 'left-2' : 'right-2'}`}
-        style={{ 
-          opacity: Math.abs(offsetX) > 15 ? 1 : 0,
-          transform: `translateY(-50%) scale(${Math.min(Math.abs(offsetX) / SWIPE_THRESHOLD, 1)})`
-        }}
-      >
+      <div className={`absolute top-1/2 -translate-y-1/2 flex items-center justify-center text-gray-400 transition-opacity duration-200 ${direction === 'right' ? 'left-2' : 'right-2'}`} style={{ opacity: Math.abs(offsetX) > 15 ? 1 : 0, transform: `translateY(-50%) scale(${Math.min(Math.abs(offsetX) / SWIPE_THRESHOLD, 1)})` }}>
         <Reply size={20} className={direction === 'left' ? "scale-x-[-1]" : ""} /> 
       </div>
-
-      <div 
-        style={{ 
-          transform: `translateX(${offsetX}px)`, 
-          transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28)' 
-        }}
-      >
+      <div style={{ transform: `translateX(${offsetX}px)`, transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28)' }}>
         {children}
       </div>
     </div>
@@ -395,17 +303,13 @@ export default function ChatItNow() {
   
   const [isMuted, setIsMuted] = useState(false);
   const [isNotifyMuted, setIsNotifyMuted] = useState(false);
-  
   const [isReadReceiptsEnabled, setIsReadReceiptsEnabled] = useState(true);
   const [partnerHasReadReceipts, setPartnerHasReadReceipts] = useState(true);
-  
-  // --- SAFE MODE STATE ---
   const [safeMode, setSafeMode] = useState(true);
 
   const [replyingTo, setReplyingTo] = useState<ReplyData | null>(null);
   const [activeReactionId, setActiveReactionId] = useState<string | null>(null);
 
-  // --- MEDIA STATES ---
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -413,7 +317,6 @@ export default function ChatItNow() {
   const recordingTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null); 
   
-  // --- FILE PREVIEW & NSFW ---
   const [filePreview, setFilePreview] = useState<{ base64: string, type: 'image' | 'video' } | null>(null);
   const [isNSFWMarked, setIsNSFWMarked] = useState(false);
   const [aiDetectedNSFW, setAiDetectedNSFW] = useState(false); 
@@ -466,9 +369,7 @@ export default function ChatItNow() {
 
   // --- FORCE DISCONNECT ON RELOAD ---
   useEffect(() => {
-    const handleBeforeUnload = () => {
-        socket.emit('disconnect_partner');
-    };
+    const handleBeforeUnload = () => { socket.emit('disconnect_partner'); };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
@@ -496,20 +397,12 @@ export default function ChatItNow() {
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
   const REACTIONS = ['❤️', '😆', '😮', '😢', '😡', '👍'];
 
-  // Initialize Audio
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
-    
-    [audioSentRef.current, audioReceivedRef.current].forEach(audio => {
-        if(audio) {
-            audio.volume = 1.0;
-            audio.preload = 'auto';
-        }
-    });
+    [audioSentRef.current, audioReceivedRef.current].forEach(audio => { if(audio) { audio.volume = 1.0; audio.preload = 'auto'; } });
   }, []);
 
-  // --- GLOBAL AUDIO UNLOCKER ---
   useEffect(() => {
     const unlockAudio = () => {
         const audioElements = [audioSentRef.current, audioReceivedRef.current];
@@ -529,11 +422,9 @@ export default function ChatItNow() {
         document.removeEventListener('touchstart', unlockAudio);
         document.removeEventListener('keydown', unlockAudio);
     };
-
     document.addEventListener('click', unlockAudio);
     document.addEventListener('touchstart', unlockAudio);
     document.addEventListener('keydown', unlockAudio);
-
     return () => {
         document.removeEventListener('click', unlockAudio);
         document.removeEventListener('touchstart', unlockAudio);
@@ -544,21 +435,10 @@ export default function ChatItNow() {
   const playSound = (type: 'sent' | 'received') => {
     if (isMuted) return;
     try {
-      const audioMap = {
-        sent: audioSentRef.current,
-        received: audioReceivedRef.current,
-      };
+      const audioMap = { sent: audioSentRef.current, received: audioReceivedRef.current };
       // @ts-ignore
       const audio = audioMap[type];
-      if (audio) {
-        audio.currentTime = 0;
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch((error: any) => {
-             console.log("Audio play failed", error);
-          });
-        }
-      }
+      if (audio) { audio.currentTime = 0; audio.play().catch(() => {}); }
     } catch (e) { console.error("Audio play failed", e); }
   };
 
@@ -569,50 +449,25 @@ export default function ChatItNow() {
   const toggleReadReceipts = () => {
     const newState = !isReadReceiptsEnabled;
     setIsReadReceiptsEnabled(newState);
-    if(isConnected) {
-      socket.emit('toggle_read_receipts', newState);
-    }
+    if(isConnected) { socket.emit('toggle_read_receipts', newState); }
   };
 
-  // --- RECORDING LOGIC ---
   const startRecording = async () => {
     try {
       let mimeType = 'audio/webm'; 
-      if (MediaRecorder.isTypeSupported('audio/mp4')) {
-          mimeType = 'audio/mp4'; 
-      } else if (MediaRecorder.isTypeSupported('audio/aac')) {
-          mimeType = 'audio/aac';
-      }
-
+      if (MediaRecorder.isTypeSupported('audio/mp4')) { mimeType = 'audio/mp4'; } else if (MediaRecorder.isTypeSupported('audio/aac')) { mimeType = 'audio/aac'; }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
+      mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) { audioChunksRef.current.push(event.data); } };
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingDuration(0);
-
       recordingTimerRef.current = window.setInterval(() => {
-        setRecordingDuration(prev => {
-          if (prev >= 15) {
-             stopRecordingAndSend();
-             return 15;
-          }
-          return prev + 1;
-        });
+        setRecordingDuration(prev => { if (prev >= 15) { stopRecordingAndSend(); return 15; } return prev + 1; });
       }, 1000);
-
-    } catch (err) {
-      console.error("Error accessing microphone:", err);
-      alert("Could not access microphone.");
-    }
+    } catch (err) { console.error("Error accessing microphone:", err); alert("Could not access microphone."); }
   };
 
   const stopRecordingAndSend = () => {
@@ -623,7 +478,6 @@ export default function ChatItNow() {
          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
          const base64Audio = await blobToBase64(audioBlob);
          handleSendAudio(base64Audio);
-         
          if(recordingTimerRef.current) clearInterval(recordingTimerRef.current);
          mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
          setIsRecording(false);
@@ -643,36 +497,33 @@ export default function ChatItNow() {
     }
   };
 
-  // --- AI SCANNERS (STRICTER FILTER) ---
+  // --- FAST IMAGE SCANNER (createImageBitmap + 224x224 + 5% Threshold) ---
   const checkImageContent = async (base64Data: string): Promise<boolean> => {
     if (!nsfwModel) return false;
+    const res = await fetch(base64Data);
+    const blob = await res.blob();
     return new Promise((resolve) => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.src = base64Data;
-        img.onload = async () => {
-            try {
-                // Resize image to 224x224 (Model Input Size) for speed
-                const canvas = document.createElement('canvas');
-                canvas.width = 224;
-                canvas.height = 224;
-                const ctx = canvas.getContext('2d');
-                if(ctx) {
-                    ctx.drawImage(img, 0, 0, 224, 224);
-                    const predictions = await nsfwModel.classify(canvas);
-                    console.log("NSFW Analysis (Image):", predictions);
+        createImageBitmap(blob).then(bitmap => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 224;
+            canvas.height = 224;
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            if(ctx) {
+                ctx.drawImage(bitmap, 0, 0, 224, 224);
+                nsfwModel!.classify(canvas).then(predictions => {
+                    console.log("Fast Image Scan:", predictions);
                     const isNsfw = predictions.some(p => 
                         (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
                         && p.probability > 0.05
                     );
                     resolve(isNsfw);
-                } else { resolve(false); }
-            } catch (err) { resolve(false); }
-        };
-        img.onerror = () => resolve(false);
+                }).catch(() => resolve(false));
+            } else { resolve(false); }
+        }).catch(() => resolve(false));
     });
   };
 
+  // --- FAST VIDEO SCANNER (3 SCANS @ 224x224 + 5% Threshold) ---
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
@@ -708,20 +559,19 @@ export default function ChatItNow() {
 
       video.onseeked = async () => {
          try {
-             // Resize video frame to 224x224 for speed
              const canvas = document.createElement('canvas');
              canvas.width = 224;
              canvas.height = 224;
-             const ctx = canvas.getContext('2d');
+             const ctx = canvas.getContext('2d', { willReadFrequently: true });
              
              if(ctx) {
                  ctx.drawImage(video, 0, 0, 224, 224);
-                 const predictions = await nsfwModel.classify(canvas);
-                 console.log("NSFW Analysis (Video Frame):", predictions);
+                 const predictions = await nsfwModel!.classify(canvas);
+                 console.log("Fast Video Scan:", predictions);
                  
                  const isNsfw = predictions.some(p => 
                      (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
-                     && p.probability > 0.05 // 5% Tolerance
+                     && p.probability > 0.05
                  );
 
                  if (isNsfw) {
@@ -742,7 +592,6 @@ export default function ChatItNow() {
     });
   };
 
-  // --- FILE SELECT LOGIC ---
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -760,26 +609,27 @@ export default function ChatItNow() {
       return;
     }
 
-    const base64 = await blobToBase64(file);
-    setFilePreview({ base64, type: isImage ? 'image' : 'video' });
-    
     setIsAnalyzing(true);
     setIsNSFWMarked(false); 
     setAiDetectedNSFW(false); 
 
     try {
-        let detectedNSFW = false;
-        if (nsfwModel) {
-            if (isImage) {
-                detectedNSFW = await checkImageContent(base64);
-            } else if (isVideo) {
-                detectedNSFW = await checkVideoContent(file);
-            }
-        }
+        const base64 = await blobToBase64(file);
+        setFilePreview({ base64, type: isImage ? 'image' : 'video' });
         
+        let detectedNSFW = false;
+        if(nsfwModel) {
+             if(isImage) {
+                 detectedNSFW = await checkImageContent(base64);
+             } else {
+                 detectedNSFW = await checkVideoContent(file);
+             }
+        }
+
         if (detectedNSFW) {
             setAiDetectedNSFW(true); 
         }
+
     } catch (e) {
         console.error("Scan error", e);
     } finally {
@@ -1178,7 +1028,7 @@ export default function ChatItNow() {
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
-             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
+            <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
                 <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
                 <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
                 <p>As a university student who knows what it feels like to crave real, genuine connection in a world thats getting more digital and more distant every year. Sometimes, even if we're surrounded by people, we still feel like no one really listens. That's why I built this platform to create a space where Filipinos can express themselves openly, share their stories, and find comfort from people who might actually understand what they're going through—even if they're total strangers.</p>
@@ -1538,7 +1388,18 @@ export default function ChatItNow() {
                             )}
 
                             {msg.text && (
-                                <span>{msg.text}</span>
+                                <div className="flex flex-col">
+                                  <span className="whitespace-pre-wrap">{msg.text}</span>
+                                  {/* LINK SAFETY WARNING */}
+                                  {msg.type === 'stranger' && typeof msg.text === 'string' && /(http|https|www\.)/i.test(msg.text) && (
+                                      <div className="mt-2 p-2 rounded bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800 flex items-center gap-2">
+                                          <ShieldAlert size={14} className="text-red-600 dark:text-red-400 shrink-0" />
+                                          <span className="text-[10px] font-bold text-red-600 dark:text-red-400">
+                                              Warning: Be careful clicking links from strangers.
+                                          </span>
+                                      </div>
+                                  )}
+                                </div>
                             )}
 
                             {/* TIMESTAMPS & TICKS */}
