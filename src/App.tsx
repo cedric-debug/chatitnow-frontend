@@ -58,6 +58,7 @@ interface ReplyData {
   text: string;
   name: string;
   isYou: boolean;
+  id: string; // ADDED: Store ID for scrolling
 }
 
 interface Message {
@@ -102,7 +103,6 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
     const willReveal = !isRevealed;
     setIsRevealed(willReveal);
     
-    // Only pause video if hiding. Never auto-play.
     if (!willReveal && videoRef.current) {
         videoRef.current.pause();
     }
@@ -110,8 +110,6 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
 
   return (
     <div className="relative group">
-      
-      {/* BLUR OVERLAY */}
       {!isRevealed && (
         <div 
           className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-lg cursor-pointer transition-colors backdrop-blur-xl"
@@ -137,7 +135,6 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
         </div>
       )}
 
-      {/* MEDIA CONTENT */}
       <div className={`${!isRevealed ? 'filter blur-xl opacity-0' : 'opacity-100'} transition-all duration-300`}>
         {msg.image && (
           <img 
@@ -162,7 +159,6 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
         )}
       </div>
 
-      {/* RE-HIDE BUTTON */}
       {isRevealed && (msg.isNSFW || safeMode) && (
         <button 
           onClick={toggleReveal}
@@ -538,8 +534,7 @@ export default function ChatItNow() {
     });
   };
 
-  // --- OPTIMIZED VIDEO SCANNER (Direct GPU/Model Access) ---
-  // CHANGED: Removed Canvas entirely for video scanning to speed up processing
+  // --- OPTIMIZED VIDEO SCANNER (Reuses Canvas) ---
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
@@ -564,7 +559,6 @@ export default function ChatItNow() {
       video.onloadeddata = () => {
          const dur = video.duration;
          if(dur && dur > 1) {
-            // Check Start, Middle, End
             scanQueue.push(dur * 0.1); 
             scanQueue.push(dur * 0.5); 
             scanQueue.push(dur * 0.9); 
@@ -576,9 +570,6 @@ export default function ChatItNow() {
 
       video.onseeked = async () => {
          try {
-             // OPTIMIZATION: Pass the video element directly to the model.
-             // nsfwjs/tensorflow handles the resizing and texture binding 
-             // on the GPU (WebGL), which is faster than drawing to a 2D canvas CPU context.
              const predictions = await nsfwModel!.classify(video);
              console.log("Fast Video Scan:", predictions);
              
@@ -989,12 +980,25 @@ export default function ChatItNow() {
 
   const handleStartSearch = () => { startSearch(); };
 
-  const initiateReply = (text: any, type: string) => {
+  // --- CHANGED: Added ID to initiateReply ---
+  const initiateReply = (text: any, type: string, id: string) => {
     if (!isConnected) return;
     const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
-    setReplyingTo({ text: typeof text === 'string' ? text : 'Content', name: senderName, isYou: type === 'you' });
+    // Store ID for scrolling later
+    setReplyingTo({ text: typeof text === 'string' ? text : 'Content', name: senderName, isYou: type === 'you', id: id });
     const input = document.querySelector('input[type="text"]') as HTMLInputElement;
     if(input) input.focus();
+  };
+
+  // --- ADDED: Scroll Function ---
+  const scrollToMessage = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Optional: Add a temporary highlight class
+        element.classList.add('animate-pulse-red');
+        setTimeout(() => element.classList.remove('animate-pulse-red'), 1000);
+    }
   };
 
   const sendReaction = (msgID: string, emoji: string) => {
@@ -1349,7 +1353,8 @@ export default function ChatItNow() {
           {messages.map((msg, idx) => {
             let justifyClass = 'justify-center'; if (msg.type === 'you') justifyClass = 'justify-end'; if (msg.type === 'stranger') justifyClass = 'justify-start';
             return (
-              <div key={idx} className={`flex w-full ${justifyClass} group relative`}>
+              // CHANGED: Added id={msg.id} for scroll targeting
+              <div id={msg.id} key={idx} className={`flex w-full ${justifyClass} group relative`}>
                 
                 {msg.type === 'warning' ? (
                   <div className="w-[90%] text-center my-2">
@@ -1360,8 +1365,9 @@ export default function ChatItNow() {
                     <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>{msg.data ? renderSystemMessage(msg) : msg.text}</span>
                   </div>
                 ) : (
+                  // CHANGED: Pass ID to initiateReply
                   <SwipeableMessage 
-                    onReply={() => initiateReply(msg.text, msg.type)} 
+                    onReply={() => initiateReply(msg.text, msg.type, msg.id)} 
                     isSystem={false} 
                     direction={msg.type === 'you' ? 'left' : 'right'}
                   >
@@ -1392,8 +1398,12 @@ export default function ChatItNow() {
                             </div>
                           )}
 
+                          {/* CHANGED: ADDED onClick to Reply Box */}
                           {msg.replyTo && (
-                            <div className={`mb-1 text-xs opacity-75 px-3 py-1.5 rounded-lg border-l-4 ${msg.type === 'you' ? 'bg-purple-700 text-purple-100 border-purple-300' : (darkMode ? 'bg-[#3A4250] text-gray-400 border-[#4B5563]' : 'bg-gray-200 text-gray-600 border-gray-400')}`}>
+                            <div 
+                                onClick={() => scrollToMessage(msg.replyTo!.id)}
+                                className={`mb-1 text-xs opacity-75 px-3 py-1.5 rounded-lg border-l-4 cursor-pointer hover:brightness-90 transition ${msg.type === 'you' ? 'bg-purple-700 text-purple-100 border-purple-300' : (darkMode ? 'bg-[#3A4250] text-gray-400 border-[#4B5563]' : 'bg-gray-200 text-gray-600 border-gray-400')}`}
+                            >
                                <span className="font-bold block mb-0.5">{msg.replyTo.name}</span>
                                <span className="line-clamp-1">{msg.replyTo.text}</span>
                             </div>
