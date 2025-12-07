@@ -81,22 +81,18 @@ interface Message {
 
 // --- MEDIA MESSAGE COMPONENT ---
 const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) => {
-  // Logic: Blur if it's NOT you, AND (SafeMode is ON -OR- Content is NSFW)
   const shouldBlur = msg.type !== 'you' && (msg.isNSFW || safeMode);
   const [isRevealed, setIsRevealed] = useState(!shouldBlur);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Reactive Logic for Toggle Switch
   useEffect(() => {
     if (msg.type === 'you') {
         setIsRevealed(true);
         return;
     }
     if (safeMode) {
-        // If Safe Shield is ON -> Force Blur (Hide) everything
         setIsRevealed(false); 
     } else {
-        // If Safe Shield is OFF -> Only Blur if tagged NSFW
         setIsRevealed(!msg.isNSFW); 
     }
   }, [safeMode, msg.isNSFW, msg.type]);
@@ -106,7 +102,7 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
     const willReveal = !isRevealed;
     setIsRevealed(willReveal);
     
-    // Only pause video if hiding. Do NOT auto-play on reveal.
+    // Only pause video if hiding. Never auto-play.
     if (!willReveal && videoRef.current) {
         videoRef.current.pause();
     }
@@ -125,14 +121,12 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
           onClick={toggleReveal}
         >
            {msg.isNSFW ? (
-             // RED WARNING: If AI tagged as NSFW or Manual Gore Flag
              <>
                <AlertTriangle className="text-red-500 mb-2" size={32} />
                <span className="text-red-500 font-bold text-sm uppercase tracking-wider mb-1">Sensitive Content</span>
                <span className="text-gray-400 text-xs">(NSFW / Gore)</span>
              </>
            ) : (
-             // BLUE WARNING: If Safe Shield is ON (and image is SFW)
              <>
                <Shield className="text-blue-400 mb-2" size={32} />
                <span className="text-blue-400 font-bold text-sm uppercase tracking-wider mb-1">Hidden Media</span>
@@ -535,7 +529,7 @@ export default function ChatItNow() {
                     console.log("Fast Image Scan:", predictions);
                     const isNsfw = predictions.some(p => 
                         (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
-                        && p.probability > 0.15
+                        && p.probability > 0.05
                     );
                     resolve(isNsfw);
                 }).catch(() => resolve(false));
@@ -544,7 +538,8 @@ export default function ChatItNow() {
     });
   };
 
-  // --- OPTIMIZED VIDEO SCANNER (Reuses Canvas) ---
+  // --- OPTIMIZED VIDEO SCANNER (Direct GPU/Model Access) ---
+  // CHANGED: Removed Canvas entirely for video scanning to speed up processing
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
@@ -553,12 +548,6 @@ export default function ChatItNow() {
       video.src = URL.createObjectURL(file);
       video.muted = true;
       video.playsInline = true;
-
-      // Optimization: Create canvas ONCE outside the loop
-      const canvas = document.createElement('canvas');
-      canvas.width = 224;
-      canvas.height = 224;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
       const scanQueue: number[] = []; 
 
@@ -587,22 +576,23 @@ export default function ChatItNow() {
 
       video.onseeked = async () => {
          try {
-             if(ctx) {
-                 ctx.drawImage(video, 0, 0, 224, 224);
-                 const predictions = await nsfwModel!.classify(canvas);
-                 console.log("Fast Video Scan:", predictions);
-                 
-                 const isNsfw = predictions.some(p => 
-                     (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
-                     && p.probability > 0.15
-                 );
+             // OPTIMIZATION: Pass the video element directly to the model.
+             // nsfwjs/tensorflow handles the resizing and texture binding 
+             // on the GPU (WebGL), which is faster than drawing to a 2D canvas CPU context.
+             const predictions = await nsfwModel!.classify(video);
+             console.log("Fast Video Scan:", predictions);
+             
+             const isNsfw = predictions.some(p => 
+                 (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
+                 && p.probability > 0.05
+             );
 
-                 if (isNsfw) {
-                     URL.revokeObjectURL(video.src);
-                     resolve(true);
-                     return;
-                 }
+             if (isNsfw) {
+                 URL.revokeObjectURL(video.src);
+                 resolve(true);
+                 return;
              }
+             
              scanNext();
 
          } catch(e) { 
@@ -633,7 +623,6 @@ export default function ChatItNow() {
     }
 
     // --- EXPANDED FORMAT SUPPORT ---
-    // Added: video/quicktime (.mov for iPhone), video/x-m4v, video/3gpp (old Android)
     const validVideoTypes = [
       'video/mp4', 
       'video/webm', 
@@ -644,7 +633,6 @@ export default function ChatItNow() {
     ];
 
     if (isVideo && !validVideoTypes.includes(file.type)) {
-       // Warning only - let browser try to play it, but warn user
        console.log("Warning: Uncommon video format", file.type);
     }
 
