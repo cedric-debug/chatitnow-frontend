@@ -41,11 +41,10 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
 };
 
 // --- SOCKET CONNECTION ---
-// Socket.io automatically buffers packets when disconnected
 const socket: any = io(SERVER_URL, { 
   autoConnect: false,
   reconnection: true,             
-  reconnectionAttempts: 50, // Increased attempts for long disconnects      
+  reconnectionAttempts: 50,       
   reconnectionDelay: 1000,
   auth: {
     sessionID: getSessionID()
@@ -322,6 +321,15 @@ export default function ChatItNow() {
     return false;
   });
 
+  // --- REGISTER SERVICE WORKER ---
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('SW Registered', reg))
+        .catch(err => console.log('SW Failed', err));
+    }
+  }, []);
+
   // --- AUTO-RECONNECT ON VISIBILITY ---
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -370,7 +378,7 @@ export default function ChatItNow() {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
     
-    // ANDROID FIX: Preload and set volume
+    // ANDROID FIX: Preload
     [audioSentRef.current, audioReceivedRef.current].forEach(audio => {
         if(audio) {
             audio.volume = 1.0;
@@ -379,7 +387,7 @@ export default function ChatItNow() {
     });
   }, []);
 
-  // --- GLOBAL AUDIO UNLOCKER FOR ANDROID ---
+  // --- GLOBAL AUDIO UNLOCKER ---
   useEffect(() => {
     const unlockAudio = () => {
         const audioElements = [audioSentRef.current, audioReceivedRef.current];
@@ -438,7 +446,6 @@ export default function ChatItNow() {
 
   // --- RECORDING LOGIC ---
   const startRecording = async () => {
-    // UPDATED: Removed check for !isConnected so users can record while offline
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
@@ -502,7 +509,6 @@ export default function ChatItNow() {
   };
 
   const handleSendAudio = (base64Audio: string) => {
-      // Allow sending even if !isConnected. Socket.io will buffer it.
       const msgID = generateMessageID();
       const msgData: any = {
           id: msgID,
@@ -558,28 +564,26 @@ export default function ChatItNow() {
       playSound('received');
       resetActivity();
 
-      // --- SYSTEM NOTIFICATION CHECK ---
+      // --- SYSTEM NOTIFICATION CHECK (ANDROID SW) ---
       if (!isNotifyMuted && document.hidden) {
           if (Notification.permission === "granted") {
-              try {
-                  const notifTitle = `New message from ${partnerNameRef.current || 'Partner'}`;
-                  const notifBody = data.audio ? "Sent a voice message" : (data.text || "Sent a message");
-                  
-                  if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
-                     navigator.serviceWorker.ready.then(registration => {
-                        registration.showNotification(notifTitle, {
-                           body: notifBody,
-                           icon: "/favicon.ico"
-                        });
-                     });
-                  } else {
-                     new Notification(notifTitle, {
-                        body: notifBody,
-                        icon: "/favicon.ico" 
-                     });
-                  }
-              } catch (e) {
-                  console.error("Notification failed", e);
+              const notifTitle = `New message from ${partnerNameRef.current || 'Partner'}`;
+              const notifBody = data.audio ? "Sent a voice message" : (data.text || "Sent a message");
+              
+              // Use Service Worker for Android support
+              if ('serviceWorker' in navigator) {
+                 navigator.serviceWorker.ready.then(registration => {
+                    registration.showNotification(notifTitle, {
+                       body: notifBody,
+                       icon: "/favicon.ico"
+                    });
+                 }).catch(err => console.error("SW Notif failed", err));
+              } else {
+                 // Fallback
+                 new Notification(notifTitle, {
+                    body: notifBody,
+                    icon: "/favicon.ico" 
+                 });
               }
           }
       }
@@ -698,15 +702,17 @@ export default function ChatItNow() {
     if (username.trim() && acceptedTerms && confirmedAdult) {
       setIsLoggedIn(true);
 
-      // --- PERMISSION REQUEST FIX ---
+      // --- MOBILE AUDIO UNLOCK ---
+      if (audioReceivedRef.current) {
+        audioReceivedRef.current.play().then(() => {
+           audioReceivedRef.current?.pause();
+           if(audioReceivedRef.current) audioReceivedRef.current.currentTime = 0;
+        }).catch(e => console.log("Audio unlock failed", e));
+      }
+
+      // --- PERMISSION REQUEST ---
       if ('Notification' in window) {
-        Notification.requestPermission().then((permission) => {
-          if (permission === 'granted') {
-             console.log("Notification permission granted.");
-          } else {
-             console.log("Notification permission denied/default.");
-          }
-        });
+        Notification.requestPermission();
       }
 
       socket.connect();
@@ -725,7 +731,6 @@ export default function ChatItNow() {
   };
 
   const handleSendMessage = () => {
-    // UPDATED: Allow sending even if !isConnected. Socket.io will buffer it.
     if (currentMessage.trim()) {
       const msgID = generateMessageID(); 
       const msgData: any = { 
@@ -766,7 +771,6 @@ export default function ChatItNow() {
   const handleStartSearch = () => { startSearch(); };
 
   const initiateReply = (text: any, type: string) => {
-    // UPDATED: Allow reply UI even if offline
     const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
     setReplyingTo({ text: typeof text === 'string' ? text : 'Voice Message', name: senderName, isYou: type === 'you' });
     const input = document.querySelector('input[type="text"]') as HTMLInputElement;
@@ -831,11 +835,11 @@ export default function ChatItNow() {
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
-            <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                <p><strong>ChatItNow</strong> is designed and is made to cater Filipinos around the country who wants to connect with fellow professionals, workers, and individuals from all walks of life.</p>
-                <p>Whether you're looking to share experiences, make new friends, or simply have a meaningful conversation, ChatItNow provides an anonymous platform to connect with strangers across the Philippines.</p>
-                <p>This platform was created by a university student who understands the need for genuine connection in our increasingly digital world. The goal is to build a community where Filipinos can freely express themselves, share their stories, and find support from others who understand their experiences.</p>
-                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is completely free and anonymous. Connect with fellow Filipinos, one conversation at a time.</p>
+             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
+                <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
+                <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
+                <p>As a university student who knows what it feels like to crave real, genuine connection in a world thats getting more digital and more distant every year. Sometimes, even if we're surrounded by people, we still feel like no one really listens. That's why I built this platform to create a space where Filipinos can express themselves openly, share their stories, and find comfort from people who might actually understand what they're going through—even if they're total strangers.</p>
+                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>ChatItNow is completely free to use and always will be. It's meant to be simple, accessible, and welcoming to everyone. Just hop in, start a conversation, and see where it goes. One chat might not change your whole life, but it might change your day—and sometimes, that's already more than enough.</p>
             </div>
             <button onClick={() => setShowWelcome(false)} className="w-full mt-8 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3.5 rounded-xl transition duration-200 text-lg shadow-md">Continue to ChatItNow</button>
           </div>
@@ -1195,12 +1199,10 @@ export default function ChatItNow() {
               <form className="flex gap-2 items-center h-[60px]" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
                 
                 {/* SKIP BUTTON */}
-                {/* UPDATED: Removed disabled={partnerStatus === 'searching'} so user can force skip if stuck */}
                 <button type="button" onClick={handleNext} className={`h-full px-3 w-16 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-[#374151] text-white hover:bg-[#323844]' : 'border-gray-200 text-black hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
                 
                 {/* INPUT CONTAINER */}
                 <div className="relative flex-1 h-full flex items-center">
-                  {/* UPDATED: Removed disabled={!isConnected} */}
                   <input 
                     type="text" 
                     value={currentMessage} 
@@ -1211,7 +1213,6 @@ export default function ChatItNow() {
                   />
                   
                   {/* MIC ICON INSIDE INPUT */}
-                  {/* UPDATED: Removed disabled={!isConnected} */}
                   {!currentMessage.trim() && (
                     <button 
                       type="button" 
@@ -1224,7 +1225,6 @@ export default function ChatItNow() {
                 </div>
 
                 {/* SEND BUTTON */}
-                {/* UPDATED: Removed disabled={!isConnected} */}
                 {currentMessage.trim() && (
                   <button type="submit" className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
                 )}
