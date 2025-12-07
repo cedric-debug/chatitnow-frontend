@@ -601,7 +601,7 @@ export default function ChatItNow() {
     }
   };
 
-  // --- AI SCANNERS ---
+  // --- AI SCANNERS (STRICTER FILTER) ---
   const checkImageContent = async (base64Data: string): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
@@ -677,12 +677,8 @@ export default function ChatItNow() {
       return;
     }
 
-    // 1. Show preview immediately
-    const base64 = await blobToBase64(file);
-    setFilePreview({ base64, type: isImage ? 'image' : 'video' });
-    
-    // 2. Start Analyzing
     setIsAnalyzing(true);
+    const base64 = await blobToBase64(file);
     let detectedNSFW = false;
     
     if (nsfwModel) {
@@ -693,8 +689,8 @@ export default function ChatItNow() {
         }
     }
 
-    // 3. Update result
     setIsAnalyzing(false);
+    setFilePreview({ base64, type: isImage ? 'image' : 'video' });
     setIsNSFWMarked(detectedNSFW); 
     
     if (fileInputRef.current) fileInputRef.current.value = '';
