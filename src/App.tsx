@@ -623,38 +623,77 @@ export default function ChatItNow() {
     });
   };
 
+  // --- UPDATED VIDEO SCANNER (3 SCANS) ---
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
+    
     return new Promise((resolve) => {
       const video = document.createElement('video');
       video.preload = 'metadata';
       video.src = URL.createObjectURL(file);
       video.muted = true;
       video.playsInline = true;
-      video.onloadeddata = () => {
-         let seekTime = 1;
-         if(video.duration && video.duration > 2) seekTime = video.duration * 0.2; 
-         video.currentTime = seekTime;
+
+      // We will check 3 points. Using a list to manage sequence.
+      const scanQueue: number[] = []; // Timestamps to scan
+
+      const scanNext = async () => {
+         if(scanQueue.length === 0) {
+             // All checks passed
+             URL.revokeObjectURL(video.src);
+             resolve(false);
+             return;
+         }
+
+         const nextTime = scanQueue.shift();
+         video.currentTime = nextTime!;
       };
+
+      video.onloadeddata = () => {
+         const dur = video.duration;
+         if(dur && dur > 1) {
+            scanQueue.push(dur * 0.1); // 10% Start
+            scanQueue.push(dur * 0.5); // 50% Middle
+            scanQueue.push(dur * 0.9); // 90% End
+         } else {
+            scanQueue.push(0); // Very short video
+         }
+         scanNext(); // Start the chain
+      };
+
       video.onseeked = async () => {
          try {
              const canvas = document.createElement('canvas');
              canvas.width = video.videoWidth;
              canvas.height = video.videoHeight;
              const ctx = canvas.getContext('2d');
+             
              if(ctx) {
                  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                  const predictions = await nsfwModel.classify(canvas);
-                 console.log("NSFW Analysis (Video):", predictions);
+                 console.log("NSFW Analysis (Video Frame):", predictions);
+                 
                  const isNsfw = predictions.some(p => 
                      (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
                      && p.probability > 0.25
                  );
-                 URL.revokeObjectURL(video.src);
-                 resolve(isNsfw);
-             } else { resolve(false); }
-         } catch(e) { resolve(false); }
+
+                 if (isNsfw) {
+                     // Caught NSFW! Stop scanning and report True.
+                     URL.revokeObjectURL(video.src);
+                     resolve(true);
+                     return;
+                 }
+             }
+             // If safe, move to next timestamp
+             scanNext();
+
+         } catch(e) { 
+             console.error("Frame scan failed", e);
+             scanNext(); // Continue to next frame just in case
+         }
       };
+
       video.onerror = () => resolve(false);
     });
   };
