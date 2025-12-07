@@ -341,9 +341,11 @@ export default function ChatItNow() {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [isLoggedIn]);
 
-  // --- FORCE DISCONNECT ON RELOAD ---
+  // --- FORCE DISCONNECT ON RELOAD (RESTORED) ---
   useEffect(() => {
     const handleBeforeUnload = () => {
+        // This will kill the session if the user Refreshes or Closes the tab.
+        // It does NOT fire if the internet connection simply drops.
         socket.emit('disconnect_partner');
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -509,6 +511,7 @@ export default function ChatItNow() {
   };
 
   const handleSendAudio = (base64Audio: string) => {
+      // Allow sending even if !isConnected. Socket.io will buffer it.
       const msgID = generateMessageID();
       const msgData: any = {
           id: msgID,
@@ -571,7 +574,7 @@ export default function ChatItNow() {
               const notifBody = data.audio ? "Sent a voice message" : (data.text || "Sent a message");
               
               // Use Service Worker for Android support
-              if ('serviceWorker' in navigator) {
+              if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
                  navigator.serviceWorker.ready.then(registration => {
                     registration.showNotification(notifTitle, {
                        body: notifBody,
@@ -710,9 +713,15 @@ export default function ChatItNow() {
         }).catch(e => console.log("Audio unlock failed", e));
       }
 
-      // --- PERMISSION REQUEST ---
+      // --- PERMISSION REQUEST FIX ---
       if ('Notification' in window) {
-        Notification.requestPermission();
+        Notification.requestPermission().then((permission) => {
+          if (permission === 'granted') {
+             console.log("Notification permission granted.");
+          } else {
+             console.log("Notification permission denied/default.");
+          }
+        });
       }
 
       socket.connect();
@@ -731,6 +740,7 @@ export default function ChatItNow() {
   };
 
   const handleSendMessage = () => {
+    // UPDATED: Allow sending even if !isConnected. Socket.io will buffer it.
     if (currentMessage.trim()) {
       const msgID = generateMessageID(); 
       const msgData: any = { 
@@ -771,6 +781,7 @@ export default function ChatItNow() {
   const handleStartSearch = () => { startSearch(); };
 
   const initiateReply = (text: any, type: string) => {
+    // UPDATED: Allow reply UI even if offline
     const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
     setReplyingTo({ text: typeof text === 'string' ? text : 'Voice Message', name: senderName, isYou: type === 'you' });
     const input = document.querySelector('input[type="text"]') as HTMLInputElement;
@@ -1199,10 +1210,12 @@ export default function ChatItNow() {
               <form className="flex gap-2 items-center h-[60px]" onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}>
                 
                 {/* SKIP BUTTON */}
+                {/* UPDATED: Removed disabled={partnerStatus === 'searching'} so user can force skip if stuck */}
                 <button type="button" onClick={handleNext} className={`h-full px-3 w-16 rounded-xl flex items-center justify-center border-2 font-bold transition ${darkMode ? 'border-[#374151] text-white hover:bg-[#323844]' : 'border-gray-200 text-black hover:bg-gray-50 bg-white'} disabled:opacity-50`}>Skip</button>
                 
                 {/* INPUT CONTAINER */}
                 <div className="relative flex-1 h-full flex items-center">
+                  {/* UPDATED: Removed disabled={!isConnected} */}
                   <input 
                     type="text" 
                     value={currentMessage} 
@@ -1213,6 +1226,7 @@ export default function ChatItNow() {
                   />
                   
                   {/* MIC ICON INSIDE INPUT */}
+                  {/* UPDATED: Removed disabled={!isConnected} */}
                   {!currentMessage.trim() && (
                     <button 
                       type="button" 
@@ -1225,6 +1239,7 @@ export default function ChatItNow() {
                 </div>
 
                 {/* SEND BUTTON */}
+                {/* UPDATED: Removed disabled={!isConnected} */}
                 {currentMessage.trim() && (
                   <button type="submit" className="h-full px-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 disabled:opacity-50 transition shadow-sm text-sm">Send</button>
                 )}
