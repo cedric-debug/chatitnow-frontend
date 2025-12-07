@@ -390,13 +390,14 @@ export default function ChatItNow() {
     return false;
   });
 
-  // --- LOAD NSFW MODEL ---
+  // --- LOAD NSFW MODEL (OPTIMIZED) ---
   useEffect(() => {
     const loadModel = async () => {
         try {
-            const _model = await nsfwjs.load();
+            // UPDATED: Load 'MobileNetV2Mid' - Faster than default
+            const _model = await nsfwjs.load('MobileNetV2Mid');
             setNsfwModel(_model);
-            console.log("NSFW Model Loaded");
+            console.log("NSFW Model Loaded (MobileNetV2Mid)");
         } catch (e) {
             console.error("Failed to load NSFW model", e);
         }
@@ -603,7 +604,7 @@ export default function ChatItNow() {
     }
   };
 
-  // --- AI SCANNERS (STRICTER FILTER) ---
+  // --- AI SCANNERS (OPTIMIZED SPEED) ---
   const checkImageContent = async (base64Data: string): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
@@ -612,20 +613,27 @@ export default function ChatItNow() {
         img.src = base64Data;
         img.onload = async () => {
             try {
-                const predictions = await nsfwModel.classify(img);
-                console.log("NSFW Analysis (Image):", predictions);
-                const isNsfw = predictions.some(p => 
-                    (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
-                    && p.probability > 0.25
-                );
-                resolve(isNsfw);
+                // Resize for speed (224x224 is standard model input)
+                const canvas = document.createElement('canvas');
+                canvas.width = 224;
+                canvas.height = 224;
+                const ctx = canvas.getContext('2d');
+                if(ctx) {
+                    ctx.drawImage(img, 0, 0, 224, 224);
+                    const predictions = await nsfwModel.classify(canvas);
+                    const isNsfw = predictions.some(p => 
+                        (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
+                        && p.probability > 0.25
+                    );
+                    resolve(isNsfw);
+                } else { resolve(false); }
             } catch (err) { resolve(false); }
         };
         img.onerror = () => resolve(false);
     });
   };
 
-  // --- VIDEO SCANNER (STRICT + NO TIMEOUT) ---
+  // --- VIDEO SCANNER (OPTIMIZED SPEED + 3 CHECKS) ---
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
     
@@ -662,15 +670,15 @@ export default function ChatItNow() {
 
       video.onseeked = async () => {
          try {
+             // OPTIMIZATION: Resize to 224x224
              const canvas = document.createElement('canvas');
-             canvas.width = video.videoWidth;
-             canvas.height = video.videoHeight;
+             canvas.width = 224;
+             canvas.height = 224;
              const ctx = canvas.getContext('2d');
              
              if(ctx) {
-                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                 ctx.drawImage(video, 0, 0, 224, 224);
                  const predictions = await nsfwModel.classify(canvas);
-                 console.log("NSFW Analysis (Video Frame):", predictions);
                  
                  const isNsfw = predictions.some(p => 
                      (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
@@ -691,12 +699,11 @@ export default function ChatItNow() {
          }
       };
 
-      // Ensure no indefinite hang if video fails to load
       video.onerror = () => resolve(false);
     });
   };
 
-  // --- FILE SELECT LOGIC (UPDATED: 20MB LIMIT) ---
+  // --- FILE SELECT LOGIC (UPDATED: 20MB) ---
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1030,7 +1037,7 @@ export default function ChatItNow() {
   };
 
   const handleSendMessage = () => {
-    if (currentMessage.trim() && isConnected) {
+    if (currentMessage.trim()) {
       const msgID = generateMessageID(); 
       const msgData: any = { 
         id: msgID,
@@ -1146,7 +1153,7 @@ export default function ChatItNow() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   if (!isLoggedIn) {
