@@ -76,20 +76,38 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; isYou?: boolean; };
 }
 
-// --- CUSTOM AUDIO PLAYER COMPONENT ---
+// --- CUSTOM AUDIO PLAYER COMPONENT (FIXED) ---
 const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isOwnMessage: boolean, isDarkMode: boolean }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Reload audio when src changes
+  useEffect(() => {
+    if (audioRef.current) {
+        audioRef.current.load();
+        setIsPlaying(false);
+        setCurrentTime(0);
+        setDuration(0);
+    }
+  }, [src]);
+
   const togglePlay = (e: React.MouseEvent) => {
     e.stopPropagation(); 
-    if (!audioRef.current) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+
     if (isPlaying) {
-      audioRef.current.pause();
+      audio.pause();
     } else {
-      audioRef.current.play().catch(e => console.error("Play failed", e));
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+          playPromise.catch(error => {
+              console.error("Playback failed:", error);
+              setIsPlaying(false);
+          });
+      }
     }
     setIsPlaying(!isPlaying);
   };
@@ -98,25 +116,45 @@ const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isO
     const audio = audioRef.current;
     if (!audio) return;
 
-    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const onTimeUpdate = () => {
+        // Fallback: If duration is Infinity, we can sometimes deduce it from buffered end, 
+        // but typically we just handle the UI gracefully.
+        if (audio.duration === Infinity) {
+            setDuration(0); // Signals "Unknown"
+        }
+        setCurrentTime(audio.currentTime);
+    };
+
     const onLoadedMetadata = () => {
         if(audio.duration !== Infinity && !isNaN(audio.duration)) {
             setDuration(audio.duration);
+        } else {
+            // FIX: Handle WebM Infinity Duration issue
+            // We set it to 0 so the UI knows it's streaming/unknown
+            setDuration(0);
         }
     };
+
     const onEnded = () => {
         setIsPlaying(false);
         setCurrentTime(0);
     };
 
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('ended', onEnded);
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
 
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
       audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('pause', onPause);
     };
   }, []);
 
@@ -127,7 +165,17 @@ const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isO
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  // FIX: Calculate percentage carefully to avoid NaN
+  let progressPercent = 0;
+  if (duration > 0) {
+      progressPercent = (currentTime / duration) * 100;
+  } else if (currentTime > 0) {
+      // If duration is unknown (Infinity), just show a "loading" style or keep it moving?
+      // Since max is 15s, we can cheat visually if we really wanted to, 
+      // but keeping it 0 or full is safer for "Live" feel. 
+      // Let's just keep it at 0 if unknown, but timer ticks.
+      progressPercent = 0; 
+  }
 
   const btnColor = isOwnMessage ? "text-white" : (isDarkMode ? "text-gray-200" : "text-gray-700");
   const trackBg = isOwnMessage ? "bg-purple-400/50" : (isDarkMode ? "bg-gray-600" : "bg-gray-300");
@@ -152,7 +200,7 @@ const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isO
       </div>
 
       <span className={`text-[10px] font-mono w-[30px] text-right ${timeColor} pt-0.5`}>
-        {formatTime(isPlaying ? currentTime : duration)}
+        {formatTime(currentTime)}
       </span>
     </div>
   );
@@ -461,8 +509,16 @@ export default function ChatItNow() {
   // --- RECORDING LOGIC ---
   const startRecording = async () => {
     try {
+      // Determine supported MIME type for this device
+      let mimeType = 'audio/webm'; // Default for Chrome/Android
+      if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          mimeType = 'audio/mp4'; // Safari
+      } else if (MediaRecorder.isTypeSupported('audio/aac')) {
+          mimeType = 'audio/aac';
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const mediaRecorder = new MediaRecorder(stream, { mimeType }); // Explicitly use supported type
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -494,9 +550,10 @@ export default function ChatItNow() {
 
   const stopRecordingAndSend = () => {
     if (mediaRecorderRef.current && isRecording) {
+      const mimeType = mediaRecorderRef.current.mimeType; // Get the actual type used
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.onstop = async () => {
-         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
          const base64Audio = await blobToBase64(audioBlob);
          handleSendAudio(base64Audio);
          
@@ -931,7 +988,7 @@ export default function ChatItNow() {
                <h1 className={`text-3xl font-bold mb-4 ${darkMode ? 'text-purple-400' : 'text-purple-900'}`}>Welcome to ChatItNow</h1>
                <div className="w-20 h-1 bg-purple-600 mx-auto mb-6 rounded-full"></div>
             </div>
-            <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
+             <div className={`space-y-4 text-justify text-sm sm:text-base ${darkMode ? 'text-gray-300' : 'text-gray-700'} max-h-[60vh] overflow-y-auto pr-2`}>
                 <p><strong>ChatItNow</strong> is a platform created for Filipinos everywhere who just want a place to talk, connect, and meet different kinds of people. Whether you're a student trying to take a break from school stress, a worker looking to unwind after a long shift, or a professional who just wants to share thoughts with someone new, this site is designed to give you that space.</p>
                 <p>If you want to share your experiences, make new friends, learn from someone else's perspective, or simply talk to someone who's going through the same things you are, ChatItNow makes that easy. What makes it even better is that everything is anonymous—no accounts, no profile pictures, no need to show who you are. You can just be yourself and talk freely without worrying about being judged.</p>
                 <p>As a university student who knows what it feels like to crave real, genuine connection in a world thats getting more digital and more distant every year. Sometimes, even if we're surrounded by people, we still feel like no one really listens. That's why I built this platform to create a space where Filipinos can express themselves openly, share their stories, and find comfort from people who might actually understand what they're going through—even if they're total strangers.</p>
@@ -1355,7 +1412,7 @@ export default function ChatItNow() {
                     className={`w-full h-full pl-12 rounded-xl border-2 focus:border-purple-500 outline-none transition text-[15px] ${darkMode ? 'bg-[#111827] border-[#374151] text-white placeholder-gray-400' : 'bg-white border-gray-200 text-gray-900'} ${!currentMessage.trim() ? 'pr-12' : 'pr-4'}`} 
                   />
                   
-                  {/* MIC ICON INSIDE INPUT (RIGHT) */}
+                  {/* MIC ICON INSIDE INPUT */}
                   {!currentMessage.trim() && (
                     <button 
                       type="button" 
