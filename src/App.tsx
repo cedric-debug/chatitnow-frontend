@@ -110,6 +110,7 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
   const shouldBlur = msg.type !== 'you' && (msg.isNSFW || safeMode);
   const [isRevealed, setIsRevealed] = useState(!shouldBlur);
   const videoRef = useRef<HTMLVideoElement>(null);
+  
   const [stableVideoUrl, setStableVideoUrl] = useState<string | null>(
     msg.video && msg.video.startsWith('blob:') ? msg.video : null
   );
@@ -396,6 +397,14 @@ export default function ChatItNow() {
   const audioSentRef = useRef<HTMLAudioElement | null>(null);
   const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
 
+  // --- NEW REFS FOR SCROLL CONTROL ---
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null); // To measure scroll pos
+  const isAtBottomRef = useRef(true); // Track if user is at bottom
+
+  const activityTimerRef = useRef<number | null>(null);
+  const partnerNameRef = useRef(''); 
+
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -460,10 +469,6 @@ export default function ChatItNow() {
   const [showTabReturnAd, setShowTabReturnAd] = useState(false);
   const [formError, setFormError] = useState(false);
   
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const activityTimerRef = useRef<number | null>(null);
-  const partnerNameRef = useRef(''); 
-
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
   const REACTIONS = ['❤️', '😆', '😮', '😢', '😡', '👍'];
 
@@ -514,7 +519,34 @@ export default function ChatItNow() {
 
   const getCurrentTime = () => new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isTyping, replyingTo]); 
+  // --- UPDATED: SMART SCROLL LOGIC ---
+  // Only scroll if user is already at bottom OR if user just sent a message
+  useEffect(() => {
+      const lastMsg = messages[messages.length - 1];
+      
+      // If I sent it, always scroll down
+      if (lastMsg && lastMsg.type === 'you') {
+         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+         return;
+      }
+
+      // If I am reading history (scrolled up), DON'T scroll.
+      // Only scroll if I was already near the bottom.
+      if (isAtBottomRef.current) {
+         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
+  }, [messages, isTyping, replyingTo]); 
+
+  // --- SCROLL TRACKER ---
+  const handleScroll = () => {
+      const container = chatContainerRef.current;
+      if (!container) return;
+      
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      // Consider user "at bottom" if within 100px of the end
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      isAtBottomRef.current = isNearBottom;
+  };
 
   const toggleReadReceipts = () => {
     const newState = !isReadReceiptsEnabled;
@@ -1459,7 +1491,10 @@ export default function ChatItNow() {
         <div className={`absolute top-[60px] bottom-[60px] left-0 right-0 p-2 pb-4 space-y-3 z-10 
             ${darkMode ? 'bg-[#1f2937]' : 'bg-white'} 
             ${partnerStatus === 'disconnected' ? 'overflow-hidden' : 'overflow-y-auto'} 
-        `}>
+        `} 
+        ref={chatContainerRef} // Attached Ref
+        onScroll={handleScroll} // Attached Handler
+        >
           
           <div className="w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg bg-gray-100">
              <AdUnit 
