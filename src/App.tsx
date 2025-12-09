@@ -829,7 +829,7 @@ export default function ChatItNow() {
                 nsfwModel!.classify(canvas).then(predictions => {
                     const isNsfw = predictions.some(p => 
                         (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
-                        && p.probability > 0.25
+                        && p.probability > 0.20
                     );
                     resolve(isNsfw);
                 }).catch(() => resolve(false));
@@ -906,7 +906,7 @@ export default function ChatItNow() {
                  const predictions = await nsfwModel!.classify(canvas);
                  const isNsfw = predictions.some(p => 
                      (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
-                     && p.probability > 0.25
+                     && p.probability > 0.20
                  );
                  if (isNsfw) {
                      cleanup(true);
