@@ -4,11 +4,9 @@ import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 import * as nsfwjs from 'nsfwjs';
 
-// --- CONFIGURATION ---
 const PROD_URL = "https://chatitnow-backend.onrender.com"; 
 const ADSENSE_CLIENT_ID = "ca-pub-1806664183023369"; 
 
-// --- AD SLOTS ---
 const AD_SLOT_SQUARE = "4725306503"; 
 const AD_SLOT_VERTICAL = "1701533824"; 
 const AD_SLOT_TOP_BANNER = "9658354392"; 
@@ -16,7 +14,6 @@ const AD_SLOT_INACTIVITY = "2655630641";
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
-// --- CRYPTO UTILS (E2EE) ---
 const generateKeyPair = async () => {
   return window.crypto.subtle.generateKey(
     { name: "ECDH", namedCurve: "P-256" },
@@ -91,7 +88,6 @@ const decryptData = async (secretKey: CryptoKey, base64Data: string) => {
   return JSON.parse(decoded);
 };
 
-// --- SESSION MANAGEMENT ---
 const getSessionID = () => {
   if (typeof window === 'undefined') return '';
   let sessionID = localStorage.getItem("chat_session_id");
@@ -102,7 +98,6 @@ const getSessionID = () => {
   return sessionID;
 };
 
-// --- UTILS ---
 const generateMessageID = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
@@ -140,7 +135,6 @@ const formatMessageText = (text: string) => {
   });
 };
 
-// --- SOCKET CONNECTION ---
 const socket: any = io(SERVER_URL, { 
   transports: ['websocket'], 
   autoConnect: false,
@@ -152,7 +146,6 @@ const socket: any = io(SERVER_URL, {
   }
 });
 
-// --- TYPES ---
 interface ReplyData {
   text: string;
   name: string;
@@ -179,7 +172,6 @@ interface Message {
   data?: { name?: string; field?: string; action?: 'connected' | 'disconnected'; isYou?: boolean; };
 }
 
-// --- MEDIA MESSAGE COMPONENT ---
 const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) => {
   const shouldBlur = msg.type !== 'you' && (msg.isNSFW || safeMode);
   const [isRevealed, setIsRevealed] = useState(!shouldBlur);
@@ -337,7 +329,6 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
   );
 };
 
-// --- CUSTOM AUDIO PLAYER ---
 const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isOwnMessage: boolean, isDarkMode: boolean }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -404,7 +395,6 @@ const CustomAudioPlayer = ({ src, isOwnMessage, isDarkMode }: { src: string, isO
   );
 };
 
-// --- SWIPEABLE COMPONENT ---
 const SwipeableMessage = ({ children, onReply, isSystem, direction }: { children: React.ReactNode, onReply: () => void, isSystem: boolean, direction: 'left' | 'right'}) => {
   const [offsetX, setOffsetX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
@@ -520,7 +510,6 @@ export default function ChatItNow() {
     return false;
   });
 
-  // --- STATE FOR UI ---
   const [showNextConfirm, setShowNextConfirm] = useState(false);
   const [showSearching, setShowSearching] = useState(false);
   const [isTyping, setIsTyping] = useState(false); 
@@ -532,7 +521,6 @@ export default function ChatItNow() {
   const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
   const REACTIONS = ['❤️', '😆', '😭', '😮', '😢', '😡', '👍'];
 
-  // --- HELPER FUNCTIONS ---
   const resetActivity = () => { 
       if (!showInactivityAd && !showTabReturnAd) setLastActivity(Date.now()); 
   };
@@ -653,7 +641,6 @@ export default function ChatItNow() {
     return null;
   };
 
-  // --- INIT CRYPTO ---
   useEffect(() => {
     const initCrypto = async () => {
         try {
@@ -667,7 +654,6 @@ export default function ChatItNow() {
     initCrypto();
   }, []);
 
-  // --- FASTER MODEL LOADING ---
   useEffect(() => {
     const loadModel = async () => {
         try {
@@ -681,7 +667,6 @@ export default function ChatItNow() {
     loadModel();
   }, []);
 
-  // --- REGISTER SERVICE WORKER ---
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
@@ -690,7 +675,6 @@ export default function ChatItNow() {
     }
   }, []);
 
-  // --- AUTO-RECONNECT ---
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && !socket.connected && isLoggedIn) {
@@ -701,14 +685,12 @@ export default function ChatItNow() {
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, [isLoggedIn]);
 
-  // --- FORCE DISCONNECT ON RELOAD ---
   useEffect(() => {
     const handleBeforeUnload = () => { socket.emit('disconnect_partner'); };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
-  // --- THEME & ADDRESS BAR COLOR ---
   useLayoutEffect(() => {
     const html = document.documentElement;
     const body = document.body;
@@ -734,7 +716,6 @@ export default function ChatItNow() {
     metaStatusBarStyle.setAttribute('content', darkMode ? 'black-translucent' : 'default');
   }, [darkMode]);
 
-  // --- ACTIVITY & AD LOGIC ---
   useEffect(() => {
     const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
     const handleUserInteraction = () => resetActivity();
@@ -768,7 +749,6 @@ export default function ChatItNow() {
     return () => document.removeEventListener('visibilitychange', handleVis);
   }, [isConnected, showInactivityAd, messages, isReadReceiptsEnabled, partnerHasReadReceipts]);
 
-  // --- AUDIO INIT ---
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
@@ -808,7 +788,6 @@ export default function ChatItNow() {
     if (isMuted) return;
     try {
       const audioMap = { sent: audioSentRef.current, received: audioReceivedRef.current };
-      // @ts-ignore
       const audio = audioMap[type];
       if (audio) { audio.currentTime = 0; audio.play().catch(() => {}); }
     } catch (e) { console.error("Audio play failed", e); }
@@ -816,7 +795,6 @@ export default function ChatItNow() {
 
   const getCurrentTime = () => new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
-  // --- UPDATED: SMART SCROLL LOGIC ---
   useEffect(() => {
       const lastMsg = messages[messages.length - 1];
       if (lastMsg && lastMsg.type === 'you') {
@@ -836,7 +814,6 @@ export default function ChatItNow() {
       isAtBottomRef.current = isNearBottom;
   };
 
-  // --- FAST IMAGE SCANNER ---
   const checkImageContent = async (base64Data: string): Promise<boolean> => {
     if (!nsfwModel) return false;
     const res = await fetch(base64Data);
@@ -861,7 +838,6 @@ export default function ChatItNow() {
     });
   };
 
-  // --- ROBUST VIDEO SCANNER ---
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
@@ -994,7 +970,6 @@ export default function ChatItNow() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // --- SEND HANDLER (GRACEFUL FALLBACK) ---
   const handleConfirmSendFile = async () => {
     if(!filePreview) return;
     
@@ -1180,10 +1155,8 @@ export default function ChatItNow() {
     socket.emit('send_reaction', { messageID: msgID, reaction: reactionToSend });
   };
 
-  // --- SOCKET HANDLERS ---
   useEffect(() => {
     socket.on('matched', async (data: any) => {
-      // --- E2EE HANDSHAKE ---
       if (data.partnerPublicKey && myKeyPair) {
           try {
               const partnerKey = await importKey(data.partnerPublicKey);
@@ -1208,7 +1181,6 @@ export default function ChatItNow() {
     socket.on('receive_message', async (data: any) => {
       const msgId = data.id || generateMessageID();
       
-      // --- E2EE DECRYPTION ---
       let decryptedContent = { text: null, image: null, video: null, audio: null };
       
       if (data.encrypted && sharedSecret) {
@@ -1220,7 +1192,6 @@ export default function ChatItNow() {
               decryptedContent = { text: "⚠️ Encrypted message could not be read.", image: null, video: null, audio: null };
           }
       } else if (data.text || data.image || data.video || data.audio) {
-          // Fallback for unencrypted (should not happen if backend is clean)
           decryptedContent = { text: data.text, image: data.image, video: data.video, audio: data.audio };
       }
 
@@ -1292,7 +1263,7 @@ export default function ChatItNow() {
       setIsTyping(false); 
       setReplyingTo(null); 
       if(isRecording) cancelRecording();
-      setSharedSecret(null); // Clear keys
+      setSharedSecret(null); 
 
       const nameToShow = partnerNameRef.current || 'Partner';
       setMessages(prev => [...prev, { id: 'sys-end', type: 'system', data: { name: nameToShow, action: 'disconnected', isYou: false }, reactions: {} }]);
@@ -1322,7 +1293,6 @@ export default function ChatItNow() {
     };
   }, [isMuted, isConnected, isNotifyMuted, isRecording, isReadReceiptsEnabled, partnerHasReadReceipts, sharedSecret, myKeyPair]); 
 
-  // --- RENDER LOGIC ---
   if (showWelcome) {
     return (
       <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
@@ -1435,7 +1405,6 @@ export default function ChatItNow() {
     )
   }
 
-  // --- MAIN CHAT INTERFACE ---
   return (
   <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
       
@@ -1490,7 +1459,6 @@ export default function ChatItNow() {
                       </div>
                   </div>
               ) : (
-                  // MANUAL NSFW CHECKBOX (RESTORED - Only shows if AI didn't catch it)
                   <label className={`flex items-center gap-3 mb-2 cursor-pointer p-3 rounded-lg border transition ${isNSFWMarked ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : 'hover:bg-gray-50 dark:hover:bg-[#374151]'}`}>
                      <input 
                        type="checkbox" 
@@ -1635,8 +1603,8 @@ export default function ChatItNow() {
             ${darkMode ? 'bg-[#1f2937]' : 'bg-white'} 
             ${partnerStatus === 'disconnected' ? 'overflow-hidden' : 'overflow-y-auto'} 
         `} 
-        ref={chatContainerRef} // Attached Ref
-        onScroll={handleScroll} // Attached Handler
+        ref={chatContainerRef}
+        onScroll={handleScroll}
         >
           
           <div className="w-full h-[50px] min-h-[50px] max-h-[50px] sm:h-[90px] sm:min-h-[90px] sm:max-h-[90px] flex justify-center items-center shrink-0 mb-4 overflow-hidden rounded-lg bg-gray-100">
@@ -1834,7 +1802,6 @@ export default function ChatItNow() {
               <button type="button" onClick={() => setShowNextConfirm(false)} className="h-full px-4 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition text-sm">Cancel</button>
             </div>
           ) : (
-            // --- UPDATED FORM AREA TO HANDLE RECORDING UI ---
             isRecording ? (
                <div className="flex gap-2 items-center h-[60px] w-full px-2">
                  <div className="flex-1 flex items-center gap-3">
