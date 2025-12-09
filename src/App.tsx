@@ -561,7 +561,13 @@ export default function ChatItNow() {
       const confirmTimeout = window.confirm("Are you sure you want to timeout this user? You won't match with them again for 15 minutes.");
       if (confirmTimeout) {
           socket.emit('timeout_user');
-          handleNext();
+          
+          setIsConnected(false);
+          setIsTyping(false);
+          setReplyingTo(null);
+          setSharedSecret(null);
+          
+          startSearch();
       }
   };
 
