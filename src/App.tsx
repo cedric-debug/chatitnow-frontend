@@ -1397,27 +1397,32 @@ export default function ChatItNow() {
             <div className={`rounded-xl shadow-2xl max-w-[420px] w-full my-8 p-6 max-h-[90vh] overflow-y-auto ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
               <h2 className={`text-2xl font-bold mb-4 sticky top-0 pb-2 ${darkMode ? 'text-white bg-[#1f2937]' : 'text-gray-900 bg-white'}`}>Terms & Conditions</h2>
               <div className={`space-y-4 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                <p>Last updated: December 7, 2025</p>
+                <p className="text-xs opacity-70">Last updated: December 9, 2025</p>
                 
-                <p><strong>1. Agreement to Terms</strong><br/>
-                By accessing ChatItNow.com, an anonymous multimedia chat platform, you agree to these Terms. You acknowledge that this platform allows the transmission of text, voice, images, and videos.</p>
+                <p><strong>1. Acceptance of Terms</strong><br/>
+                By accessing ChatItNow, you agree to these terms.</p>
                 
                 <p><strong>2. Age Restriction (18+)</strong><br/>
-                You affirm you are at least 18 years old. This site contains User Generated Content (UGC) that may be mature in nature.</p>
+                You affirm you are at least 18 years old. This site allows anonymous interaction with strangers and may contain mature User Generated Content (UGC).</p>
                 
-                <p><strong>3. Media & Content Policy</strong><br/>
-                You are responsible for the media you send.
-                <br/>&bull; <strong>NSFW Content:</strong> Our AI attempts to automatically blur nudity, but it is not error-proof.
-                <br/>&bull; <strong>Gore & Violence:</strong> The AI <u>does not</u> detect gore. You are <strong>REQUIRED</strong> to manually check the "Mark as Sensitive" box before sending any graphic or violent content. Failure to do so is a violation of these terms.</p>
+                <p><strong>3. Privacy & Encryption</strong><br/>
+                Messages are secured using <strong>End-to-End Encryption (E2EE)</strong>. Your keys are generated on your device, and the server cannot decrypt your message content. However, metadata (timestamps, IP addresses) may be processed to facilitate connections.</p>
                 
-                <p><strong>4. Prohibited Conduct</strong><br/>
-                Do not share illegal content (CSAM), non-consensual sexual content, or make threats. We do not permanently store messages.</p>
+                <p><strong>4. Media & AI Moderation</strong><br/>
+                &bull; <strong>Automated Filtering:</strong> We use client-side AI to scan for nudity. This system is not error-proof.<br/>
+                &bull; <strong>Manual Tagging:</strong> The AI <u>does not</u> detect gore or violence. You are <strong>REQUIRED</strong> to manually check "Mark as Sensitive" for such content. Failure to do so may result in a ban.<br/>
+                &bull; <strong>Safe Mode:</strong> The "Shield" feature blurs content locally but does not guarantee 100% safety from malicious users.</p>
                 
-                <p><strong>5. AI & Feature Disclaimer</strong><br/>
-                You use this site at your own risk. The "Read Receipts" and "NSFW Filter" are convenience features, not guarantees. We are not liable for AI misclassification (false positives/negatives) or if a stranger bypasses privacy features.</p>
+                <p><strong>5. User Conduct & Timeouts</strong><br/>
+                &bull; You agree not to share illegal content (CSAM), non-consensual content, or make threats.<br/>
+                &bull; <strong>Timeout System:</strong> Users have the right to "Timeout" (ban) you for 15 minutes. If timed out, you cannot match with that specific user again for the duration.</p>
                 
-                <p><strong>6. Limitation of Liability</strong><br/>
-                The Site is provided "as is". ChatItNow.com disclaims all liability for user interactions, emotional distress, data consumption, or harms arising from anonymous media exchange.</p>
+                <p><strong>6. Data Retention & Ads</strong><br/>
+                &bull; <strong>Sessions:</strong> Your session ID is stored locally to allow reconnection (up to 24h). We do not permanently archive chat history in a database.<br/>
+                &bull; <strong>Ads:</strong> This service is supported by Google AdSense. By using the site, you consent to the display of advertisements.</p>
+                
+                <p><strong>7. Disclaimer</strong><br/>
+                The Service is provided "as is". ChatItNow disclaims liability for any emotional distress, data usage, or interactions arising from the use of this anonymous platform. Do not share personal identifiable information (PII).</p>
               </div>
               <div className={`mt-6 flex gap-3 sticky bottom-0 pt-4 border-t ${darkMode ? 'bg-[#1f2937] border-[#374151]' : 'bg-white border-gray-100'}`}>
                 <button onClick={() => { setShowTerms(false); setAcceptedTerms(true); }} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg transition">Accept Terms</button>
@@ -1427,7 +1432,7 @@ export default function ChatItNow() {
           </div>
         )}
       </div>
-    );
+    )
   }
 
   // --- MAIN CHAT INTERFACE ---
