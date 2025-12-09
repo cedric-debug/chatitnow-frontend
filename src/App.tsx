@@ -16,6 +16,72 @@ const AD_SLOT_INACTIVITY = "2655630641";
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
+// --- CRYPTO UTILS (E2EE) ---
+const generateKeyPair = async () => {
+  return window.crypto.subtle.generateKey(
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    ["deriveKey"]
+  );
+};
+
+const exportKey = async (key: CryptoKey) => {
+  return window.crypto.subtle.exportKey("jwk", key);
+};
+
+const importKey = async (jwk: JsonWebKey) => {
+  return window.crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { name: "ECDH", namedCurve: "P-256" },
+    true,
+    []
+  );
+};
+
+const deriveSecretKey = async (privateKey: CryptoKey, publicKey: CryptoKey) => {
+  return window.crypto.subtle.deriveKey(
+    { name: "ECDH", public: publicKey },
+    privateKey,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+};
+
+const encryptData = async (secretKey: CryptoKey, data: any) => {
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
+  const encoded = new TextEncoder().encode(JSON.stringify(data));
+  const encrypted = await window.crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv },
+    secretKey,
+    encoded
+  );
+  const encryptedArray = new Uint8Array(encrypted);
+  const buf = new Uint8Array(iv.length + encryptedArray.length);
+  buf.set(iv);
+  buf.set(encryptedArray, iv.length);
+  return btoa(String.fromCharCode.apply(null, Array.from(buf)));
+};
+
+const decryptData = async (secretKey: CryptoKey, base64Data: string) => {
+  const str = atob(base64Data);
+  const buf = new Uint8Array(str.length);
+  for (let i = 0; i < str.length; i++) buf[i] = str.charCodeAt(i);
+  
+  const iv = buf.slice(0, 12);
+  const data = buf.slice(12);
+
+  const decrypted = await window.crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: iv },
+    secretKey,
+    data
+  );
+  
+  const decoded = new TextDecoder().decode(decrypted);
+  return JSON.parse(decoded);
+};
+
 // --- SESSION MANAGEMENT ---
 const getSessionID = () => {
   if (typeof window === 'undefined') return '';
@@ -41,7 +107,6 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
-// --- HELPER: DETECT LINKS & FORMAT TEXT ---
 const formatMessageText = (text: string) => {
   if (!text) return null;
   const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -89,10 +154,10 @@ interface ReplyData {
 interface Message {
   id: string; 
   type: 'system' | 'you' | 'stranger' | 'warning';
-  text?: React.ReactNode;
-  audio?: string;
-  image?: string;
-  video?: string;
+  text?: React.ReactNode; 
+  audio?: string | null;
+  image?: string | null;
+  video?: string | null;
   isNSFW?: boolean;
   replyTo?: ReplyData;
   timestamp?: string;
@@ -120,6 +185,7 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
     let isMounted = true;
 
     if (msg.video && !stableVideoUrl) {
+        // Base64 -> Blob conversion for receiver to prevent freezing/black screen
         fetch(msg.video)
             .then(res => res.blob())
             .then(blob => {
@@ -190,10 +256,10 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
       <div className={`${!isRevealed ? 'filter blur-xl opacity-0' : 'opacity-100'} transition-all duration-300`}>
         {msg.image && (
           <img 
-            src={msg.image} 
+            src={msg.image || ''} 
             alt="Sent content" 
             className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1 cursor-pointer relative z-10"
-            onClick={() => isRevealed && window.open(msg.image)} 
+            onClick={() => isRevealed && window.open(msg.image || '')} 
           />
         )}
         
@@ -394,13 +460,16 @@ export default function ChatItNow() {
   const [isAnalyzing, setIsAnalyzing] = useState(false); 
   const [nsfwModel, setNsfwModel] = useState<nsfwjs.NSFWJS | null>(null); 
 
+  // --- CRYPTO STATE (E2EE) ---
+  const [myKeyPair, setMyKeyPair] = useState<CryptoKeyPair | null>(null);
+  const [sharedSecret, setSharedSecret] = useState<CryptoKey | null>(null);
+
   const audioSentRef = useRef<HTMLAudioElement | null>(null);
   const audioReceivedRef = useRef<HTMLAudioElement | null>(null);
 
-  // --- NEW REFS FOR SCROLL CONTROL ---
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null); // To measure scroll pos
-  const isAtBottomRef = useRef(true); // Track if user is at bottom
+  const chatContainerRef = useRef<HTMLDivElement>(null); 
+  const isAtBottomRef = useRef(true); 
 
   const activityTimerRef = useRef<number | null>(null);
   const partnerNameRef = useRef(''); 
@@ -411,6 +480,57 @@ export default function ChatItNow() {
     }
     return false;
   });
+
+  // --- STATE FOR UI ---
+  const [showNextConfirm, setShowNextConfirm] = useState(false);
+  const [showSearching, setShowSearching] = useState(false);
+  const [isTyping, setIsTyping] = useState(false); 
+  const [lastActivity, setLastActivity] = useState(Date.now());
+  const [showInactivityAd, setShowInactivityAd] = useState(false);
+  const [showTabReturnAd, setShowTabReturnAd] = useState(false);
+  const [formError, setFormError] = useState(false);
+
+  const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
+  const REACTIONS = ['❤️', '😆', '😭', '😮', '😢', '😡', '👍'];
+
+  // --- HELPER FUNCTIONS ---
+  const resetActivity = () => { 
+      if (!showInactivityAd && !showTabReturnAd) setLastActivity(Date.now()); 
+  };
+
+  const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCurrentMessage(e.target.value);
+    resetActivity(); 
+    if (isConnected) socket.emit('typing', e.target.value.length > 0);
+  };
+
+  const handleLogin = () => {
+    if (username.trim() && acceptedTerms && confirmedAdult) {
+      setIsLoggedIn(true);
+      if ('Notification' in window && Notification.permission !== 'granted') {
+        Notification.requestPermission();
+      }
+      socket.connect();
+      startSearch();
+    } else {
+      setFormError(true);
+      setTimeout(() => setFormError(false), 2000);
+    }
+  };
+
+  // --- INIT CRYPTO ---
+  useEffect(() => {
+    const initCrypto = async () => {
+        try {
+            const keys = await generateKeyPair();
+            setMyKeyPair(keys);
+            console.log("E2EE: Keys generated");
+        } catch (e) {
+            console.error("Crypto init failed", e);
+        }
+    };
+    initCrypto();
+  }, []);
 
   // --- FASTER MODEL LOADING ---
   useEffect(() => {
@@ -460,18 +580,6 @@ export default function ChatItNow() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
-  const [showNextConfirm, setShowNextConfirm] = useState(false);
-  const [showSearching, setShowSearching] = useState(false);
-  const [isTyping, setIsTyping] = useState(false); 
-  
-  const [lastActivity, setLastActivity] = useState(Date.now());
-  const [showInactivityAd, setShowInactivityAd] = useState(false);
-  const [showTabReturnAd, setShowTabReturnAd] = useState(false);
-  const [formError, setFormError] = useState(false);
-  
-  const fields = ['', 'Sciences & Engineering', 'Business & Creatives', 'Healthcare', 'Retail & Service Industry', 'Government', 'Legal', 'Education', 'Others'];
-  const REACTIONS = ['❤️', '😆', '😮', '😢', '😡', '👍'];
-
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
@@ -520,30 +628,21 @@ export default function ChatItNow() {
   const getCurrentTime = () => new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
   // --- UPDATED: SMART SCROLL LOGIC ---
-  // Only scroll if user is already at bottom OR if user just sent a message
   useEffect(() => {
       const lastMsg = messages[messages.length - 1];
-      
-      // If I sent it, always scroll down
       if (lastMsg && lastMsg.type === 'you') {
          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
          return;
       }
-
-      // If I am reading history (scrolled up), DON'T scroll.
-      // Only scroll if I was already near the bottom.
       if (isAtBottomRef.current) {
          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }
   }, [messages, isTyping, replyingTo]); 
 
-  // --- SCROLL TRACKER ---
   const handleScroll = () => {
       const container = chatContainerRef.current;
       if (!container) return;
-      
       const { scrollTop, scrollHeight, clientHeight } = container;
-      // Consider user "at bottom" if within 100px of the end
       const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
       isAtBottomRef.current = isNearBottom;
   };
@@ -599,7 +698,7 @@ export default function ChatItNow() {
     }
   };
 
-  // --- FAST IMAGE SCANNER (createImageBitmap + 224x224 + 5% Threshold) ---
+  // --- FAST IMAGE SCANNER ---
   const checkImageContent = async (base64Data: string): Promise<boolean> => {
     if (!nsfwModel) return false;
     const res = await fetch(base64Data);
@@ -613,7 +712,6 @@ export default function ChatItNow() {
             if(ctx) {
                 ctx.drawImage(bitmap, 0, 0, 224, 224);
                 nsfwModel!.classify(canvas).then(predictions => {
-                    console.log("Fast Image Scan:", predictions);
                     const isNsfw = predictions.some(p => 
                         (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
                         && p.probability > 0.15
@@ -625,24 +723,21 @@ export default function ChatItNow() {
     });
   };
 
-  // --- ROBUST VIDEO SCANNER (Mobile Optimized / Canvas Bridge) ---
+  // --- ROBUST VIDEO SCANNER ---
   const checkVideoContent = async (file: File): Promise<boolean> => {
     if (!nsfwModel) return false;
     return new Promise((resolve) => {
-      // 1. Create hidden video element
       const video = document.createElement('video');
       video.preload = 'auto';
       video.muted = true;
       video.playsInline = true; 
       
-      // CRITICAL FOR MOBILE: Must be in DOM to trigger loading/seeking
       video.style.position = 'fixed';
       video.style.top = '-10000px';
       video.style.left = '-10000px';
       video.style.opacity = '0';
       document.body.appendChild(video);
 
-      // 2. Setup Canvas
       const canvas = document.createElement('canvas');
       canvas.width = 224;
       canvas.height = 224;
@@ -651,7 +746,6 @@ export default function ChatItNow() {
       const scanQueue: number[] = []; 
       let isResolved = false;
 
-      // Helper to clean up DOM and resolve
       const cleanup = (result: boolean) => {
          if (isResolved) return;
          isResolved = true;
@@ -664,28 +758,22 @@ export default function ChatItNow() {
 
       const scanNext = async () => {
          if(scanQueue.length === 0) {
-             cleanup(false); // Finished scanning, no NSFW found
+             cleanup(false); 
              return;
          }
          const nextTime = scanQueue.shift();
-         
          try {
              video.currentTime = nextTime!;
          } catch (e) {
-             console.warn("Seek error, skipping frame", e);
              scanNext();
          }
       };
 
       video.onloadedmetadata = async () => {
-         // --- MOBILE FIX: Force play to buffer data ---
          try {
              await video.play();
-             video.pause(); // Pause immediately once activated
-         } catch(e) {
-             console.log("Play kicked failed (might be desktop)", e);
-         }
-
+             video.pause(); 
+         } catch(e) {}
          const dur = video.duration;
          if(dur && dur > 1) {
             scanQueue.push(dur * 0.1); 
@@ -702,31 +790,20 @@ export default function ChatItNow() {
              if(ctx) {
                  ctx.drawImage(video, 0, 0, 224, 224);
                  const predictions = await nsfwModel!.classify(canvas);
-                 console.log("Video Scan:", predictions);
-                 
                  const isNsfw = predictions.some(p => 
                      (p.className === 'Porn' || p.className === 'Hentai' || p.className === 'Sexy') 
                      && p.probability > 0.15
                  );
-
                  if (isNsfw) {
                      cleanup(true);
                      return;
                  }
              }
              scanNext();
-         } catch(e) { 
-             console.error("Frame scan failed", e);
-             scanNext(); 
-         }
+         } catch(e) { scanNext(); }
       };
 
-      video.onerror = () => {
-          console.error("Video load error");
-          cleanup(false); // Fail safe
-      };
-
-      // 3. Start Loading
+      video.onerror = () => cleanup(false);
       video.src = URL.createObjectURL(file);
       video.load();
     });
@@ -748,18 +825,8 @@ export default function ChatItNow() {
       alert("Only images and videos are supported.");
       return;
     }
-
-    // --- EXPANDED FORMAT SUPPORT ---
-    const validVideoTypes = [
-      'video/mp4', 
-      'video/webm', 
-      'video/ogg', 
-      'video/quicktime', 
-      'video/x-m4v', 
-      'video/3gpp'
-    ];
-
-    if (isVideo && !validVideoTypes.includes(file.type)) {
+    
+    if (isVideo && !['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-m4v', 'video/3gpp'].includes(file.type)) {
        console.log("Warning: Uncommon video format", file.type);
     }
 
@@ -769,9 +836,7 @@ export default function ChatItNow() {
 
     try {
         const base64 = await blobToBase64(file);
-        // Use Object URL for preview to ensure playback works
         const previewUrl = isVideo ? URL.createObjectURL(file) : base64;
-        
         setFilePreview({ base64, type: isImage ? 'image' : 'video', previewUrl });
         
         let detectedNSFW = false;
@@ -782,40 +847,42 @@ export default function ChatItNow() {
                  detectedNSFW = await checkVideoContent(file);
              }
         }
-
         if (detectedNSFW) {
             setAiDetectedNSFW(true); 
         }
-
-    } catch (e) {
-        console.error("Scan error", e);
-    } finally {
-        setIsAnalyzing(false); 
-    }
+    } catch (e) { console.error("Scan error", e); } 
+    finally { setIsAnalyzing(false); }
 
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleConfirmSendFile = () => {
+  const handleConfirmSendFile = async () => {
     if(!filePreview) return;
+    if(!sharedSecret) { alert("E2EE not ready"); return; }
 
     const msgID = generateMessageID();
     const timestamp = getCurrentTime();
-    
     const finalIsNSFW = aiDetectedNSFW || isNSFWMarked;
+
+    // Encrypt
+    const rawPayload = {
+      text: null,
+      image: filePreview.type === 'image' ? filePreview.base64 : null,
+      video: filePreview.type === 'video' ? filePreview.base64 : null,
+      audio: null
+    };
+
+    const encryptedData = await encryptData(sharedSecret, rawPayload);
 
     const msgData: any = {
       id: msgID,
-      text: null,
-      timestamp: timestamp,
-      image: filePreview.type === 'image' ? filePreview.base64 : null,
-      video: filePreview.type === 'video' ? filePreview.base64 : null,
-      isNSFW: finalIsNSFW
+      encrypted: encryptedData,
+      isNSFW: finalIsNSFW,
+      timestamp: timestamp
     };
 
     if (replyingTo) msgData.replyTo = replyingTo;
 
-    // Use previewUrl for local message to fix playback
     setMessages(prev => [...prev, {
       id: msgID,
       type: 'you',
@@ -830,9 +897,6 @@ export default function ChatItNow() {
     }]);
 
     socket.emit('send_message', msgData);
-    
-    // NOTE: We do not revoke the URL immediately so it stays playable
-    
     setReplyingTo(null);
     playSound('sent');
     resetActivity();
@@ -848,14 +912,22 @@ export default function ChatItNow() {
       setFilePreview(null);
   };
 
-  const handleSendAudio = (base64Audio: string) => {
+  const handleSendAudio = async (base64Audio: string) => {
+      if(!sharedSecret) { alert("E2EE not ready"); return; }
+
       const msgID = generateMessageID();
+      const timestamp = getCurrentTime();
+
+      const rawPayload = { text: null, image: null, video: null, audio: base64Audio };
+      const encryptedData = await encryptData(sharedSecret, rawPayload);
+
       const msgData: any = {
           id: msgID,
-          text: null,
-          audio: base64Audio,
-          timestamp: getCurrentTime()
+          encrypted: encryptedData,
+          timestamp: timestamp,
+          isNSFW: false
       };
+
       if (replyingTo) msgData.replyTo = replyingTo;
 
       setMessages(prev => [...prev, {
@@ -864,21 +936,201 @@ export default function ChatItNow() {
           text: null,
           audio: base64Audio,
           replyTo: replyingTo || undefined,
-          timestamp: msgData.timestamp,
+          timestamp: timestamp,
           status: 'sent',
           reactions: {}
       }]);
       socket.emit('send_message', msgData);
-
       setReplyingTo(null);
       playSound('sent');
       resetActivity();
   };
 
+  const startSearch = async () => {
+    if (!myKeyPair) return;
+    const publicKeyJwk = await exportKey(myKeyPair.publicKey);
+    setPartnerStatus('searching');
+    setShowSearching(true);
+    setMessages([]);
+    socket.emit('find_partner', { username, field, publicKey: publicKeyJwk });
+  };
+  
+  const handleStartSearch = () => { startSearch(); };
+
+  const handleSendMessage = async () => {
+    if (currentMessage.trim()) {
+      if(!sharedSecret) { alert("Secure connection not established yet."); return; }
+
+      const msgID = generateMessageID(); 
+      const timestamp = getCurrentTime();
+
+      const rawPayload = { text: currentMessage, image: null, video: null, audio: null };
+      const encryptedData = await encryptData(sharedSecret, rawPayload);
+
+      const msgData: any = { 
+        id: msgID,
+        encrypted: encryptedData,
+        timestamp: timestamp,
+        isNSFW: false
+      };
+      
+      if (replyingTo) msgData.replyTo = replyingTo;
+
+      setMessages(prev => [...prev, { 
+        id: msgID,
+        type: 'you', 
+        text: currentMessage, 
+        replyTo: replyingTo || undefined,
+        timestamp: timestamp,
+        status: 'sent',
+        reactions: {}
+      }]);
+      
+      socket.emit('send_message', msgData);
+      setCurrentMessage('');
+      setReplyingTo(null);
+      playSound('sent');
+      resetActivity();
+    }
+  };
+
+  const handleNext = () => {
+    if (!showNextConfirm) { setShowNextConfirm(true); return; }
+    socket.emit('disconnect_partner');
+    setIsConnected(false);
+    setShowNextConfirm(false);
+    setPartnerStatus('disconnected');
+    setIsTyping(false);
+    setReplyingTo(null);
+    setSharedSecret(null);
+    setMessages(prev => [...prev, { id: 'sys-end-me', type: 'system', data: { name: username, action: 'disconnected', isYou: true }, reactions: {} }]);
+  };
+
+  const initiateReply = (text: any, type: string, id: string) => {
+    if (!isConnected) return;
+    const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
+    setReplyingTo({ text: typeof text === 'string' ? text : 'Content', name: senderName, isYou: type === 'you', id: id });
+    const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+    if(input) input.focus();
+  };
+
+  const scrollToMessage = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.classList.add('animate-pulse-red');
+        setTimeout(() => element.classList.remove('animate-pulse-red'), 1000);
+    }
+  };
+
+  const sendReaction = (msgID: string, emoji: string) => {
+    const message = messages.find(m => m.id === msgID);
+    const isRemoving = message?.reactions?.you === emoji;
+    const reactionToSend = isRemoving ? null : emoji;
+    setMessages(prev => prev.map(msg => msg.id === msgID ? { ...msg, reactions: { ...msg.reactions, you: reactionToSend } } : msg));
+    setActiveReactionId(null);
+    socket.emit('send_reaction', { messageID: msgID, reaction: reactionToSend });
+  };
+
+  const renderSystemMessage = (msg: Message) => {
+    if (!msg.data) return null;
+    const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
+    if (msg.data.action === 'connected') return <span>You are now chatting with <span style={boldStyle}>{msg.data.name}</span>{msg.data.field ? <> who is in <span style={boldStyle}>{msg.data.field}</span></> : "."}</span>;
+    if (msg.data.action === 'disconnected') {
+      if (msg.data.isYou) return <span><span style={boldStyle}>You</span> disconnected from the chat.</span>;
+      return <span><span style={boldStyle}>{msg.data.name}</span> disconnected from the chat.</span>;
+    }
+    return null;
+  };
+
+  const renderStatusPill = () => {
+      switch(partnerStatus) {
+          case 'searching': return <span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>;
+          case 'connected': return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>;
+          case 'disconnected': return <span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>;
+          case 'reconnecting_me': return <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">Trying to reconnect you back...</span>;
+          case 'reconnecting_partner': return <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">{partnerNameRef.current} is trying to reconnect...</span>;
+          default:
+              if (partnerStatus === 'restored_me') return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">You reconnected.</span>;
+              if (partnerStatus === 'restored_partner') return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">{partnerNameRef.current} has reconnected.</span>;
+              return null;
+      }
+  };
+
+  // --- THEME & ADDRESS BAR COLOR ---
+  useLayoutEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const DARK_BG = '#1f2937'; 
+    const LIGHT_BG = '#ffffff';
+    const currentBgColor = darkMode ? DARK_BG : LIGHT_BG;
+    if (darkMode) { html.classList.add('dark'); } else { html.classList.remove('dark'); }
+    body.style.backgroundColor = currentBgColor;
+    html.style.backgroundColor = currentBgColor;
+    let metaThemeColor = document.querySelector("meta[name='theme-color']");
+    if (!metaThemeColor) {
+      metaThemeColor = document.createElement('meta');
+      metaThemeColor.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaThemeColor);
+    }
+    metaThemeColor.setAttribute('content', currentBgColor);
+    let metaStatusBarStyle = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
+    if (!metaStatusBarStyle) {
+        metaStatusBarStyle = document.createElement('meta');
+        metaStatusBarStyle.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
+        document.head.appendChild(metaStatusBarStyle);
+    }
+    metaStatusBarStyle.setAttribute('content', darkMode ? 'black-translucent' : 'default');
+  }, [darkMode]);
+
+  useEffect(() => {
+    const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
+    const handleUserInteraction = () => resetActivity();
+    activityEvents.forEach(event => window.addEventListener(event, handleUserInteraction));
+    return () => activityEvents.forEach(event => window.removeEventListener(event, handleUserInteraction));
+  }, [showInactivityAd, showTabReturnAd]);
+
+  useEffect(() => {
+    if (isConnected) {
+      activityTimerRef.current = window.setInterval(() => {
+        const now = Date.now();
+        if (now - lastActivity > 7 * 60 * 1000 && !showInactivityAd && !showTabReturnAd) setShowInactivityAd(true);
+      }, 5000); 
+      return () => { if (activityTimerRef.current) clearInterval(activityTimerRef.current); };
+    }
+  }, [isConnected, lastActivity, showInactivityAd, showTabReturnAd]);
+
+  useEffect(() => {
+    const handleVis = () => { 
+        if (!document.hidden && isConnected) {
+            if(!showInactivityAd) setShowTabReturnAd(true);
+            if(isReadReceiptsEnabled && partnerHasReadReceipts) {
+                const lastMsg = messages[messages.length - 1];
+                if(lastMsg && lastMsg.type === 'stranger') {
+                    socket.emit('mark_read', lastMsg.id);
+                }
+            }
+        }
+    };
+    document.addEventListener('visibilitychange', handleVis);
+    return () => document.removeEventListener('visibilitychange', handleVis);
+  }, [isConnected, showInactivityAd, messages, isReadReceiptsEnabled, partnerHasReadReceipts]);
 
   // --- SOCKET HANDLERS ---
   useEffect(() => {
-    socket.on('matched', (data: any) => {
+    socket.on('matched', async (data: any) => {
+      // --- E2EE HANDSHAKE ---
+      if (data.partnerPublicKey && myKeyPair) {
+          try {
+              const partnerKey = await importKey(data.partnerPublicKey);
+              const secret = await deriveSecretKey(myKeyPair.privateKey, partnerKey);
+              setSharedSecret(secret);
+              console.log("E2EE: Secure Channel Established");
+          } catch(e) {
+              console.error("E2EE Handshake failed", e);
+          }
+      }
+
       setShowSearching(false);
       setPartnerStatus('connected');
       setIsConnected(true);
@@ -889,16 +1141,32 @@ export default function ChatItNow() {
       resetActivity();
     });
 
-    socket.on('receive_message', (data: any) => {
+    socket.on('receive_message', async (data: any) => {
       const msgId = data.id || generateMessageID();
       
+      // --- E2EE DECRYPTION ---
+      let decryptedContent = { text: null, image: null, video: null, audio: null };
+      
+      if (data.encrypted && sharedSecret) {
+          try {
+              decryptedContent = await decryptData(sharedSecret, data.encrypted);
+          } catch(e) {
+              console.error("Decryption failed", e);
+              // @ts-ignore
+              decryptedContent = { text: "⚠️ Encrypted message could not be read.", image: null, video: null, audio: null };
+          }
+      } else if (data.text || data.image) {
+          // Fallback for unencrypted (should not happen if backend is clean)
+          decryptedContent = { text: data.text, image: data.image, video: data.video, audio: data.audio };
+      }
+
       setMessages(prev => [...prev, { 
         id: msgId,
         type: 'stranger', 
-        text: data.text,
-        audio: data.audio,
-        image: data.image,
-        video: data.video,
+        text: decryptedContent.text,
+        audio: decryptedContent.audio,
+        image: decryptedContent.image,
+        video: decryptedContent.video,
         isNSFW: data.isNSFW,
         replyTo: data.replyTo,
         timestamp: data.timestamp || getCurrentTime(),
@@ -916,7 +1184,7 @@ export default function ChatItNow() {
       if (!isNotifyMuted && document.hidden) {
           if (Notification.permission === "granted") {
               const notifTitle = `New message from ${partnerNameRef.current || 'Partner'}`;
-              const notifBody = data.image ? "Sent a photo" : (data.video ? "Sent a video" : (data.audio ? "Sent a voice message" : (data.text || "Sent a message")));
+              const notifBody = decryptedContent.image ? "Sent a photo" : (decryptedContent.video ? "Sent a video" : (decryptedContent.audio ? "Sent a voice message" : (decryptedContent.text || "Sent a message")));
               
               if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
                  navigator.serviceWorker.ready.then(registration => {
@@ -960,6 +1228,7 @@ export default function ChatItNow() {
       setIsTyping(false); 
       setReplyingTo(null); 
       if(isRecording) cancelRecording();
+      setSharedSecret(null); // Clear keys
 
       const nameToShow = partnerNameRef.current || 'Partner';
       setMessages(prev => [...prev, { id: 'sys-end', type: 'system', data: { name: nameToShow, action: 'disconnected', isYou: false }, reactions: {} }]);
@@ -987,212 +1256,7 @@ export default function ChatItNow() {
       socket.off('message_read_by_partner');
       socket.off('partner_receipt_setting');
     };
-  }, [isMuted, isConnected, isNotifyMuted, isRecording, isReadReceiptsEnabled, partnerHasReadReceipts]); 
-
-  // --- THEME & ADDRESS BAR COLOR ---
-  useLayoutEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    
-    const DARK_BG = '#1f2937'; 
-    const LIGHT_BG = '#ffffff';
-
-    const currentBgColor = darkMode ? DARK_BG : LIGHT_BG;
-
-    if (darkMode) {
-      html.classList.add('dark');
-    } else {
-      html.classList.remove('dark');
-    }
-    body.style.backgroundColor = currentBgColor;
-    html.style.backgroundColor = currentBgColor;
-
-    let metaThemeColor = document.querySelector("meta[name='theme-color']");
-    if (!metaThemeColor) {
-      metaThemeColor = document.createElement('meta');
-      metaThemeColor.setAttribute('name', 'theme-color');
-      document.head.appendChild(metaThemeColor);
-    }
-    metaThemeColor.setAttribute('content', currentBgColor);
-
-    let metaStatusBarStyle = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
-    if (!metaStatusBarStyle) {
-        metaStatusBarStyle = document.createElement('meta');
-        metaStatusBarStyle.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
-        document.head.appendChild(metaStatusBarStyle);
-    }
-    metaStatusBarStyle.setAttribute('content', darkMode ? 'black-translucent' : 'default');
-
-  }, [darkMode]);
-
-  const resetActivity = () => { if (!showInactivityAd && !showTabReturnAd) setLastActivity(Date.now()); };
-  
-  useEffect(() => {
-    const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
-    const handleUserInteraction = () => resetActivity();
-    activityEvents.forEach(event => window.addEventListener(event, handleUserInteraction));
-    return () => activityEvents.forEach(event => window.removeEventListener(event, handleUserInteraction));
-  }, [showInactivityAd, showTabReturnAd]);
-
-  useEffect(() => {
-    if (isConnected) {
-      activityTimerRef.current = window.setInterval(() => {
-        const now = Date.now();
-        if (now - lastActivity > 7 * 60 * 1000 && !showInactivityAd && !showTabReturnAd) setShowInactivityAd(true);
-      }, 5000); 
-      return () => { if (activityTimerRef.current) clearInterval(activityTimerRef.current); };
-    }
-  }, [isConnected, lastActivity, showInactivityAd, showTabReturnAd]);
-
-  useEffect(() => {
-    const handleVis = () => { 
-        if (!document.hidden && isConnected) {
-            if(!showInactivityAd) setShowTabReturnAd(true);
-            if(isReadReceiptsEnabled && partnerHasReadReceipts) {
-                const lastMsg = messages[messages.length - 1];
-                if(lastMsg && lastMsg.type === 'stranger') {
-                    socket.emit('mark_read', lastMsg.id);
-                }
-            }
-        }
-    };
-    document.addEventListener('visibilitychange', handleVis);
-    return () => document.removeEventListener('visibilitychange', handleVis);
-  }, [isConnected, showInactivityAd, messages, isReadReceiptsEnabled, partnerHasReadReceipts]);
-
-  const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCurrentMessage(e.target.value);
-    resetActivity(); 
-    if (isConnected) socket.emit('typing', e.target.value.length > 0);
-  };
-
-  const handleLogin = () => {
-    if (username.trim() && acceptedTerms && confirmedAdult) {
-      setIsLoggedIn(true);
-      // Request Notification Permission on Login
-      if ('Notification' in window && Notification.permission !== 'granted') {
-        Notification.requestPermission();
-      }
-      socket.connect();
-      startSearch();
-    } else {
-      setFormError(true);
-      setTimeout(() => setFormError(false), 2000);
-    }
-  };
-
-  const startSearch = () => {
-    setPartnerStatus('searching');
-    setShowSearching(true);
-    setMessages([]);
-    socket.emit('find_partner', { username, field });
-  };
-
-  const handleSendMessage = () => {
-    if (currentMessage.trim()) {
-      const msgID = generateMessageID(); 
-      const msgData: any = { 
-        id: msgID,
-        text: currentMessage,
-        timestamp: getCurrentTime()
-      };
-      if (replyingTo) msgData.replyTo = replyingTo;
-
-      setMessages(prev => [...prev, { 
-        id: msgID,
-        type: 'you', 
-        text: currentMessage, 
-        replyTo: replyingTo || undefined,
-        timestamp: msgData.timestamp,
-        status: 'sent',
-        reactions: {}
-      }]);
-      socket.emit('send_message', msgData);
-      
-      setCurrentMessage('');
-      setReplyingTo(null);
-      playSound('sent');
-      resetActivity();
-    }
-  };
-
-  const handleNext = () => {
-    if (!showNextConfirm) { setShowNextConfirm(true); return; }
-    socket.emit('disconnect_partner');
-    setIsConnected(false);
-    setShowNextConfirm(false);
-    setPartnerStatus('disconnected');
-    setIsTyping(false);
-    setReplyingTo(null);
-    setMessages(prev => [...prev, { id: 'sys-end-me', type: 'system', data: { name: username, action: 'disconnected', isYou: true }, reactions: {} }]);
-  };
-
-  const handleStartSearch = () => { startSearch(); };
-
-  const initiateReply = (text: any, type: string, id: string) => {
-    if (!isConnected) return;
-    const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
-    setReplyingTo({ text: typeof text === 'string' ? text : 'Content', name: senderName, isYou: type === 'you', id: id });
-    const input = document.querySelector('input[type="text"]') as HTMLInputElement;
-    if(input) input.focus();
-  };
-
-  const scrollToMessage = (id: string) => {
-    const element = document.getElementById(id);
-    if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        element.classList.add('animate-pulse-red');
-        setTimeout(() => element.classList.remove('animate-pulse-red'), 1000);
-    }
-  };
-
-  const sendReaction = (msgID: string, emoji: string) => {
-    const message = messages.find(m => m.id === msgID);
-    const isRemoving = message?.reactions?.you === emoji;
-    const reactionToSend = isRemoving ? null : emoji;
-
-    setMessages(prev => prev.map(msg => 
-        msg.id === msgID ? { 
-            ...msg, 
-            reactions: { ...msg.reactions, you: reactionToSend } 
-        } : msg
-    ));
-    
-    setActiveReactionId(null);
-    socket.emit('send_reaction', { messageID: msgID, reaction: reactionToSend });
-  };
-
-  const renderSystemMessage = (msg: Message) => {
-    if (!msg.data) return null;
-    const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
-    if (msg.data.action === 'connected') return <span>You are now chatting with <span style={boldStyle}>{msg.data.name}</span>{msg.data.field ? <> who is in <span style={boldStyle}>{msg.data.field}</span></> : "."}</span>;
-    if (msg.data.action === 'disconnected') {
-      if (msg.data.isYou) return <span><span style={boldStyle}>You</span> disconnected from the chat.</span>;
-      return <span><span style={boldStyle}>{msg.data.name}</span> disconnected from the chat.</span>;
-    }
-    return null;
-  };
-
-  const renderStatusPill = () => {
-      switch(partnerStatus) {
-          case 'searching':
-              return <span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>;
-          case 'connected':
-          case 'restored_me': 
-          case 'restored_partner':
-              return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>;
-          case 'disconnected':
-              return <span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>;
-          case 'reconnecting_me':
-              return <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">Trying to reconnect you back...</span>;
-          case 'reconnecting_partner':
-              return <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">{partnerNameRef.current} is trying to reconnect...</span>;
-          default:
-              if (partnerStatus === 'restored_me') return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">You reconnected.</span>;
-              if (partnerStatus === 'restored_partner') return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">{partnerNameRef.current} has reconnected.</span>;
-              return null;
-      }
-  };
+  }, [isMuted, isConnected, isNotifyMuted, isRecording, isReadReceiptsEnabled, partnerHasReadReceipts, sharedSecret, myKeyPair]); 
 
   if (showWelcome) {
     return (
