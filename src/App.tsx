@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip, AlertTriangle, EyeOff, Loader2, Info, Shield, ShieldCheck, ShieldAlert, ExternalLink } from 'lucide-react';
+import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip, AlertTriangle, EyeOff, Loader2, Info, Shield, ShieldCheck, ShieldAlert, ExternalLink, Timer } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 import * as nsfwjs from 'nsfwjs';
@@ -16,7 +16,7 @@ const AD_SLOT_INACTIVITY = "2655630641";
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
-// --- CRYPTO UTILS (E2EE - LARGE FILE SAFE) ---
+// --- CRYPTO UTILS (E2EE) ---
 const generateKeyPair = async () => {
   return window.crypto.subtle.generateKey(
     { name: "ECDH", namedCurve: "P-256" },
@@ -49,20 +49,6 @@ const deriveSecretKey = async (privateKey: CryptoKey, publicKey: CryptoKey) => {
   );
 };
 
-// FIX: Chunk-safe Buffer to Base64 (Prevents Stack Overflow on large files)
-const bufferToBase64 = (buffer: Uint8Array) => {
-  const CHUNK_SIZE = 0x8000; // 32k chunks
-  let index = 0;
-  let length = buffer.length;
-  let result = '';
-  while (index < length) {
-    const slice = buffer.subarray(index, Math.min(index + CHUNK_SIZE, length));
-    result += String.fromCharCode.apply(null, Array.from(slice));
-    index += CHUNK_SIZE;
-  }
-  return btoa(result);
-};
-
 const encryptData = async (secretKey: CryptoKey, data: any) => {
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(JSON.stringify(data));
@@ -75,7 +61,7 @@ const encryptData = async (secretKey: CryptoKey, data: any) => {
   const buf = new Uint8Array(iv.length + encryptedArray.length);
   buf.set(iv);
   buf.set(encryptedArray, iv.length);
-  return bufferToBase64(buf);
+  return btoa(String.fromCharCode.apply(null, Array.from(buf)));
 };
 
 const decryptData = async (secretKey: CryptoKey, base64Data: string) => {
@@ -199,7 +185,6 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
     let isMounted = true;
 
     if (msg.video && !stableVideoUrl) {
-        // Base64 -> Blob conversion for receiver
         fetch(msg.video)
             .then(res => res.blob())
             .then(blob => {
@@ -563,6 +548,15 @@ export default function ChatItNow() {
     }
   };
 
+  // --- NEW: TIMEOUT HANDLER (Fix for previous missing feature) ---
+  const handleTimeout = () => {
+      const confirmTimeout = window.confirm("Are you sure you want to timeout this user? You won't match with them again for 15 minutes.");
+      if (confirmTimeout) {
+          socket.emit('timeout_user');
+          handleNext();
+      }
+  };
+
   // --- INIT CRYPTO ---
   useEffect(() => {
     const initCrypto = async () => {
@@ -903,7 +897,7 @@ export default function ChatItNow() {
 
   const handleConfirmSendFile = async () => {
     if(!filePreview) return;
-    // Removed strict check: if(!sharedSecret) return;
+    // Graceful Fallback: No strict E2EE check
 
     const msgID = generateMessageID();
     const timestamp = getCurrentTime();
@@ -916,7 +910,6 @@ export default function ChatItNow() {
         replyTo: replyingTo || undefined
     };
 
-    // Prepare payload
     const rawPayload = {
       text: null,
       image: filePreview.type === 'image' ? filePreview.base64 : null,
@@ -924,7 +917,6 @@ export default function ChatItNow() {
       audio: null
     };
 
-    // Try Encrypt, else Fallback
     if (sharedSecret) {
         try {
             msgData.encrypted = await encryptData(sharedSecret, rawPayload);
@@ -934,7 +926,6 @@ export default function ChatItNow() {
             msgData.video = rawPayload.video;
         }
     } else {
-        // Fallback to plain text
         msgData.image = rawPayload.image;
         msgData.video = rawPayload.video;
     }
@@ -953,9 +944,6 @@ export default function ChatItNow() {
     }]);
 
     socket.emit('send_message', msgData);
-    
-    // NOTE: We do not revoke the URL immediately so it stays playable
-    
     setReplyingTo(null);
     playSound('sent');
     resetActivity();
@@ -1189,10 +1177,9 @@ export default function ChatItNow() {
     return () => document.removeEventListener('visibilitychange', handleVis);
   }, [isConnected, showInactivityAd, messages, isReadReceiptsEnabled, partnerHasReadReceipts]);
 
-  // --- SOCKET HANDLERS ---
+  // --- SOCKET HANDLERS (E2EE Integrated) ---
   useEffect(() => {
     socket.on('matched', async (data: any) => {
-      // --- E2EE HANDSHAKE ---
       if (data.partnerPublicKey && myKeyPair) {
           try {
               const partnerKey = await importKey(data.partnerPublicKey);
@@ -1217,7 +1204,6 @@ export default function ChatItNow() {
     socket.on('receive_message', async (data: any) => {
       const msgId = data.id || generateMessageID();
       
-      // --- E2EE DECRYPTION ---
       let decryptedContent = { text: null, image: null, video: null, audio: null };
       
       if (data.encrypted && sharedSecret) {
@@ -1229,7 +1215,6 @@ export default function ChatItNow() {
               decryptedContent = { text: "⚠️ Encrypted message could not be read.", image: null, video: null, audio: null };
           }
       } else if (data.text || data.image || data.video || data.audio) {
-          // Fallback for unencrypted (should not happen if backend is clean)
           decryptedContent = { text: data.text, image: data.image, video: data.video, audio: data.audio };
       }
 
@@ -1301,7 +1286,7 @@ export default function ChatItNow() {
       setIsTyping(false); 
       setReplyingTo(null); 
       if(isRecording) cancelRecording();
-      setSharedSecret(null); // Clear keys
+      setSharedSecret(null);
 
       const nameToShow = partnerNameRef.current || 'Partner';
       setMessages(prev => [...prev, { id: 'sys-end', type: 'system', data: { name: nameToShow, action: 'disconnected', isYou: false }, reactions: {} }]);
@@ -1595,6 +1580,15 @@ export default function ChatItNow() {
             />
             <span className={`font-bold text-lg ${darkMode ? 'text-purple-500' : 'text-purple-600'}`}>ChatItNow</span>
             
+            {/* NEW: TIMEOUT BUTTON */}
+            <button
+               onClick={handleTimeout}
+               className={`ml-1 p-1.5 rounded-full transition-colors ${darkMode ? 'text-gray-400 hover:bg-[#374151] hover:text-red-500' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600'}`}
+               title="Timeout User (15m Ban)"
+            >
+               <Timer size={16} />
+            </button>
+
             {/* SAFE MODE TOGGLE (LEFT SIDE) */}
             <button 
               onClick={() => setSafeMode(!safeMode)} 
