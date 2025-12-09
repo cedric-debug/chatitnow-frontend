@@ -49,6 +49,15 @@ const deriveSecretKey = async (privateKey: CryptoKey, publicKey: CryptoKey) => {
   );
 };
 
+const bufferToBase64 = (buffer: Uint8Array) => {
+  let binary = '';
+  const len = buffer.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(buffer[i]);
+  }
+  return window.btoa(binary);
+};
+
 const encryptData = async (secretKey: CryptoKey, data: any) => {
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(JSON.stringify(data));
@@ -61,7 +70,7 @@ const encryptData = async (secretKey: CryptoKey, data: any) => {
   const buf = new Uint8Array(iv.length + encryptedArray.length);
   buf.set(iv);
   buf.set(encryptedArray, iv.length);
-  return btoa(String.fromCharCode.apply(null, Array.from(buf)));
+  return bufferToBase64(buf);
 };
 
 const decryptData = async (secretKey: CryptoKey, base64Data: string) => {
@@ -548,13 +557,100 @@ export default function ChatItNow() {
     }
   };
 
-  // --- NEW: TIMEOUT HANDLER (Fix for previous missing feature) ---
+  const handleNext = () => {
+    if (!showNextConfirm) { setShowNextConfirm(true); return; }
+    socket.emit('disconnect_partner');
+    setIsConnected(false);
+    setShowNextConfirm(false);
+    setPartnerStatus('disconnected');
+    setIsTyping(false);
+    setReplyingTo(null);
+    setSharedSecret(null);
+    setMessages(prev => [...prev, { id: 'sys-end-me', type: 'system', data: { name: username, action: 'disconnected', isYou: true }, reactions: {} }]);
+  };
+
   const handleTimeout = () => {
       const confirmTimeout = window.confirm("Are you sure you want to timeout this user? You won't match with them again for 15 minutes.");
       if (confirmTimeout) {
           socket.emit('timeout_user');
           handleNext();
       }
+  };
+
+  const toggleReadReceipts = () => {
+    const newState = !isReadReceiptsEnabled;
+    setIsReadReceiptsEnabled(newState);
+    if(isConnected) { socket.emit('toggle_read_receipts', newState); }
+  };
+
+  const startRecording = async () => {
+    try {
+      let mimeType = 'audio/webm'; 
+      if (MediaRecorder.isTypeSupported('audio/mp4')) { mimeType = 'audio/mp4'; } else if (MediaRecorder.isTypeSupported('audio/aac')) { mimeType = 'audio/aac'; }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) { audioChunksRef.current.push(event.data); } };
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = window.setInterval(() => {
+        setRecordingDuration(prev => { if (prev >= 15) { stopRecordingAndSend(); return 15; } return prev + 1; });
+      }, 1000);
+    } catch (err) { console.error("Error accessing microphone:", err); alert("Could not access microphone."); }
+  };
+
+  const stopRecordingAndSend = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      const mimeType = mediaRecorderRef.current.mimeType;
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.onstop = async () => {
+         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+         const base64Audio = await blobToBase64(audioBlob);
+         handleSendAudio(base64Audio);
+         if(recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+         mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
+         setIsRecording(false);
+         setRecordingDuration(0);
+      };
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      if(recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+      setRecordingDuration(0);
+      audioChunksRef.current = [];
+    }
+  };
+
+  const renderStatusPill = () => {
+      switch(partnerStatus) {
+          case 'searching': return <span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>;
+          case 'connected': return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>;
+          case 'disconnected': return <span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>;
+          case 'reconnecting_me': return <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">Trying to reconnect you back...</span>;
+          case 'reconnecting_partner': return <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">{partnerNameRef.current} is trying to reconnect...</span>;
+          default:
+              if (partnerStatus === 'restored_me') return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">You reconnected.</span>;
+              if (partnerStatus === 'restored_partner') return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">{partnerNameRef.current} has reconnected.</span>;
+              return null;
+      }
+  };
+
+  const renderSystemMessage = (msg: Message) => {
+    if (!msg.data) return null;
+    const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
+    if (msg.data.action === 'connected') return <span>You are now chatting with <span style={boldStyle}>{msg.data.name}</span>{msg.data.field ? <> who is in <span style={boldStyle}>{msg.data.field}</span></> : "."}</span>;
+    if (msg.data.action === 'disconnected') {
+      if (msg.data.isYou) return <span><span style={boldStyle}>You</span> disconnected from the chat.</span>;
+      return <span><span style={boldStyle}>{msg.data.name}</span> disconnected from the chat.</span>;
+    }
+    return null;
   };
 
   // --- INIT CRYPTO ---
@@ -612,13 +708,67 @@ export default function ChatItNow() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e: MediaQueryListEvent) => setDarkMode(e.matches);
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
+  // --- THEME & ADDRESS BAR COLOR ---
+  useLayoutEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const DARK_BG = '#1f2937'; 
+    const LIGHT_BG = '#ffffff';
+    const currentBgColor = darkMode ? DARK_BG : LIGHT_BG;
+    if (darkMode) { html.classList.add('dark'); } else { html.classList.remove('dark'); }
+    body.style.backgroundColor = currentBgColor;
+    html.style.backgroundColor = currentBgColor;
+    let metaThemeColor = document.querySelector("meta[name='theme-color']");
+    if (!metaThemeColor) {
+      metaThemeColor = document.createElement('meta');
+      metaThemeColor.setAttribute('name', 'theme-color');
+      document.head.appendChild(metaThemeColor);
+    }
+    metaThemeColor.setAttribute('content', currentBgColor);
+    let metaStatusBarStyle = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
+    if (!metaStatusBarStyle) {
+        metaStatusBarStyle = document.createElement('meta');
+        metaStatusBarStyle.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
+        document.head.appendChild(metaStatusBarStyle);
+    }
+    metaStatusBarStyle.setAttribute('content', darkMode ? 'black-translucent' : 'default');
+  }, [darkMode]);
 
+  // --- ACTIVITY & AD LOGIC ---
+  useEffect(() => {
+    const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
+    const handleUserInteraction = () => resetActivity();
+    activityEvents.forEach(event => window.addEventListener(event, handleUserInteraction));
+    return () => activityEvents.forEach(event => window.removeEventListener(event, handleUserInteraction));
+  }, [showInactivityAd, showTabReturnAd]);
+
+  useEffect(() => {
+    if (isConnected) {
+      activityTimerRef.current = window.setInterval(() => {
+        const now = Date.now();
+        if (now - lastActivity > 7 * 60 * 1000 && !showInactivityAd && !showTabReturnAd) setShowInactivityAd(true);
+      }, 5000); 
+      return () => { if (activityTimerRef.current) clearInterval(activityTimerRef.current); };
+    }
+  }, [isConnected, lastActivity, showInactivityAd, showTabReturnAd]);
+
+  useEffect(() => {
+    const handleVis = () => { 
+        if (!document.hidden && isConnected) {
+            if(!showInactivityAd) setShowTabReturnAd(true);
+            if(isReadReceiptsEnabled && partnerHasReadReceipts) {
+                const lastMsg = messages[messages.length - 1];
+                if(lastMsg && lastMsg.type === 'stranger') {
+                    socket.emit('mark_read', lastMsg.id);
+                }
+            }
+        }
+    };
+    document.addEventListener('visibilitychange', handleVis);
+    return () => document.removeEventListener('visibilitychange', handleVis);
+  }, [isConnected, showInactivityAd, messages, isReadReceiptsEnabled, partnerHasReadReceipts]);
+
+  // --- AUDIO INIT ---
   useEffect(() => {
     audioSentRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'); 
     audioReceivedRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'); 
@@ -684,57 +834,6 @@ export default function ChatItNow() {
       const { scrollTop, scrollHeight, clientHeight } = container;
       const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
       isAtBottomRef.current = isNearBottom;
-  };
-
-  const toggleReadReceipts = () => {
-    const newState = !isReadReceiptsEnabled;
-    setIsReadReceiptsEnabled(newState);
-    if(isConnected) { socket.emit('toggle_read_receipts', newState); }
-  };
-
-  const startRecording = async () => {
-    try {
-      let mimeType = 'audio/webm'; 
-      if (MediaRecorder.isTypeSupported('audio/mp4')) { mimeType = 'audio/mp4'; } else if (MediaRecorder.isTypeSupported('audio/aac')) { mimeType = 'audio/aac'; }
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
-      mediaRecorderRef.current = mediaRecorder;
-      audioChunksRef.current = [];
-      mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) { audioChunksRef.current.push(event.data); } };
-      mediaRecorder.start();
-      setIsRecording(true);
-      setRecordingDuration(0);
-      recordingTimerRef.current = window.setInterval(() => {
-        setRecordingDuration(prev => { if (prev >= 15) { stopRecordingAndSend(); return 15; } return prev + 1; });
-      }, 1000);
-    } catch (err) { console.error("Error accessing microphone:", err); alert("Could not access microphone."); }
-  };
-
-  const stopRecordingAndSend = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      const mimeType = mediaRecorderRef.current.mimeType;
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.onstop = async () => {
-         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-         const base64Audio = await blobToBase64(audioBlob);
-         handleSendAudio(base64Audio);
-         if(recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-         mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
-         setIsRecording(false);
-         setRecordingDuration(0);
-      };
-    }
-  };
-
-  const cancelRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      if(recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-      setIsRecording(false);
-      setRecordingDuration(0);
-      audioChunksRef.current = [];
-    }
   };
 
   // --- FAST IMAGE SCANNER ---
@@ -895,10 +994,10 @@ export default function ChatItNow() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // --- SEND HANDLER (GRACEFUL FALLBACK) ---
   const handleConfirmSendFile = async () => {
     if(!filePreview) return;
-    // Graceful Fallback: No strict E2EE check
-
+    
     const msgID = generateMessageID();
     const timestamp = getCurrentTime();
     const finalIsNSFW = aiDetectedNSFW || isNSFWMarked;
@@ -1055,18 +1154,6 @@ export default function ChatItNow() {
     }
   };
 
-  const handleNext = () => {
-    if (!showNextConfirm) { setShowNextConfirm(true); return; }
-    socket.emit('disconnect_partner');
-    setIsConnected(false);
-    setShowNextConfirm(false);
-    setPartnerStatus('disconnected');
-    setIsTyping(false);
-    setReplyingTo(null);
-    setSharedSecret(null);
-    setMessages(prev => [...prev, { id: 'sys-end-me', type: 'system', data: { name: username, action: 'disconnected', isYou: true }, reactions: {} }]);
-  };
-
   const initiateReply = (text: any, type: string, id: string) => {
     if (!isConnected) return;
     const senderName = type === 'you' ? username : (partnerNameRef.current || 'Stranger');
@@ -1093,93 +1180,10 @@ export default function ChatItNow() {
     socket.emit('send_reaction', { messageID: msgID, reaction: reactionToSend });
   };
 
-  const renderSystemMessage = (msg: Message) => {
-    if (!msg.data) return null;
-    const boldStyle = { fontWeight: '900', color: darkMode ? '#ffffff' : '#000000' };
-    if (msg.data.action === 'connected') return <span>You are now chatting with <span style={boldStyle}>{msg.data.name}</span>{msg.data.field ? <> who is in <span style={boldStyle}>{msg.data.field}</span></> : "."}</span>;
-    if (msg.data.action === 'disconnected') {
-      if (msg.data.isYou) return <span><span style={boldStyle}>You</span> disconnected from the chat.</span>;
-      return <span><span style={boldStyle}>{msg.data.name}</span> disconnected from the chat.</span>;
-    }
-    return null;
-  };
-
-  const renderStatusPill = () => {
-      switch(partnerStatus) {
-          case 'searching': return <span className="text-[10px] bg-yellow-100 text-yellow-800 px-3 py-0.5 rounded-full">Searching...</span>;
-          case 'connected': return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">Connected</span>;
-          case 'disconnected': return <span className="text-[10px] bg-red-100 text-red-800 px-3 py-0.5 rounded-full">Disconnected</span>;
-          case 'reconnecting_me': return <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">Trying to reconnect you back...</span>;
-          case 'reconnecting_partner': return <span className="text-[10px] bg-yellow-100 text-yellow-800 border border-yellow-300 px-3 py-0.5 rounded-full animate-pulse">{partnerNameRef.current} is trying to reconnect...</span>;
-          default:
-              if (partnerStatus === 'restored_me') return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">You reconnected.</span>;
-              if (partnerStatus === 'restored_partner') return <span className="text-[10px] bg-green-100 text-green-800 px-3 py-0.5 rounded-full">{partnerNameRef.current} has reconnected.</span>;
-              return null;
-      }
-  };
-
-  // --- THEME & ADDRESS BAR COLOR ---
-  useLayoutEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    const DARK_BG = '#1f2937'; 
-    const LIGHT_BG = '#ffffff';
-    const currentBgColor = darkMode ? DARK_BG : LIGHT_BG;
-    if (darkMode) { html.classList.add('dark'); } else { html.classList.remove('dark'); }
-    body.style.backgroundColor = currentBgColor;
-    html.style.backgroundColor = currentBgColor;
-    let metaThemeColor = document.querySelector("meta[name='theme-color']");
-    if (!metaThemeColor) {
-      metaThemeColor = document.createElement('meta');
-      metaThemeColor.setAttribute('name', 'theme-color');
-      document.head.appendChild(metaThemeColor);
-    }
-    metaThemeColor.setAttribute('content', currentBgColor);
-    let metaStatusBarStyle = document.querySelector("meta[name='apple-mobile-web-app-status-bar-style']");
-    if (!metaStatusBarStyle) {
-        metaStatusBarStyle = document.createElement('meta');
-        metaStatusBarStyle.setAttribute('name', 'apple-mobile-web-app-status-bar-style');
-        document.head.appendChild(metaStatusBarStyle);
-    }
-    metaStatusBarStyle.setAttribute('content', darkMode ? 'black-translucent' : 'default');
-  }, [darkMode]);
-
-  useEffect(() => {
-    const activityEvents = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'];
-    const handleUserInteraction = () => resetActivity();
-    activityEvents.forEach(event => window.addEventListener(event, handleUserInteraction));
-    return () => activityEvents.forEach(event => window.removeEventListener(event, handleUserInteraction));
-  }, [showInactivityAd, showTabReturnAd]);
-
-  useEffect(() => {
-    if (isConnected) {
-      activityTimerRef.current = window.setInterval(() => {
-        const now = Date.now();
-        if (now - lastActivity > 7 * 60 * 1000 && !showInactivityAd && !showTabReturnAd) setShowInactivityAd(true);
-      }, 5000); 
-      return () => { if (activityTimerRef.current) clearInterval(activityTimerRef.current); };
-    }
-  }, [isConnected, lastActivity, showInactivityAd, showTabReturnAd]);
-
-  useEffect(() => {
-    const handleVis = () => { 
-        if (!document.hidden && isConnected) {
-            if(!showInactivityAd) setShowTabReturnAd(true);
-            if(isReadReceiptsEnabled && partnerHasReadReceipts) {
-                const lastMsg = messages[messages.length - 1];
-                if(lastMsg && lastMsg.type === 'stranger') {
-                    socket.emit('mark_read', lastMsg.id);
-                }
-            }
-        }
-    };
-    document.addEventListener('visibilitychange', handleVis);
-    return () => document.removeEventListener('visibilitychange', handleVis);
-  }, [isConnected, showInactivityAd, messages, isReadReceiptsEnabled, partnerHasReadReceipts]);
-
-  // --- SOCKET HANDLERS (E2EE Integrated) ---
+  // --- SOCKET HANDLERS ---
   useEffect(() => {
     socket.on('matched', async (data: any) => {
+      // --- E2EE HANDSHAKE ---
       if (data.partnerPublicKey && myKeyPair) {
           try {
               const partnerKey = await importKey(data.partnerPublicKey);
@@ -1204,6 +1208,7 @@ export default function ChatItNow() {
     socket.on('receive_message', async (data: any) => {
       const msgId = data.id || generateMessageID();
       
+      // --- E2EE DECRYPTION ---
       let decryptedContent = { text: null, image: null, video: null, audio: null };
       
       if (data.encrypted && sharedSecret) {
@@ -1215,6 +1220,7 @@ export default function ChatItNow() {
               decryptedContent = { text: "⚠️ Encrypted message could not be read.", image: null, video: null, audio: null };
           }
       } else if (data.text || data.image || data.video || data.audio) {
+          // Fallback for unencrypted (should not happen if backend is clean)
           decryptedContent = { text: data.text, image: data.image, video: data.video, audio: data.audio };
       }
 
@@ -1286,7 +1292,7 @@ export default function ChatItNow() {
       setIsTyping(false); 
       setReplyingTo(null); 
       if(isRecording) cancelRecording();
-      setSharedSecret(null);
+      setSharedSecret(null); // Clear keys
 
       const nameToShow = partnerNameRef.current || 'Partner';
       setMessages(prev => [...prev, { id: 'sys-end', type: 'system', data: { name: nameToShow, action: 'disconnected', isYou: false }, reactions: {} }]);
@@ -1316,6 +1322,7 @@ export default function ChatItNow() {
     };
   }, [isMuted, isConnected, isNotifyMuted, isRecording, isReadReceiptsEnabled, partnerHasReadReceipts, sharedSecret, myKeyPair]); 
 
+  // --- RENDER LOGIC ---
   if (showWelcome) {
     return (
       <div className={`fixed inset-0 flex flex-col items-center justify-center ${darkMode ? 'bg-[#1f2937]' : 'bg-white'}`}>
