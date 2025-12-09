@@ -16,7 +16,7 @@ const AD_SLOT_INACTIVITY = "2655630641";
 
 const SERVER_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : PROD_URL;
 
-// --- CRYPTO UTILS (E2EE) ---
+// --- CRYPTO UTILS (E2EE - LARGE FILE SAFE) ---
 const generateKeyPair = async () => {
   return window.crypto.subtle.generateKey(
     { name: "ECDH", namedCurve: "P-256" },
@@ -49,6 +49,20 @@ const deriveSecretKey = async (privateKey: CryptoKey, publicKey: CryptoKey) => {
   );
 };
 
+// FIX: Chunk-safe Buffer to Base64 (Prevents Stack Overflow on large files)
+const bufferToBase64 = (buffer: Uint8Array) => {
+  const CHUNK_SIZE = 0x8000; // 32k chunks
+  let index = 0;
+  let length = buffer.length;
+  let result = '';
+  while (index < length) {
+    const slice = buffer.subarray(index, Math.min(index + CHUNK_SIZE, length));
+    result += String.fromCharCode.apply(null, Array.from(slice));
+    index += CHUNK_SIZE;
+  }
+  return btoa(result);
+};
+
 const encryptData = async (secretKey: CryptoKey, data: any) => {
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
   const encoded = new TextEncoder().encode(JSON.stringify(data));
@@ -61,7 +75,7 @@ const encryptData = async (secretKey: CryptoKey, data: any) => {
   const buf = new Uint8Array(iv.length + encryptedArray.length);
   buf.set(iv);
   buf.set(encryptedArray, iv.length);
-  return btoa(String.fromCharCode.apply(null, Array.from(buf)));
+  return bufferToBase64(buf);
 };
 
 const decryptData = async (secretKey: CryptoKey, base64Data: string) => {
@@ -887,7 +901,6 @@ export default function ChatItNow() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // --- FIXED: GRACEFUL FALLBACK SENDER ---
   const handleConfirmSendFile = async () => {
     if(!filePreview) return;
     // Removed strict check: if(!sharedSecret) return;
@@ -940,6 +953,9 @@ export default function ChatItNow() {
     }]);
 
     socket.emit('send_message', msgData);
+    
+    // NOTE: We do not revoke the URL immediately so it stays playable
+    
     setReplyingTo(null);
     playSound('sent');
     resetActivity();
@@ -956,7 +972,6 @@ export default function ChatItNow() {
   };
 
   const handleSendAudio = async (base64Audio: string) => {
-      // Graceful fallback for audio too
       const msgID = generateMessageID();
       const timestamp = getCurrentTime();
 
