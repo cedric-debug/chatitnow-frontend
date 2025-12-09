@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip, AlertTriangle, EyeOff, Loader2, Info, Shield, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Moon, Sun, Volume2, VolumeX, X, Reply, Smile, Bell, BellOff, Trash2, AudioLines, Play, Pause, Check, CheckCheck, Paperclip, AlertTriangle, EyeOff, Loader2, Info, Shield, ShieldCheck, ShieldAlert, ExternalLink } from 'lucide-react';
 import io from 'socket.io-client';
 import AdUnit from './AdUnit';
 import * as nsfwjs from 'nsfwjs';
@@ -185,7 +185,7 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
     let isMounted = true;
 
     if (msg.video && !stableVideoUrl) {
-        // Base64 -> Blob conversion for receiver to prevent freezing/black screen
+        // Base64 -> Blob conversion for receiver
         fetch(msg.video)
             .then(res => res.blob())
             .then(blob => {
@@ -226,6 +226,25 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
     }
   };
 
+  const handleOpenNewTab = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const src = stableVideoUrl || msg.image;
+    if (!src) return;
+
+    if (src.startsWith('blob:')) {
+        window.open(src, '_blank');
+    } else {
+        try {
+            const res = await fetch(src);
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            window.open(blobUrl, '_blank');
+        } catch (err) {
+            console.error("Failed to open media", err);
+        }
+    }
+  };
+
   return (
     <div className="relative group">
       {!isRevealed && (
@@ -259,7 +278,7 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
             src={msg.image || ''} 
             alt="Sent content" 
             className="max-w-[200px] sm:max-w-[300px] rounded-lg mb-1 cursor-pointer relative z-10"
-            onClick={() => isRevealed && window.open(msg.image || '')} 
+            onClick={handleOpenNewTab} 
           />
         )}
         
@@ -285,14 +304,26 @@ const MediaMessage = ({ msg, safeMode }: { msg: Message, safeMode: boolean }) =>
         )}
       </div>
 
-      {isRevealed && (msg.isNSFW || safeMode) && (
-        <button 
-          onClick={toggleReveal}
-          className="absolute top-2 right-2 z-50 p-1 bg-black/50 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Hide Content"
-        >
-          <EyeOff size={14} />
-        </button>
+      {isRevealed && (
+         <div className="absolute top-2 right-2 z-50 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button 
+                onClick={handleOpenNewTab}
+                className="p-1 bg-black/50 text-white rounded-full hover:bg-black/70"
+                title="Open in new tab"
+            >
+                <ExternalLink size={14} />
+            </button>
+            
+            {(msg.isNSFW || safeMode) && (
+                <button 
+                onClick={toggleReveal}
+                className="p-1 bg-black/50 text-white rounded-full hover:bg-black/70"
+                title="Hide Content"
+                >
+                <EyeOff size={14} />
+                </button>
+            )}
+         </div>
       )}
     </div>
   );
