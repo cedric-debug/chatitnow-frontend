@@ -1563,7 +1563,7 @@ export default function ChatItNow() {
             {/* NEW: TIMEOUT BUTTON */}
             <button
                onClick={handleTimeout}
-               className={`ml-1 p-1.5 rounded-full transition-colors ${darkMode ? 'text-gray-400 hover:bg-[#374151] hover:text-red-500' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600'}`}
+               className={`ml-1 p-1.5 rounded-full transition-colors text-red-500 ${darkMode ? 'hover:bg-[#374151] hover:text-red-400' : 'hover:bg-gray-100 hover:text-red-600'}`}
                title="Timeout User (15m Ban)"
             >
                <Timer size={16} />
