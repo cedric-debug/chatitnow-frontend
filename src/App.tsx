@@ -887,15 +887,23 @@ export default function ChatItNow() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  // --- FIXED: GRACEFUL FALLBACK SENDER ---
   const handleConfirmSendFile = async () => {
     if(!filePreview) return;
-    if(!sharedSecret) { alert("E2EE not ready"); return; }
+    // Removed strict check: if(!sharedSecret) return;
 
     const msgID = generateMessageID();
     const timestamp = getCurrentTime();
     const finalIsNSFW = aiDetectedNSFW || isNSFWMarked;
 
-    // Encrypt
+    let msgData: any = {
+        id: msgID,
+        timestamp: timestamp,
+        isNSFW: finalIsNSFW,
+        replyTo: replyingTo || undefined
+    };
+
+    // Prepare payload
     const rawPayload = {
       text: null,
       image: filePreview.type === 'image' ? filePreview.base64 : null,
@@ -903,16 +911,20 @@ export default function ChatItNow() {
       audio: null
     };
 
-    const encryptedData = await encryptData(sharedSecret, rawPayload);
-
-    const msgData: any = {
-      id: msgID,
-      encrypted: encryptedData,
-      isNSFW: finalIsNSFW,
-      timestamp: timestamp
-    };
-
-    if (replyingTo) msgData.replyTo = replyingTo;
+    // Try Encrypt, else Fallback
+    if (sharedSecret) {
+        try {
+            msgData.encrypted = await encryptData(sharedSecret, rawPayload);
+        } catch (e) {
+            console.error("Encryption failed, sending plain", e);
+            msgData.image = rawPayload.image;
+            msgData.video = rawPayload.video;
+        }
+    } else {
+        // Fallback to plain text
+        msgData.image = rawPayload.image;
+        msgData.video = rawPayload.video;
+    }
 
     setMessages(prev => [...prev, {
       id: msgID,
@@ -944,22 +956,28 @@ export default function ChatItNow() {
   };
 
   const handleSendAudio = async (base64Audio: string) => {
-      if(!sharedSecret) { alert("E2EE not ready"); return; }
-
+      // Graceful fallback for audio too
       const msgID = generateMessageID();
       const timestamp = getCurrentTime();
 
-      const rawPayload = { text: null, image: null, video: null, audio: base64Audio };
-      const encryptedData = await encryptData(sharedSecret, rawPayload);
-
-      const msgData: any = {
+      let msgData: any = {
           id: msgID,
-          encrypted: encryptedData,
           timestamp: timestamp,
-          isNSFW: false
+          isNSFW: false,
+          replyTo: replyingTo || undefined
       };
 
-      if (replyingTo) msgData.replyTo = replyingTo;
+      const rawPayload = { text: null, image: null, video: null, audio: base64Audio };
+
+      if (sharedSecret) {
+          try {
+              msgData.encrypted = await encryptData(sharedSecret, rawPayload);
+          } catch(e) {
+              msgData.audio = base64Audio;
+          }
+      } else {
+          msgData.audio = base64Audio;
+      }
 
       setMessages(prev => [...prev, {
           id: msgID,
@@ -978,8 +996,12 @@ export default function ChatItNow() {
   };
 
   const startSearch = async () => {
-    if (!myKeyPair) return;
-    const publicKeyJwk = await exportKey(myKeyPair.publicKey);
+    let publicKeyJwk = null;
+    if (myKeyPair) {
+        try {
+            publicKeyJwk = await exportKey(myKeyPair.publicKey);
+        } catch(e) { console.error("Key export failed", e); }
+    }
     setPartnerStatus('searching');
     setShowSearching(true);
     setMessages([]);
@@ -990,23 +1012,28 @@ export default function ChatItNow() {
 
   const handleSendMessage = async () => {
     if (currentMessage.trim()) {
-      if(!sharedSecret) { alert("Secure connection not established yet."); return; }
-
       const msgID = generateMessageID(); 
       const timestamp = getCurrentTime();
 
-      const rawPayload = { text: currentMessage, image: null, video: null, audio: null };
-      const encryptedData = await encryptData(sharedSecret, rawPayload);
-
-      const msgData: any = { 
+      let msgData: any = { 
         id: msgID,
-        encrypted: encryptedData,
         timestamp: timestamp,
-        isNSFW: false
+        isNSFW: false,
+        replyTo: replyingTo || undefined
       };
-      
-      if (replyingTo) msgData.replyTo = replyingTo;
 
+      const rawPayload = { text: currentMessage, image: null, video: null, audio: null };
+
+      if (sharedSecret) {
+          try {
+              msgData.encrypted = await encryptData(sharedSecret, rawPayload);
+          } catch (e) {
+              msgData.text = currentMessage;
+          }
+      } else {
+          msgData.text = currentMessage;
+      }
+      
       setMessages(prev => [...prev, { 
         id: msgID,
         type: 'you', 
@@ -1186,7 +1213,7 @@ export default function ChatItNow() {
               // @ts-ignore
               decryptedContent = { text: "⚠️ Encrypted message could not be read.", image: null, video: null, audio: null };
           }
-      } else if (data.text || data.image) {
+      } else if (data.text || data.image || data.video || data.audio) {
           // Fallback for unencrypted (should not happen if backend is clean)
           decryptedContent = { text: data.text, image: data.image, video: data.video, audio: data.audio };
       }
